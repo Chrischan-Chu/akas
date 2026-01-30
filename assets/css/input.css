@@ -1,0 +1,91 @@
+@layer base {
+  .nav-link:hover {
+    color: var(--accent) !important;
+  }
+  html.nohash-snap {
+    scroll-behavior: auto !important;
+  }
+}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root{
+    --primary:#40B7FF;
+    --secondary:#90D5FF;
+    --accent:#ffbe8a;
+  }
+}
+
+@layer components {
+  /* Cards */
+  .clinic-card { @apply transition-all duration-300 ease-in-out; }
+  .clinic-card:hover { @apply -translate-y-1.5 shadow-lg; }
+
+  /* Shared theme helpers */
+  .search-box { background-color: var(--primary); }
+  .clinic-icon { background-color: var(--accent); }
+
+  /* Pagination */
+  .page-link {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    transition: transform .18s ease, background-color .18s ease, color .18s ease, box-shadow .18s ease;
+    background-color: var(--primary);
+    color: white;
+    text-decoration: none;
+  }
+  .page-link:hover,
+  .page-item.active .page-link {
+    background-color: var(--accent);
+    color: #000;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  }
+  :root{
+      --primary:#4bb6f5;
+      --secondary:#9ed9fb;
+      --accent:#ffbe8a;
+    }
+
+    /* Back to Top Button */
+    #backToTop {
+      display: flex; /* always flex */
+      opacity: 0; /* hidden */
+      pointer-events: none;
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0,0,0,.3);
+      transition: all 0.3s ease;
+      z-index: 999;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    #backToTop:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 15px 35px rgba(0,0,0,.4);
+      background-color: var(--accent);
+      color: #1f2937;
+    }
+    #backToTop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+}
+
