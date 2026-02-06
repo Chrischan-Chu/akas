@@ -69,9 +69,61 @@ include "../includes/partials/head.php";
   </div>
 </section>
 
+<!-- CLINIC DESCRIPTION / DETAILS -->
+<section class="px-4 pb-10">
+  <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- About / Description -->
+    <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+      <h3 class="text-xl font-extrabold" style="color:var(--secondary)">About the Clinic</h3>
+      <p class="mt-2 text-slate-600 leading-relaxed">
+        This is where your clinic description goes. You can describe services, specialties,
+        and what patients should expect when visiting.
+      </p>
+
+      <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="rounded-xl p-4" style="background: rgba(64,183,255,.10);">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-700">Address</p>
+          <p class="mt-1 text-sm text-slate-700">Angeles City, Pampanga</p>
+        </div>
+        <div class="rounded-xl p-4" style="background: rgba(255,161,84,.12);">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-700">Contact</p>
+          <p class="mt-1 text-sm text-slate-700">09xx xxx xxxx</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Info Card -->
+    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+      <h3 class="text-lg font-extrabold" style="color:var(--secondary)">Clinic Info</h3>
+
+      <div class="mt-4 space-y-3 text-sm text-slate-700">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500">Status</span>
+          <span class="font-semibold">Open</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500">Hours</span>
+          <span class="font-semibold">9:00 AM – 5:00 PM</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500">Type</span>
+          <span class="font-semibold">General Clinic</span>
+        </div>
+      </div>
+
+      <div class="mt-5 rounded-xl p-4 text-xs text-slate-600" style="background: rgba(15,23,42,.04);">
+        Tip: Log in to book an appointment. You can still view the schedule without logging in.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
 <!-- BOOKING MODAL -->
 <section id="bookingModal"
-         class="hidden fixed inset-0 z-50 bg-black/40 px-4 flex items-center justify-center">
+         class="hidden fixed inset-0 transition-opacity duration-200 z-50 bg-black/40 px-4 flex items-center justify-center">
   <div class="max-w-6xl w-full max-h-[90vh] overflow-auto bg-white rounded-2xl shadow-lg p-6 md:p-8 relative">
 
     <button type="button" id="closeBooking"
@@ -205,7 +257,7 @@ include "../includes/partials/head.php";
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <?php for($i=1;$i<=3;$i++): ?>
         <a
-          href="<?php echo $baseUrl; ?>/pages/doctor-profile.php?id=<?php echo urlencode($i); ?>&clinic_id=<?php echo urlencode($_GET['id'] ?? 1); ?>&return=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>"
+          href="<?php echo $baseUrl; ?>/pages/doctor-profile.php?id=<?php echo urlencode($i); ?>&clinic_id=<?php echo urlencode($_GET['id'] ?? 1); ?>"
           class="doctorCard block"
           data-doctor-id="<?php echo (int)$i; ?>"
           data-clinic-id="<?php echo (int)($_GET['id'] ?? 1); ?>"
