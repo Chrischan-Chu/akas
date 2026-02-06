@@ -31,7 +31,6 @@ if (!$row || !password_verify($password, (string)$row['password_hash'])) {
 
 auth_set((int)$row['id'], (string)$row['role'], (string)$row['name'], (string)$row['email']);
 
-// Redirect based on role
 if ((string)$row['role'] === 'clinic_admin') {
   header('Location: ' . $baseUrl . '/admin/dashboard.php');
   exit;

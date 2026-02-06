@@ -1,28 +1,35 @@
-
 <?php
 $clinicName = "Name of Clinic";
 $appTitle = $clinicName . " | AKAS";
 $baseUrl  = "/AKAS";
+
+require_once __DIR__ . '/../includes/auth.php';
+$isLoggedIn = auth_is_logged_in();
+$role = auth_role();
+$isUser = $isLoggedIn && $role === 'user';
+
 $return = $_GET['return'] ?? ($baseUrl . "/index.php#clinics");
 if (strpos($return, $baseUrl) !== 0) {
   $return = $baseUrl . "/index.php#clinics";
 }
+
 include "../includes/partials/head.php";
 ?>
-<body class="bg-blue-100">
+
+<body class="bg-blue-100"
+      data-base-url="<?php echo htmlspecialchars($baseUrl, ENT_QUOTES); ?>"
+      data-is-user="<?php echo $isUser ? '1' : '0'; ?>">
+
 <?php include "../includes/partials/navbar.php"; ?>
 
 <section class="py-6 text-white" style="background:var(--secondary)">
   <div class="max-w-6xl mx-auto px-4">
-
     <div class="grid grid-cols-3 items-center">
-      
-      <!-- Left: Back -->
+
       <div class="justify-self-start">
         <a id="backLink"
            href="<?php echo htmlspecialchars($return); ?>"
-           class="inline-flex items-center justify-center
-                  p-2 rounded-full bg-white/20 hover:bg-white/30 transition"
+           class="inline-flex items-center justify-center p-2 rounded-full bg-white/20 hover:bg-white/30 transition"
            aria-label="Back">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -30,37 +37,31 @@ include "../includes/partials/head.php";
         </a>
       </div>
 
-      <!-- Middle: Title -->
       <h1 class="justify-self-center text-center text-2xl sm:text-3xl tracking-widest font-light truncate">
         <?php echo strtoupper(htmlspecialchars($clinicName)); ?>
       </h1>
 
-      <!-- Right: Spacer (same width as back button area) -->
       <div class="justify-self-end w-10 sm:w-12"></div>
-
     </div>
   </div>
 </section>
-
-
 
 <!-- MAIN INFO -->
 <section class="py-10 px-4">
   <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-    <!-- Clinic Image -->
     <div class="bg-white rounded-2xl p-6 flex items-center justify-center">
       <img src="https://cdn-icons-png.flaticon.com/512/2967/2967350.png" class="w-48" alt="Clinic">
     </div>
 
-    <!-- Calendar Placeholder (CLICK TO OPEN BOOKING) -->
+    <!-- ✅ Everyone can open and view -->
     <div id="openBooking" class="rounded-2xl p-6 cursor-pointer select-none flex flex-col" style="background:var(--primary)">
       <div class="bg-white rounded-xl flex-1 min-h-[200px] flex items-center justify-center">
         <span class="text-gray-400 font-semibold">CALENDAR</span>
       </div>
       <p class="mt-3 text-center">
         <span class="inline-block px-4 py-2 rounded-full text-xs font-semibold text-white" style="background: rgba(255,255,255,0.18);">
-          Click to book an appointment
+          Click to view schedule
         </span>
       </p>
     </div>
@@ -68,12 +69,11 @@ include "../includes/partials/head.php";
   </div>
 </section>
 
-<!-- BOOKING MODAL (hidden until calendar clicked) -->
+<!-- BOOKING MODAL -->
 <section id="bookingModal"
          class="hidden fixed inset-0 z-50 bg-black/40 px-4 flex items-center justify-center">
   <div class="max-w-6xl w-full max-h-[90vh] overflow-auto bg-white rounded-2xl shadow-lg p-6 md:p-8 relative">
 
-    <!-- Close button -->
     <button type="button" id="closeBooking"
             class="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center
                    bg-gray-100 hover:bg-gray-200 transition"
@@ -85,7 +85,6 @@ include "../includes/partials/head.php";
       Book an Appointment
     </h2>
 
-    <!-- Form + Calendar -->
     <form class="grid grid-cols-1 md:grid-cols-2 gap-8">
 
       <!-- LEFT -->
@@ -130,26 +129,22 @@ include "../includes/partials/head.php";
         </div>
       </div>
 
-      <!-- CALENDAR AREA -->
-      <div class="md:col-span-2 ">
+      <!-- CALENDAR -->
+      <div class="md:col-span-2">
         <div class="rounded-xl p-4 md:p-5" style="background:var(--primary)">
           <div class="flex items-center justify-between mb-3">
             <p class="text-white font-semibold">Calendar</p>
 
             <div class="flex items-center gap-2">
               <button type="button" id="prevMonth"
-                      class="px-3 py-1 rounded-md text-sm font-semibold bg-white/90 hover:bg-white transition">
-                ‹
-              </button>
+                      class="px-3 py-1 rounded-md text-sm font-semibold bg-white/90 hover:bg-white transition">‹</button>
 
               <div class="px-4 py-1 rounded-md text-sm font-semibold" style="background:var(--accent)">
                 <span id="monthLabel">Month</span>
               </div>
 
               <button type="button" id="nextMonth"
-                      class="px-3 py-1 rounded-md text-sm font-semibold bg-white/90 hover:bg-white transition">
-                ›
-              </button>
+                      class="px-3 py-1 rounded-md text-sm font-semibold bg-white/90 hover:bg-white transition">›</button>
             </div>
           </div>
 
@@ -170,11 +165,32 @@ include "../includes/partials/head.php";
             <p class="mt-3 text-xs text-gray-500">Time slots (mock UI for now):</p>
             <div id="slotGrid" class="mt-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2"></div>
 
-            <button type="button" id="bookBtn" disabled
-                    class="mt-4 w-full rounded-xl py-2 font-semibold text-white disabled:opacity-40 transition"
-                    style="background:var(--primary)">
-              Book Appointment
-            </button>
+            <!-- ✅ Login required note + buttons -->
+            <?php if (!$isUser): ?>
+              <p class="mt-3 text-xs text-red-600">
+                You have to login first before booking an appointment.
+              </p>
+
+              <button type="button" id="bookBtn"
+                      class="mt-4 w-full rounded-xl py-2 font-semibold text-white transition"
+                      style="background:var(--primary)">
+                Login
+              </button>
+
+              <a href="<?php echo $baseUrl; ?>/pages/signup.php"
+                 class="mt-3 block w-full text-center rounded-xl py-2 font-semibold transition border"
+                 style="border-color: rgba(15,23,42,.18); color: white; background-color: var(--accent);">
+                Sign Up
+              </a>
+            <?php else: ?>
+
+              <button type="button" id="bookBtn" disabled
+                      class="mt-4 w-full rounded-xl py-2 font-semibold text-white disabled:opacity-40 transition"
+                      style="background:var(--primary)">
+                Book Appointment
+              </button>
+
+            <?php endif; ?>
           </div>
         </div>
       </div>
@@ -183,20 +199,7 @@ include "../includes/partials/head.php";
   </div>
 </section>
 
-<!-- CONTACT CARD -->
-<section class="px-4 mb-6">
-  <div class="max-w-6xl mx-auto bg-white rounded-xl flex items-center gap-4 p-4">
-    <div class="p-4 rounded-lg" style="background:var(--accent)">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    </div>
-    <p class="text-gray-600">Clinic contact information or short description goes here.</p>
-  </div>
-</section>
-
-<!-- DOCTORS -->
+<!-- DOCTORS (unchanged) -->
 <section class="py-10 px-4">
   <div class="max-w-6xl mx-auto">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -222,21 +225,17 @@ include "../includes/partials/head.php";
   </div>
 </section>
 
-<!-- Doctor Profile Modal (hidden by default) -->
+<!-- Doctor Modal (unchanged in this file) -->
 <div id="doctorModal" class="fixed inset-0 z-[9999] hidden" aria-hidden="true">
   <div id="doctorBackdrop" class="absolute inset-0 bg-black/55"></div>
-
   <div class="relative h-full w-full flex items-center justify-center p-4 sm:p-6">
     <div class="w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-white/40">
       <div class="flex items-center justify-between px-5 py-4" style="background: rgba(64,183,255,.12);">
         <h3 class="font-extrabold" style="color: var(--secondary);">Doctor Profile</h3>
         <button id="closeDoctorModal"
                 class="h-10 w-10 rounded-full bg-white border border-slate-200 hover:bg-slate-50 flex items-center justify-center"
-                aria-label="Close">
-          ✕
-        </button>
+                aria-label="Close">✕</button>
       </div>
-
       <div id="doctorModalBody" class="p-5 sm:p-6">
         <div class="text-slate-600 text-sm">Loading…</div>
       </div>
@@ -244,121 +243,5 @@ include "../includes/partials/head.php";
   </div>
 </div>
 
-
-<script>
-(function () {
-  function initBack() {
-    const back = document.getElementById("backLink");
-    if (!back) return;
-    back.addEventListener("click", (e) => {
-      try {
-        if (document.referrer) {
-          const ref = new URL(document.referrer);
-          if (ref.origin === location.origin) {
-            e.preventDefault();
-            history.back();
-            return;
-          }
-        }
-      } catch (_) {}
-    });
-  }
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initBack);
-  } else {
-    initBack();
-  }
-  const modal = document.getElementById("bookingModal");
-  const openBooking = document.getElementById("openBooking");
-  const closeBooking = document.getElementById("closeBooking");
-  if (modal && openBooking && closeBooking) {
-    openBooking.addEventListener("click", () => modal.classList.remove("hidden"));
-    closeBooking.addEventListener("click", () => modal.classList.add("hidden"));
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) modal.classList.add("hidden");
-    });
-  }
-  const calendarGrid = document.getElementById("calendarGrid");
-  const monthLabel = document.getElementById("monthLabel");
-  const selectedDateText = document.getElementById("selectedDateText");
-  const slotGrid = document.getElementById("slotGrid");
-  const bookBtn = document.getElementById("bookBtn");
-  const prevMonthBtn = document.getElementById("prevMonth");
-  const nextMonthBtn = document.getElementById("nextMonth");
-  if (!calendarGrid || !monthLabel || !selectedDateText || !slotGrid || !bookBtn || !prevMonthBtn || !nextMonthBtn) return;
-  let viewDate = new Date();
-  let selectedDate = null;
-  let selectedSlot = null;
-  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  function pad2(n){ return String(n).padStart(2, "0"); }
-  function toYMD(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
-  function clearSlots(){ slotGrid.innerHTML = ""; selectedSlot = null; bookBtn.disabled = true; }
-  function getMockSlots(){ return ["09:00","09:30","10:00","10:30","11:00","13:00","13:30","14:00","14:30","15:00"]; }
-  function renderSlots(){ clearSlots(); getMockSlots().forEach((time) => { const b = document.createElement("button"); b.type = "button"; b.textContent = time; b.className = "rounded-lg border px-2 py-1 text-sm font-semibold hover:text-white transition"; b.style.borderColor = "rgba(75,182,245,.45)"; b.style.color = "#0f172a"; b.addEventListener("click", () => { slotGrid.querySelectorAll("button").forEach((x) => { x.classList.remove("text-white"); x.style.background = "transparent"; }); b.classList.add("text-white"); b.style.background = getComputedStyle(document.documentElement).getPropertyValue("--primary"); selectedSlot = time; bookBtn.disabled = false; }); slotGrid.appendChild(b); }); }
-  function renderCalendar(){ calendarGrid.innerHTML = ""; clearSlots(); const year = viewDate.getFullYear(); const month = viewDate.getMonth(); monthLabel.textContent = `${monthNames[month]} ${year}`; const firstDay = new Date(year, month, 1); const lastDay  = new Date(year, month + 1, 0); const startWeekday = firstDay.getDay(); const daysInMonth = lastDay.getDate(); for (let i=0;i<startWeekday;i++){ const empty = document.createElement("div"); empty.className = "h-10"; calendarGrid.appendChild(empty); } const today = new Date(); const todayYMD = toYMD(today); for (let day=1; day<=daysInMonth; day++){ const d = new Date(year, month, day); const ymd = toYMD(d); const btn = document.createElement("button"); btn.type = "button"; btn.textContent = day; btn.className = "h-10 rounded-lg font-semibold transition border bg-white/90 hover:bg-white"; btn.style.borderColor = "rgba(255,255,255,.35)"; if (ymd === todayYMD){ btn.style.outline = "2px solid rgba(255,190,138,.9)"; btn.style.outlineOffset = "2px"; } if (selectedDate && ymd === toYMD(selectedDate)){ btn.style.background = "white"; btn.style.borderColor = "rgba(255,190,138,.95)"; } btn.addEventListener("click", () => { selectedDate = d; selectedDateText.textContent = ymd; renderCalendar(); renderSlots(); }); calendarGrid.appendChild(btn); } }
-  prevMonthBtn.addEventListener("click", () => { viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1); renderCalendar(); });
-  nextMonthBtn.addEventListener("click", () => { viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1); renderCalendar(); });
-  bookBtn.addEventListener("click", () => { alert(`Booking (UI only)\nDate: ${selectedDate ? toYMD(selectedDate) : "None"}\nTime: ${selectedSlot || "None"}`); });
-  renderCalendar();
-})();
-
-(function () {
-  const modal = document.getElementById("doctorModal");
-  const body  = document.getElementById("doctorModalBody");
-  const closeBtn = document.getElementById("closeDoctorModal");
-  const backdrop = document.getElementById("doctorBackdrop");
-
-  function openModal() {
-    modal.classList.remove("hidden");
-    modal.setAttribute("aria-hidden", "false");
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeModal() {
-    modal.classList.add("hidden");
-    modal.setAttribute("aria-hidden", "true");
-    body.innerHTML = '<div class="text-slate-600 text-sm">Loading…</div>';
-    document.body.style.overflow = "";
-  }
-
-  closeBtn?.addEventListener("click", closeModal);
-  backdrop?.addEventListener("click", closeModal);
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
-  });
-
-  // ✅ Only opens when a doctor is clicked
-  document.addEventListener("click", async (e) => {
-    const card = e.target.closest(".doctorCard");
-    if (!card) return;
-
-    e.preventDefault();
-
-    const doctorId = card.dataset.doctorId;
-    const clinicId = card.dataset.clinicId || "";
-
-    if (!doctorId) return;
-
-    openModal();
-
-    try {
-      const url = `<?php echo $baseUrl; ?>/pages/doctor-modal.php?id=${encodeURIComponent(doctorId)}&clinic_id=${encodeURIComponent(clinicId)}`;
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to load doctor profile");
-
-      body.innerHTML = await res.text();
-    } catch (err) {
-      console.error(err);
-      body.innerHTML = `
-        <div class="rounded-2xl bg-slate-50 border border-slate-200 p-6">
-          <p class="font-extrabold text-slate-900">Couldn’t load doctor profile.</p>
-          <p class="text-sm text-slate-600 mt-1">Please try again.</p>
-        </div>
-      `;
-    }
-  });
-})();
-</script>
-
+<script src="<?php echo $baseUrl; ?>/assets/js/clinic-profile.js"></script>
 <?php include "../includes/partials/footer.php"; ?>
-

@@ -1,9 +1,13 @@
 <?php
+declare(strict_types=1);
+
 header('Content-Type: application/json');
-require_once __DIR__ . '/../db.php'; // your PDO connection
+require_once __DIR__ . '/../includes/db.php';
+
+$pdo = db();
 
 $clinicId = (int)($_GET['clinic_id'] ?? 0);
-$date     = $_GET['date'] ?? ''; // YYYY-MM-DD
+$date     = (string)($_GET['date'] ?? ''); // YYYY-MM-DD
 
 if (!$clinicId || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
   http_response_code(400);
@@ -13,7 +17,7 @@ if (!$clinicId || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
 
 $dayOfWeek = (int)date('w', strtotime($date)); // 0-6
 
-// 1) if clinic is closed on that date, return []
+// Closed dates
 $stmt = $pdo->prepare("SELECT 1 FROM clinic_closed_dates WHERE clinic_id=? AND closed_date=? LIMIT 1");
 $stmt->execute([$clinicId, $date]);
 if ($stmt->fetchColumn()) {
@@ -21,7 +25,7 @@ if ($stmt->fetchColumn()) {
   exit;
 }
 
-// 2) get weekly hours
+// Weekly hours
 $stmt = $pdo->prepare("
   SELECT start_time, end_time, slot_minutes, is_open
   FROM clinic_hours
@@ -39,7 +43,7 @@ $start = strtotime("$date " . $hours['start_time']);
 $end   = strtotime("$date " . $hours['end_time']);
 $slotMins = (int)$hours['slot_minutes'];
 
-// 3) get booked times for that date (pending/approved blocks)
+// Booked times
 $stmt = $pdo->prepare("
   SELECT APT_Time
   FROM appointments
@@ -48,15 +52,15 @@ $stmt = $pdo->prepare("
 $stmt->execute([$clinicId, $date]);
 $booked = [];
 foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $t) {
-  $booked[$t] = true; // e.g. "10:00:00"
+  $booked[$t] = true;
 }
 
-// 4) generate slots
+// Generate slots
 $slots = [];
-for ($t = $start; $t + ($slotMins*60) <= $end; $t += $slotMins*60) {
+for ($t = $start; $t + ($slotMins * 60) <= $end; $t += $slotMins * 60) {
   $timeStr = date('H:i:s', $t);
   if (!isset($booked[$timeStr])) {
-    $slots[] = date('H:i', $t); // return "10:00"
+    $slots[] = date('H:i', $t);
   }
 }
 

@@ -3,7 +3,6 @@ $appTitle = "AKAS | Login";
 $baseUrl  = "/AKAS";
 require_once __DIR__ . '/../includes/auth.php';
 
-// Already logged in? send them away
 if (auth_is_logged_in()) {
   header('Location: ' . ($baseUrl . (auth_role() === 'clinic_admin' ? '/admin/dashboard.php' : '/index.php#top')));
   exit;
@@ -24,7 +23,6 @@ include "../includes/partials/head.php";
 
 <main class="min-h-screen flex items-center justify-center py-10">
 
-  <!-- ✅ OUTER FRAME: keep margin on small laptops (lg = 1024px) -->
   <section
     class="w-full max-w-6xl
            mx-4 sm:mx-8 lg:mx-10 xl:mx-auto
@@ -32,17 +30,13 @@ include "../includes/partials/head.php";
 
     <div class="grid grid-cols-1 lg:grid-cols-2 min-h-[560px]">
 
-      <!-- LEFT (off-white) -->
       <div class="bg-[#FFFDF6] relative flex items-start justify-center pt-16 p-10">
-
-        <!-- Logo -->
         <img
           src="<?php echo $baseUrl; ?>/assets/img/akas-logo.png"
           alt="AKAS Logo"
           class="w-80 max-w-full"
         />
 
-        <!-- ✅ Doctor (DESKTOP ONLY) - smaller on lg (1024px), normal on xl+ -->
         <img
           src="<?php echo $baseUrl; ?>/assets/img/doctor.png"
           alt="Doctor"
@@ -52,16 +46,12 @@ include "../includes/partials/head.php";
         />
       </div>
 
-
-      <!-- RIGHT (blue panel) -->
       <div
         class="relative flex items-center justify-center p-6 sm:p-8 lg:p-10 rounded-tl-[40px] rounded-bl-[40px]"
         style="background: var(--primary);">
 
-        <!-- INNER FORM WRAPPER -->
         <div class="w-full max-w-sm px-4 sm:px-6 lg:px-0">
 
-          <!-- Title -->
           <h1 class="login-title text-5xl font-semibold text-white mb-6 text-center">
             LOGIN
           </h1>
@@ -74,73 +64,59 @@ include "../includes/partials/head.php";
 
           <form action="<?php echo $baseUrl; ?>/pages/login-process.php" method="POST">
 
-          <!-- Email -->
-          <div class="relative mb-5">
-            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/80">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M3 8l9 6 9-6m-18 0v10a2 2 0 002 2h14a2 2 0 002-2V8" />
-              </svg>
-            </span>
+            <div class="relative mb-5">
+              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/80">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M3 8l9 6 9-6m-18 0v10a2 2 0 002 2h14a2 2 0 002-2V8" />
+                </svg>
+              </span>
 
-            <input
-              type="text"
-              name="email"
-              placeholder="Email"
-              data-validate="email"
-              data-error-id="loginEmailError"
-              class="w-full rounded-xl bg-white px-12 py-3 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
-              required
-            />
-            
-          </div>
-        
+              <input
+                type="text"
+                name="email"
+                placeholder="Email"
+                class="w-full rounded-xl bg-white px-12 py-3 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                required
+              />
+            </div>
 
-          <!-- Password -->
-          <div class="relative">
-            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/80">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M12 11V7a4 4 0 00-8 0v4m8 0h6a2 2 0 012 2v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7a2 2 0 012-2h6z" />
-              </svg>
-            </span>
+            <div class="relative">
+              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/80">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 11V7a4 4 0 00-8 0v4m8 0h6a2 2 0 012 2v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7a2 2 0 012-2h6z" />
+                </svg>
+              </span>
 
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              data-validate="password"
-              data-error-id="passwordError"
-              class="w-full rounded-xl bg-white px-12 py-3 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
-              required
-            />
-          </div>
+              <input
+                type="password"
+                name="password"
+                placeholder="Password"
+                class="w-full rounded-xl bg-white px-12 py-3 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                required
+              />
+            </div>
 
-          <!-- Forgot password (unchanged) -->
-          <div class="mt-3 text-xs text-black/80">
-            <a href="#" class="hover:underline">Forgot password?</a>
-          </div>
+            <div class="mt-3 text-xs text-black/80">
+              <a href="#" class="hover:underline">Forgot password?</a>
+            </div>
 
-          <!-- Buttons -->
-          <div class="mt-8 flex flex-wrap items-center gap-3">
+            <div class="mt-8 flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                class="px-6 sm:px-8 py-2.5 text-sm sm:text-base rounded-lg font-semibold text-white shadow-md hover:shadow-lg transition-all"
+                style="background-color: var(--secondary);">
+                Login
+              </button>
 
-            <!-- Login -->
-            <button
-              type="submit"
-              class="px-6 sm:px-8 py-2.5 text-sm sm:text-base rounded-lg font-semibold text-white shadow-md hover:shadow-lg transition-all"
-              style="background-color: var(--secondary);">
-              Login
-            </button>
-
-            <!-- Sign Up -->
-            <a
-              href="<?php echo $baseUrl; ?>/pages/signup.php"
-              class="px-4 sm:px-6 lg:px-8 py-2.5 text-sm sm:text-base rounded-lg font-semibold shadow-md hover:shadow-lg transition-all border border-white whitespace-nowrap"
-              style="background-color: rgba(255, 255, 255, 0.9); color: var(--primary);">
-              Sign Up
-            </a>
-
-          </div>
+              <a
+                href="<?php echo $baseUrl; ?>/pages/signup.php"
+                class="px-4 sm:px-6 lg:px-8 py-2.5 text-sm sm:text-base rounded-lg font-semibold shadow-md hover:shadow-lg transition-all border border-white whitespace-nowrap"
+                style="background-color: rgba(255, 255, 255, 0.9); color: var(--primary);">
+                Sign Up
+              </a>
+            </div>
 
           </form>
 
@@ -151,7 +127,7 @@ include "../includes/partials/head.php";
   </section>
 
 </main>
-<script src="<?php echo $baseUrl; ?>/assets/js/form-validators.js"></script>
 
+<script src="<?php echo $baseUrl; ?>/assets/js/form-validators.js"></script>
 </body>
 </html>

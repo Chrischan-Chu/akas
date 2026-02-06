@@ -270,7 +270,7 @@ include "../includes/partials/head.php";
                 class="w-full text-center py-2.5 text-sm sm:text-base rounded-lg font-semibold
                       border border-slate-300 text-slate-600 bg-white
                       hover:bg-slate-100 transition">
-                ← Back to home
+                ← Back to Selection
               </a>
 
               <!-- Create Clinic -->
