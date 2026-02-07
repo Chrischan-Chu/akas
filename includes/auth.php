@@ -29,12 +29,18 @@ function auth_email(): ?string {
   return auth_is_logged_in() ? (string)($_SESSION['auth']['email'] ?? null) : null;
 }
 
-function auth_set(int $id, string $role, string $name, string $email): void {
+// For clinic admins: which clinic they belong to
+function auth_clinic_id(): ?int {
+  return auth_is_logged_in() ? (int)($_SESSION['auth']['clinic_id'] ?? 0) : null;
+}
+
+function auth_set(int $id, string $role, string $name, string $email, ?int $clinicId = null): void {
   $_SESSION['auth'] = [
     'id' => $id,
     'role' => $role,
     'name' => $name,
     'email' => $email,
+    'clinic_id' => $clinicId,
   ];
 }
 

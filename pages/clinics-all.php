@@ -18,22 +18,67 @@ $activeTab = $_GET["tab"] ?? "all";
 if (!isset($tabs[$activeTab])) $activeTab = "all";
 $q = trim($_GET["q"] ?? "");
 
-// ✅ SAMPLE DATA (Replace this with DB fetch later)
-$clinics = [
-  ["id"=>1, "name"=>"Angeles Care Clinic", "specialty"=>"General Medicine", "barangay"=>"Balibago", "category"=>"general"],
-  ["id"=>2, "name"=>"SmileBright Dental", "specialty"=>"Dentistry", "barangay"=>"Sto. Rosario", "category"=>"dental"],
-  ["id"=>3, "name"=>"KidsFirst Pediatric", "specialty"=>"Pediatrics", "barangay"=>"Cutcut", "category"=>"pediatric"],
-  ["id"=>4, "name"=>"SkinLab Derma Center", "specialty"=>"Dermatology", "barangay"=>"Pampang", "category"=>"derma"],
-  ["id"=>5, "name"=>"Prime Health Clinic", "specialty"=>"General Medicine", "barangay"=>"Pulungbulu", "category"=>"general"],
-  ["id"=>6, "name"=>"Tooth & Co.", "specialty"=>"Orthodontics", "barangay"=>"Balibago", "category"=>"dental"],
-  ["id"=>7, "name"=>"Little Steps Clinic", "specialty"=>"Pediatrics", "barangay"=>"Tabun", "category"=>"pediatric"],
-  ["id"=>8, "name"=>"Glow Dermatology", "specialty"=>"Dermatology", "barangay"=>"Sto. Domingo", "category"=>"derma"],
-  ["id"=>9, "name"=>"CityCare Clinic", "specialty"=>"Family Medicine", "barangay"=>"Mining", "category"=>"general"],
-  ["id"=>10,"name"=>"BrightBite Dental Hub", "specialty"=>"Dentistry", "barangay"=>"Salapungan", "category"=>"dental"],
-];
+// ✅ DB data (Clinic Admin accounts + their CMS details)
+require_once __DIR__ . '/../includes/db.php';
+
+/** Map the stored specialty text into one of our tab keys */
+function clinic_category_from_specialty(string $specialty): string {
+  $s = strtolower($specialty);
+  if (str_contains($s, 'dental')) return 'dental';
+  if (str_contains($s, 'pedia')) return 'pediatric';
+  if (str_contains($s, 'derma')) return 'derma';
+  return 'general';
+}
+
+$rows = db()->query(
+  "SELECT
+        c.id AS clinic_id,
+        c.clinic_name, c.specialty, c.specialty_other, c.logo_path,
+        c.description, c.address, c.contact, c.email, c.is_open, c.open_time, c.close_time
+     FROM clinics c
+ ORDER BY c.clinic_name ASC"
+)->fetchAll();
+
+$clinics = [];
+foreach ($rows as $r) {
+  $clinicName = trim((string)($r['clinic_name'] ?? ''));
+  if ($clinicName === '') continue;
+
+  $specialty = (string)($r['specialty'] ?? '');
+  $specialtyOther = (string)($r['specialty_other'] ?? '');
+  // Display: if specialty is "Other", show the custom text only
+  $displayType = ($specialty === 'Other' && $specialtyOther !== '') ? $specialtyOther : $specialty;
+  $category  = clinic_category_from_specialty($specialty);
+
+  $clinics[] = [
+    'id'          => (int)$r['clinic_id'],
+    'name'        => $clinicName,
+    'specialty'   => $displayType,
+    'category'    => $category,
+    'logo_path'   => (string)($r['logo_path'] ?? ''),
+    'description' => (string)($r['description'] ?? ''),
+    'address'     => (string)($r['address'] ?? ''),
+    'contact'     => (string)($r['contact'] ?? ''),
+    'email'       => (string)($r['email'] ?? ''),
+    'is_open'     => (int)($r['is_open'] ?? 1),
+    'open_time'   => (string)($r['open_time'] ?? ''),
+    'close_time'  => (string)($r['close_time'] ?? ''),
+  ];
+}
+
+// Server-side filter: tab + search
+$qLower = strtolower($q);
+$clinics = array_values(array_filter($clinics, function ($c) use ($activeTab, $qLower) {
+  if ($activeTab !== 'all' && ($c['category'] ?? '') !== $activeTab) return false;
+  if ($qLower !== '') {
+    $hay = strtolower(($c['name'] ?? '') . ' ' . ($c['specialty'] ?? '') . ' ' . ($c['address'] ?? ''));
+    if (strpos($hay, $qLower) === false) return false;
+  }
+  return true;
+}));
 ?>
 
-<body class="min-h-screen flex flex-col bg-gradient-to-br from-white to-[var(--secondary)]/40">
+<body class="min-h-screen flex flex-col bg-gradient-to-br from-white to-[var(--secondary)]/40 overflow-x-hidden">
 
 <?php include __DIR__ . "/../includes/partials/navbar.php"; ?>
 
@@ -118,7 +163,6 @@ $clinics = [
 
       </div>
 
-
     <!-- RESULTS -->
     <section class="mt-8">
       <div id="clinicGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -132,7 +176,7 @@ $clinics = [
             data-category="<?php echo htmlspecialchars($c["category"]); ?>"
             data-name="<?php echo htmlspecialchars(strtolower($c["name"])); ?>"
             data-specialty="<?php echo htmlspecialchars(strtolower($c["specialty"])); ?>"
-            data-barangay="<?php echo htmlspecialchars(strtolower($c["barangay"])); ?>"
+            data-address="<?php echo htmlspecialchars(strtolower($c["address"])); ?>"
             href="<?php echo $baseUrl; ?>/pages/clinic-profile.php?id=<?php echo urlencode($c["id"]); ?>&return=<?php echo urlencode($returnUrl); ?>"
           >
             <article class="h-full min-h-[320px] rounded-3xl bg-white shadow-sm border border-slate-100 overflow-hidden transition
@@ -142,17 +186,17 @@ $clinics = [
                 <div class="flex items-center gap-3">
                   <div class="h-28 w-28 rounded-2xl bg-white/85 flex items-center justify-center border border-white/60 shadow-sm">
                     <img
-                      src="https://cdn-icons-png.flaticon.com/512/2967/2967350.png"
+                      src="<?php echo htmlspecialchars($c['logo_path'] ?: 'https://cdn-icons-png.flaticon.com/512/2967/2967350.png'); ?>"
                       class="w-20 h-20"
                       alt="Clinic"
                       loading="lazy"
                     >
                   </div>
-                  <div class="leading-tight">
-                    <h2 class="font-extrabold text-slate-900">
+                  <div class="leading-tight min-w-0">
+                    <h2 class="font-extrabold text-slate-900 truncate">
                       <?php echo htmlspecialchars($c["name"]); ?>
                     </h2>
-                    <p class="text-xs font-semibold" style="color: rgba(11,56,105,.75);">
+                    <p class="text-xs font-semibold truncate" style="color: rgba(11,56,105,.75);">
                       <?php echo htmlspecialchars($c["specialty"]); ?>
                     </p>
                   </div>
@@ -164,15 +208,42 @@ $clinics = [
                 </span>
               </div>
 
-              <div class="p-6">
-                <p class="text-sm text-slate-600 leading-relaxed">
-                  Barangay: <span class="font-semibold"><?php echo htmlspecialchars($c["barangay"]); ?></span>
+              <div class="p-6 min-w-0">
+                <p class="text-sm text-slate-600 leading-relaxed whitespace-normal break-words"
+                   style="overflow-wrap:anywhere; word-break:break-word;">
+                  Address: <span class="font-semibold"><?php echo htmlspecialchars($c["address"] ?: '—'); ?></span>
                 </p>
+
+                <p class="text-xs text-slate-500 mt-2 whitespace-normal break-words"
+                   style="overflow-wrap:anywhere; word-break:break-word;">
+                  Contact:
+                  <span class="font-semibold text-slate-700">
+                    <?php
+                      $phone = preg_replace('/\D/', '', (string)($c['contact'] ?? ''));
+
+                      echo ($phone && strlen($phone) === 10)
+                        ? '+63 ' . htmlspecialchars($phone)
+                        : '—';
+                    ?>
+                  </span>
+
+                </p>
+
+                <?php if (!empty($c['email'])): ?>
+                  <p class="text-xs text-slate-500 mt-1 whitespace-normal break-words"
+                     style="overflow-wrap:anywhere; word-break:break-word;">
+                    Email: <span class="font-semibold text-slate-700"><?php echo htmlspecialchars($c['email']); ?></span>
+                  </p>
+                <?php endif; ?>
 
                 <div class="mt-5 flex items-center justify-between">
                   <span class="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
                     <span class="h-2 w-2 rounded-full" style="background: var(--primary);"></span>
-                    Open for booking
+                    <?php if ((int)$c['is_open'] === 1): ?>
+                      Open<?php if ($c['open_time'] && $c['close_time']): ?> • <?php echo htmlspecialchars(substr($c['open_time'],0,5)); ?>–<?php echo htmlspecialchars(substr($c['close_time'],0,5)); ?><?php endif; ?>
+                    <?php else: ?>
+                      Closed
+                    <?php endif; ?>
                   </span>
 
                   <span class="inline-flex items-center gap-2 text-sm font-bold" style="color: var(--primary);">
@@ -212,7 +283,6 @@ $clinics = [
   const cards = Array.from(document.querySelectorAll(".clinic-card"));
   const empty = document.getElementById("emptyState");
 
-  // Read tab from URL (already handled server-side for activeTab)
   const url = new URL(window.location.href);
   const activeTab = url.searchParams.get("tab") || "all";
 
@@ -224,10 +294,10 @@ $clinics = [
       const category = card.dataset.category || "";
       const name = card.dataset.name || "";
       const specialty = card.dataset.specialty || "";
-      const barangay = card.dataset.barangay || "";
+      const address = card.dataset.address || "";
 
       const tabOk = (activeTab === "all") || (category === activeTab);
-      const qOk = (q === "") || name.includes(q) || specialty.includes(q) || barangay.includes(q);
+      const qOk = (q === "") || name.includes(q) || specialty.includes(q) || address.includes(q);
 
       const show = tabOk && qOk;
       card.classList.toggle("hidden", !show);
@@ -237,10 +307,7 @@ $clinics = [
     empty.classList.toggle("hidden", visible !== 0);
   }
 
-  // Filter as you type
   input.addEventListener("input", applyFilter);
-
-  // Run once on load
   applyFilter();
 })();
 </script>

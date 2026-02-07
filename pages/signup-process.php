@@ -26,14 +26,14 @@ $email = strtolower(trim((string)($_POST['email'] ?? '')));
 $password = (string)($_POST['password'] ?? '');
 $confirmPassword = (string)($_POST['confirm_password'] ?? '');
 
-// Basic validation
+// Basic email validation (always required for login)
 if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
   flash_set('error', 'Please enter a valid email.');
   header('Location: ' . $baseUrl . ($role === 'clinic_admin' ? '/pages/signup-admin.php' : '/pages/signup-user.php'));
   exit;
 }
 
-// Password rules (same as your JS)
+// Password rules (same as JS)
 $minLen = strlen($password) >= 8;
 $hasUpper = preg_match('/[A-Z]/', $password) === 1;
 $hasSpecial = preg_match('/[^A-Za-z0-9]/', $password) === 1;
@@ -63,12 +63,14 @@ if ($stmt->fetch()) {
 
 $hash = password_hash($password, PASSWORD_DEFAULT);
 
+// -----------------------
+// USER SIGN UP
+// -----------------------
 if ($role === 'user') {
   $name = trim((string)($_POST['name'] ?? ''));
   $gender = trim((string)($_POST['gender'] ?? ''));
-  $phone = trim((string)($_POST['number'] ?? ''));
+  $phone = trim((string)($_POST['contact_number'] ?? ''));
   $birthdate = trim((string)($_POST['birthdate'] ?? ''));
-
 
   if ($name === '') {
     flash_set('error', 'Please enter your name.');
@@ -120,57 +122,137 @@ if ($role === 'user') {
                         VALUES (?,?,?,?,?,?,?)');
   $ins->execute(['user', $name, $gender, $email, $hash, $phoneVal, $birthdateVal]);
 
-} else {
-  // clinic_admin
-  $clinicName = trim((string)($_POST['clinic_name'] ?? ''));
-  $specialty = trim((string)($_POST['specialty'] ?? ''));
-  $specialtyOther = trim((string)($_POST['specialty_other'] ?? ''));
-  $phone = trim((string)($_POST['contact_number'] ?? ''));
-  $license = trim((string)($_POST['license_number'] ?? ''));
+  header('Location: ' . $baseUrl . '/pages/signup-success.php?role=' . urlencode($role));
+  exit;
+}
 
-  if ($clinicName === '' || $specialty === '' || $license === '') {
-    flash_set('error', 'Please complete all required fields.');
-    header('Location: ' . $baseUrl . '/pages/signup-admin.php');
-    exit;
-  }
+// -----------------------
+// CLINIC ADMIN SIGN UP (creates a NEW clinic + first admin)
+// -----------------------
+$adminName      = trim((string)($_POST['admin_name'] ?? ''));
+$clinicName     = trim((string)($_POST['clinic_name'] ?? ''));
+$specialty      = trim((string)($_POST['specialty'] ?? ''));
+$specialtyOther = trim((string)($_POST['specialty_other'] ?? ''));
+$contactNumber  = trim((string)($_POST['contact_number'] ?? ''));
+$clinicEmail    = strtolower(trim((string)($_POST['clinic_email'] ?? '')));
+$businessId     = trim((string)($_POST['business_id'] ?? ''));
 
-  if ($specialty === 'Other' && $specialtyOther === '') {
-    flash_set('error', 'Please specify your clinic type.');
-    header('Location: ' . $baseUrl . '/pages/signup-admin.php');
-    exit;
-  }
+if ($adminName === '') {
+  flash_set('error', 'Please enter the admin name.');
+  header('Location: ' . $baseUrl . '/pages/signup-admin.php');
+  exit;
+}
 
-  // Upload logo
-  $logoPath = null;
-  if (!empty($_FILES['logo']['name'])) {
-    $tmp = $_FILES['logo']['tmp_name'] ?? '';
-    if (is_uploaded_file($tmp)) {
-      $ext = strtolower(pathinfo((string)($_FILES['logo']['name'] ?? ''), PATHINFO_EXTENSION));
-      if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
-        flash_set('error', 'Logo must be a JPG, PNG, or WEBP image.');
-        header('Location: ' . $baseUrl . '/pages/signup-admin.php');
-        exit;
-      }
+if ($clinicName === '' || $specialty === '' || $businessId === '' || $contactNumber === '') {
+  flash_set('error', 'Please complete all required fields.');
+  header('Location: ' . $baseUrl . '/pages/signup-admin.php');
+  exit;
+}
 
-      $dir = __DIR__ . '/../uploads/logos';
-      if (!is_dir($dir)) @mkdir($dir, 0777, true);
+if ($specialty === 'Other' && $specialtyOther === '') {
+  flash_set('error', 'Please specify your clinic type.');
+  header('Location: ' . $baseUrl . '/pages/signup-admin.php');
+  exit;
+}
 
-      $fileName = 'logo_' . bin2hex(random_bytes(8)) . '.' . $ext;
-      $dest = $dir . '/' . $fileName;
-      if (!move_uploaded_file($tmp, $dest)) {
-        flash_set('error', 'Failed to upload logo. Please try again.');
-        header('Location: ' . $baseUrl . '/pages/signup-admin.php');
-        exit;
-      }
-      $logoPath = $baseUrl . '/uploads/logos/' . $fileName;
-    }
-  }
+// Business ID validation (exactly 10 digits)
+$businessIdDigits = preg_replace('/\D+/', '', $businessId) ?? '';
+if (!preg_match('/^\d{10}$/', $businessIdDigits)) {
+  flash_set('error', 'Business ID must be exactly 10 digits.');
+  header('Location: ' . $baseUrl . '/pages/signup-admin.php');
+  exit;
+}
 
-  $displayName = $clinicName;
+// Contact number required, digits only (10 digits starting with 9)
+$contactDigits = preg_replace('/\D+/', '', $contactNumber) ?? '';
+if (!preg_match('/^9\d{9}$/', $contactDigits)) {
+  flash_set('error', 'Enter a valid PH mobile number (ex: 9123456789).');
+  header('Location: ' . $baseUrl . '/pages/signup-admin.php');
+  exit;
+}
 
-  $ins = $pdo->prepare('INSERT INTO accounts (role, name, email, password_hash, phone, clinic_name, specialty, specialty_other, logo_path, license_number)
-                        VALUES (?,?,?,?,?,?,?,?,?,?)');
-  $ins->execute(['clinic_admin', $displayName, $email, $hash, $phone ?: null, $clinicName, $specialty, $specialtyOther ?: null, $logoPath, $license]);
+// Clinic email optional
+if ($clinicEmail !== '' && !filter_var($clinicEmail, FILTER_VALIDATE_EMAIL)) {
+  flash_set('error', 'Please enter a valid clinic email address.');
+  header('Location: ' . $baseUrl . '/pages/signup-admin.php');
+  exit;
+}
+
+// Unique Business ID (clinic)
+$stmt = $pdo->prepare('SELECT id FROM clinics WHERE business_id = ? LIMIT 1');
+$stmt->execute([$businessIdDigits]);
+if ($stmt->fetch()) {
+  flash_set('error', 'Business ID is already registered.');
+  header('Location: ' . $baseUrl . '/pages/signup-admin.php');
+  exit;
+}
+
+// Upload helper
+function upload_image_optional(array $file, string $dirFs, string $dirWeb, array $extAllow, string $prefix): ?string {
+  if (empty($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return null;
+  if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) return null;
+
+  $tmp = (string)($file['tmp_name'] ?? '');
+  if ($tmp === '' || !is_uploaded_file($tmp)) return null;
+
+  $ext = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+  if (!in_array($ext, $extAllow, true)) return null;
+
+  if (!is_dir($dirFs)) { @mkdir($dirFs, 0777, true); }
+
+  $fileName = $prefix . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+  $dest = rtrim($dirFs, '/\\') . DIRECTORY_SEPARATOR . $fileName;
+  if (!move_uploaded_file($tmp, $dest)) return null;
+
+  return rtrim($dirWeb, '/') . '/' . $fileName;
+}
+
+$logoPath = upload_image_optional(
+  $_FILES['logo'] ?? [],
+  __DIR__ . '/../uploads/logos',
+  $baseUrl . '/uploads/logos',
+  ['jpg', 'jpeg', 'png', 'webp'],
+  'logo'
+);
+
+$workIdPath = upload_image_optional(
+  $_FILES['admin_work_id'] ?? [],
+  __DIR__ . '/../uploads/work-ids',
+  $baseUrl . '/uploads/work-ids',
+  ['jpg', 'jpeg', 'png', 'webp'],
+  'workid'
+);
+
+try {
+  $pdo->beginTransaction();
+
+  // Create clinic
+  $insClinic = $pdo->prepare('INSERT INTO clinics
+      (clinic_name, specialty, specialty_other, logo_path, business_id, contact, email)
+    VALUES
+      (?,?,?,?,?,?,?)');
+  $insClinic->execute([
+    $clinicName,
+    $specialty,
+    ($specialty === 'Other' ? ($specialtyOther !== '' ? $specialtyOther : null) : null),
+    $logoPath,
+    $businessIdDigits,
+    $contactDigits,
+    ($clinicEmail !== '' ? $clinicEmail : null),
+  ]);
+  $clinicId = (int)$pdo->lastInsertId();
+
+  // Create first clinic admin account (linked to the clinic)
+  $ins = $pdo->prepare('INSERT INTO accounts (role, clinic_id, name, email, password_hash, phone, admin_work_id_path)
+                        VALUES (?,?,?,?,?,?,?)');
+  $ins->execute(['clinic_admin', $clinicId, $adminName, $email, $hash, $contactDigits, $workIdPath]);
+
+  $pdo->commit();
+} catch (Throwable $e) {
+  if ($pdo->inTransaction()) $pdo->rollBack();
+  flash_set('error', 'Sign up failed. Please try again.');
+  header('Location: ' . $baseUrl . '/pages/signup-admin.php');
+  exit;
 }
 
 header('Location: ' . $baseUrl . '/pages/signup-success.php?role=' . urlencode($role));

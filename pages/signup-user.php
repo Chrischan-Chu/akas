@@ -74,6 +74,7 @@ include "../includes/partials/head.php";
       id="gender"
       name="gender"
       required
+      data-required-msg="Please select a Gender."
       class="appearance-none w-full rounded-xl bg-white px-4 pr-12 py-2.5
              text-slate-700 outline-none border border-slate-200
              focus:ring-2 focus:ring-white/60"
@@ -108,7 +109,6 @@ include "../includes/partials/head.php";
                 name="email"
                 placeholder="Email"
                 data-validate="email"
-                data-error-id="emailError"
                 required
                 class="w-full rounded-xl bg-white px-12 py-2.5 text-slate-700 placeholder:text-slate-400
                        focus:outline-none focus:ring-2 focus:ring-white/60"
@@ -188,17 +188,15 @@ include "../includes/partials/head.php";
                 <input
                 type="tel"
                 id="contactNumber"
-                name="number"
-                placeholder="9XXXXXXXXX"
+                name="contact_number"
+                placeholder="9123456789"
                 inputmode="numeric"
                 minlength="10"
                 required
                 data-validate="phone-ph"
-                data-error-id="phoneError"
-                class="flex-1 rounded-xl bg-white px-2 sm:px-2 py-2 sm:py-2.5
-                      text-slate-300 placeholder:text-slate-300
-                      focus:outline-none focus:ring-2 focus:ring-white/60
-                      text-sm sm:text-base"
+                class="flex-1 h-11 rounded-xl bg-white px-4
+                          text-slate-700 placeholder:text-slate-400
+                          focus:outline-none focus:ring-2 focus:ring-white/60"
               />
               </div>
 
@@ -212,7 +210,6 @@ include "../includes/partials/head.php";
               <input
                 type="date"
                 name="birthdate"
-                data-error-id="birthdateError"
                 data-validate="age-18"
                 class="w-full rounded-xl bg-white px-4 py-2.5 text-slate-700 outline-none border border-slate-200
                        focus:ring-2 focus:ring-white/60"

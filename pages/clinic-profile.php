@@ -1,9 +1,57 @@
 <?php
-$clinicName = "Name of Clinic";
-$appTitle = $clinicName . " | AKAS";
+declare(strict_types=1);
+
 $baseUrl  = "/AKAS";
 
 require_once __DIR__ . '/../includes/auth.php';
+
+$pdo = db();
+
+$clinicId = (int)($_GET['id'] ?? 0); // clinics.id
+if ($clinicId <= 0) {
+  header('Location: ' . $baseUrl . '/index.php#clinics');
+  exit;
+}
+
+$stmt = $pdo->prepare(
+  "SELECT
+      id,
+      clinic_name,
+      specialty,
+      specialty_other,
+      logo_path,
+      business_id,
+      contact,
+      email,
+      description,
+      address,
+      is_open,
+      open_time,
+      close_time,
+      updated_at
+   FROM clinics
+   WHERE id=?
+   LIMIT 1"
+);
+
+$stmt->execute([$clinicId]);
+$clinic = $stmt->fetch();
+if (!$clinic) {
+  header('Location: ' . $baseUrl . '/index.php#clinics');
+  exit;
+}
+
+// Extra details saved from admin CMS (same clinics row)
+$details = $clinic ?: [];
+
+// Doctors
+$stmt = $pdo->prepare('SELECT id, name, about, availability, image_path FROM clinic_doctors WHERE clinic_id=? ORDER BY id DESC');
+$stmt->execute([$clinicId]);
+$doctors = $stmt->fetchAll();
+
+$clinicName = (string)($clinic['clinic_name'] ?? 'Clinic');
+$appTitle = $clinicName . " | AKAS";
+
 $isLoggedIn = auth_is_logged_in();
 $role = auth_role();
 $isUser = $isLoggedIn && $role === 'user';
@@ -14,9 +62,11 @@ if (strpos($return, $baseUrl) !== 0) {
 }
 
 include "../includes/partials/head.php";
+
+function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 ?>
 
-<body class="bg-blue-100"
+<body class="bg-blue-100 overflow-x-hidden"
       data-base-url="<?php echo htmlspecialchars($baseUrl, ENT_QUOTES); ?>"
       data-is-user="<?php echo $isUser ? '1' : '0'; ?>">
 
@@ -38,7 +88,7 @@ include "../includes/partials/head.php";
       </div>
 
       <h1 class="justify-self-center text-center text-2xl sm:text-3xl tracking-widest font-light truncate">
-        <?php echo strtoupper(htmlspecialchars($clinicName)); ?>
+        <?php echo strtoupper(h($clinicName)); ?>
       </h1>
 
       <div class="justify-self-end w-10 sm:w-12"></div>
@@ -51,7 +101,10 @@ include "../includes/partials/head.php";
   <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
 
     <div class="bg-white rounded-2xl p-6 flex items-center justify-center">
-      <img src="https://cdn-icons-png.flaticon.com/512/2967/2967350.png" class="w-48" alt="Clinic">
+      <img src="<?php echo h((string)($clinic['logo_path'] ?? '')); ?>"
+           onerror="this.onerror=null;this.src='https://cdn-icons-png.flaticon.com/512/2967/2967350.png';"
+           class="w-48"
+           alt="Clinic">
     </div>
 
     <!-- ✅ Everyone can open and view -->
@@ -74,52 +127,92 @@ include "../includes/partials/head.php";
   <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
 
     <!-- About / Description -->
-    <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+    <div class="lg:col-span-2 min-w-0 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
       <h3 class="text-xl font-extrabold" style="color:var(--secondary)">About the Clinic</h3>
-      <p class="mt-2 text-slate-600 leading-relaxed">
-        This is where your clinic description goes. You can describe services, specialties,
-        and what patients should expect when visiting.
+
+      <p
+        class="mt-2 text-slate-600 leading-relaxed whitespace-normal break-words"
+        style="overflow-wrap:anywhere; word-break:break-word;"
+      >
+        <?php echo !empty($details['description']) ? nl2br(h($details['description'])) : 'No clinic description yet.'; ?>
       </p>
 
       <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="rounded-xl p-4" style="background: rgba(64,183,255,.10);">
+        <div class="rounded-xl p-4 min-w-0" style="background: rgba(64,183,255,.10);">
           <p class="text-xs font-bold uppercase tracking-wide text-slate-700">Address</p>
-          <p class="mt-1 text-sm text-slate-700">Angeles City, Pampanga</p>
+          <p class="mt-1 text-sm text-slate-700 whitespace-normal break-words" style="overflow-wrap:anywhere; word-break:break-word;">
+            <?php echo !empty($details['address']) ? h($details['address']) : '—'; ?>
+          </p>
         </div>
-        <div class="rounded-xl p-4" style="background: rgba(255,161,84,.12);">
-          <p class="text-xs font-bold uppercase tracking-wide text-slate-700">Contact</p>
-          <p class="mt-1 text-sm text-slate-700">09xx xxx xxxx</p>
+
+        <div class="rounded-xl p-4 min-w-0" style="background: rgba(255,161,84,.12);">
+         <p class="text-xs font-bold uppercase tracking-wide text-slate-700">Contact</p>
+
+        <p class="mt-1 text-sm text-slate-700 whitespace-normal break-words"
+          style="overflow-wrap:anywhere; word-break:break-word;">
+          <?php
+            $phone = preg_replace('/\D/', '', (string)($details['contact'] ?? ''));
+
+            echo ($phone && strlen($phone) === 10)
+              ? '+63 ' . h($phone)
+              : '—';
+          ?>
+        </p>
+
+
+          <?php if (!empty($details['email'])): ?>
+            <p class="mt-1 text-sm text-slate-700 whitespace-normal break-words" style="overflow-wrap:anywhere; word-break:break-word;">
+              <?php echo h($details['email']); ?>
+            </p>
+          <?php endif; ?>
         </div>
       </div>
     </div>
 
     <!-- Quick Info Card -->
-    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-      <h3 class="text-lg font-extrabold" style="color:var(--secondary)">Clinic Info</h3>
+    <div class="self-start lg:sticky lg:top-24">
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <h3 class="text-lg font-extrabold" style="color:var(--secondary)">Clinic Info</h3>
 
-      <div class="mt-4 space-y-3 text-sm text-slate-700">
-        <div class="flex items-center justify-between">
-          <span class="text-slate-500">Status</span>
-          <span class="font-semibold">Open</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-slate-500">Hours</span>
-          <span class="font-semibold">9:00 AM – 5:00 PM</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-slate-500">Type</span>
-          <span class="font-semibold">General Clinic</span>
-        </div>
-      </div>
+        <div class="mt-4 space-y-3 text-sm text-slate-700">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">Status</span>
+            <?php $isOpen = (int)($details['is_open'] ?? 1) === 1; ?>
+            <span class="font-semibold"><?php echo $isOpen ? 'Open' : 'Closed'; ?></span>
+          </div>
 
-      <div class="mt-5 rounded-xl p-4 text-xs text-slate-600" style="background: rgba(15,23,42,.04);">
-        Tip: Log in to book an appointment. You can still view the schedule without logging in.
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">Hours</span>
+            <?php
+              $ot = $details['open_time'] ?? null;
+              $ct = $details['close_time'] ?? null;
+              $hours = ($ot && $ct)
+                ? (date('g:i A', strtotime((string)$ot)) . ' – ' . date('g:i A', strtotime((string)$ct)))
+                : '—';
+            ?>
+            <span class="font-semibold"><?php echo h($hours); ?></span>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">Type</span>
+            <span class="font-semibold">
+              <?php echo h((string)($clinic['specialty'] ?? '')); ?>
+              <?php if (!empty($clinic['specialty_other'])): ?>
+                (<?php echo h((string)$clinic['specialty_other']); ?>)
+              <?php endif; ?>
+            </span>
+          </div>
+        </div>
+
+        <div class="mt-5 rounded-xl p-4 text-xs text-slate-600" style="background: rgba(15,23,42,.04);">
+          Tip: Log in to book an appointment. You can still view the schedule without logging in.
+        </div>
       </div>
     </div>
 
+
   </div>
 </section>
-
 
 <!-- BOOKING MODAL -->
 <section id="bookingModal"
@@ -254,26 +347,36 @@ include "../includes/partials/head.php";
 <!-- DOCTORS (unchanged) -->
 <section class="py-10 px-4">
   <div class="max-w-6xl mx-auto">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <?php for($i=1;$i<=3;$i++): ?>
-        <a
-          href="<?php echo $baseUrl; ?>/pages/doctor-profile.php?id=<?php echo urlencode($i); ?>&clinic_id=<?php echo urlencode($_GET['id'] ?? 1); ?>"
-          class="doctorCard block"
-          data-doctor-id="<?php echo (int)$i; ?>"
-          data-clinic-id="<?php echo (int)($_GET['id'] ?? 1); ?>"
-        >
-          <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition">
-            <div class="flex items-center justify-center py-6">
-              <img src="../assets/img/doctor1.png" class="w-20" alt="Doctor">
+    <?php if (empty($doctors)): ?>
+      <div class="bg-white rounded-2xl p-6 border border-slate-100 text-slate-600">
+        No doctors have been added yet.
+      </div>
+    <?php else: ?>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <?php foreach($doctors as $d): ?>
+          <a
+            href="#"
+            class="doctorCard block"
+            data-doctor-id="<?php echo (int)$d['id']; ?>"
+            data-clinic-id="<?php echo (int)$clinicId; ?>"
+          >
+            <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition">
+              <div class="flex items-center justify-center py-6">
+                <?php if (!empty($d['image_path'])): ?>
+                  <img src="<?php echo h((string)$d['image_path']); ?>" class="w-20 h-20 rounded-2xl object-cover" alt="Doctor">
+                <?php else: ?>
+                  <img src="<?php echo $baseUrl; ?>/assets/img/doctor1.png" class="w-20" alt="Doctor">
+                <?php endif; ?>
+              </div>
+              <div class="p-6 text-white" style="background:var(--primary)">
+                <h5 class="font-semibold truncate"><?php echo h((string)$d['name']); ?></h5>
+                <p class="text-sm line-clamp-2"><?php echo h((string)($d['about'] ?? '')); ?></p>
+              </div>
             </div>
-            <div class="p-6 text-white" style="background:var(--primary)">
-              <h5 class="font-semibold">Doctor <?php echo $i; ?></h5>
-              <p class="text-sm">General Practitioner</p>
-            </div>
-          </div>
-        </a>
-      <?php endfor; ?>
-    </div>
+          </a>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
   </div>
 </section>
 

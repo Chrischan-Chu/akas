@@ -49,7 +49,15 @@
       if (typeof filter === "function") filter(input);
       const v = (input.value || "").trim();
 
-      // strict on blur
+      // ✅ empty should NOT show red ring
+      // required fields will be handled by Next/Submit
+      if (v === "") {
+        clearError(input);
+        input.setCustomValidity("");
+        return;
+      }
+
+      // strict on blur ONLY if they typed something
       const { ok } = validate(v, input, "blur");
       if (!ok) showError(input);
       else clearError(input);
@@ -65,12 +73,65 @@
     });
   };
 
+  /**
+   * Required selects: customize the built-in message
+   * - No red ring when empty on blur (until submit)
+   * - On invalid/submit, show data-required-msg if provided
+   */
+  const wireRequiredSelect = (select) => {
+    if (!select) return;
+
+    const requiredMsg = (select.dataset.requiredMsg || "Please select an option.").trim();
+
+    const syncUI = () => {
+      const v = (select.value || "").trim();
+      if (v === "") clearError(select);
+      else clearError(select);
+    };
+
+    // When the browser triggers invalid, replace message
+    select.addEventListener("invalid", () => {
+      const v = (select.value || "").trim();
+      if (v === "") {
+        select.setCustomValidity(requiredMsg);
+      } else {
+        select.setCustomValidity("");
+      }
+    });
+
+    select.addEventListener("change", () => {
+      select.setCustomValidity("");
+      syncUI();
+    });
+
+    select.addEventListener("blur", () => {
+      // no red ring for empty; message handled by Next/Submit
+      syncUI();
+      if ((select.value || "").trim() === "") {
+        select.setCustomValidity("");
+      }
+    });
+
+    select.closest("form")?.addEventListener("submit", () => {
+      const v = (select.value || "").trim();
+      select.setCustomValidity(v === "" ? requiredMsg : "");
+    });
+  };
+
   /* ================= validators ================= */
 
   const validateEmail = (val) => {
     const v = (val || "").trim();
+
+    // ✅ allow empty (optional fields)
+    if (v === "") return { ok: true, message: "" };
+
     const ok = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
-    return { ok, message: ok ? "" : "Enter a valid email (ex: name@gmail.com)." };
+
+    return {
+      ok,
+      message: ok ? "" : "Enter a valid email (ex: name@gmail.com).",
+    };
   };
 
   const validatePHMobile = (val, input, phase = "input") => {
@@ -87,6 +148,19 @@
       ok,
       message: ok ? "" : "Enter a valid PH mobile number (ex: 9123456789).",
     };
+  };
+
+  const validateBusinessId10 = (val, input, phase = "input") => {
+    const v = (val || "").trim();
+
+    // while typing: don't show red until they reach 10 digits
+    if (phase === "input" && v.length < 10) {
+      return { ok: true, message: "" };
+    }
+
+    // blur/submit: must be exactly 10 digits
+    const ok = /^\d{10}$/.test(v);
+    return { ok, message: ok ? "" : "Business ID must be exactly 10 digits." };
   };
 
   const validatePassword = (val) => {
@@ -197,6 +271,15 @@
       });
     });
 
+    // Business ID (10 digits)
+    document.querySelectorAll('[data-validate="business-id-10"]').forEach((input) => {
+      wireInput({
+        input,
+        validate: validateBusinessId10,
+        filter: (el) => (el.value = el.value.replace(/\D/g, "").slice(0, 10)),
+      });
+    });
+
     // Password (required)
     document.querySelectorAll('[data-validate="password"]').forEach((input) => {
       wireInput({ input, validate: validatePassword });
@@ -215,6 +298,11 @@
     // Age 18+
     document.querySelectorAll('[data-validate="age-18"]').forEach((input) => {
       wireInput({ input, validate: validateAge18 });
+    });
+
+    // Required select custom messages
+    document.querySelectorAll('select[required]').forEach((sel) => {
+      wireRequiredSelect(sel);
     });
 
     // Password toggles

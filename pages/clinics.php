@@ -1,3 +1,20 @@
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/../includes/db.php';
+$pdo = db();
+
+// Show the latest 3 clinics
+$stmt = $pdo->query("SELECT id,
+                            clinic_name, specialty, specialty_other, logo_path,
+                            description, address
+                     FROM clinics
+                     ORDER BY updated_at DESC
+                     LIMIT 3");
+$clinics = $stmt->fetchAll() ?: [];
+
+function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+?>
 
 <section id="clinics" class="scroll-mt-24">
   <section class="px-4 py-14" style="background-color: var(--secondary);">
@@ -21,9 +38,9 @@
       <!-- BIGGER GRID -->
       <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-6 px-8 lg:px-0">
 
-        <?php for ($i = 1; $i <= 3; $i++): ?>
+        <?php foreach ($clinics as $c): ?>
 
-          <a href="/AKAS/pages/clinic-profile.php?id=<?php echo urlencode($i); ?>"
+          <a href="/AKAS/pages/clinic-profile.php?id=<?php echo urlencode((string)$c['id']); ?>"
              class="group block bg-white rounded-3xl shadow-sm hover:shadow-lg transition overflow-hidden">
 
             <div class="p-8 min-h-[210px] flex flex-col justify-between">
@@ -32,22 +49,30 @@
               <div class="flex items-center gap-5">
 
                 <!-- Bigger icon -->
-                <div class="h-20 w-20 rounded-3xl flex items-center justify-center shadow-sm"
+                <div class="h-20 w-20 rounded-3xl flex items-center justify-center shadow-sm overflow-hidden"
                      style="background: #40b7ff26;">
-                  <img
-                    src="https://cdn-icons-png.flaticon.com/512/2967/2967350.png"
-                    alt="Clinic"
-                    class="h-12 w-12"
-                  >
+                  <?php if (!empty($c['logo_path'])): ?>
+                    <img src="<?php echo h((string)$c['logo_path']); ?>" alt="Clinic Logo" class="h-full w-full object-cover" />
+                  <?php else: ?>
+                    <img src="https://cdn-icons-png.flaticon.com/512/2967/2967350.png" alt="Clinic" class="h-12 w-12" />
+                  <?php endif; ?>
                 </div>
 
                 <div class="min-w-0">
                   <h5 class="text-xl font-extrabold text-[var(--primary)] truncate">
-                    Clinic Name <?php echo $i; ?>
+                    <?php echo h((string)($c['clinic_name'] ?? 'Clinic')); ?>
                   </h5>
 
                   <p class="text-slate-600 text-sm truncate">
-                    Medical Specialty • Barangay
+                    <?php
+                      $spec = (string)($c['specialty'] ?? '');
+                      $specOther = (string)($c['specialty_other'] ?? '');
+                      $display = ($spec === 'Other' && $specOther !== '') ? $specOther : $spec;
+                    ?>
+                    <?php echo h($display); ?>
+                    <?php if (!empty($c['address'])): ?>
+                      • <?php echo h((string)$c['address']); ?>
+                    <?php endif; ?>
                   </p>
                 </div>
 
@@ -56,7 +81,7 @@
 
               <!-- Middle -->
               <p class="text-slate-600 mt-5 text-base leading-relaxed line-clamp-3">
-                Short clinic description goes here. This can be fetched from the database.
+                <?php echo !empty($c['description']) ? h((string)$c['description']) : 'No clinic description yet.'; ?>
               </p>
 
 
@@ -70,7 +95,7 @@
 
           </a>
 
-        <?php endfor; ?>
+        <?php endforeach; ?>
 
       </div>
 

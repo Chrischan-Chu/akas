@@ -1,67 +1,62 @@
 <?php
 declare(strict_types=1);
 
-header('Content-Type: application/json');
-require_once __DIR__ . '/../includes/db.php';
+header('Content-Type: application/json; charset=utf-8');
+
+require_once __DIR__ . '/../includes/auth.php';
 
 $pdo = db();
 
 $clinicId = (int)($_GET['clinic_id'] ?? 0);
-$date     = (string)($_GET['date'] ?? ''); // YYYY-MM-DD
+$date     = trim((string)($_GET['date'] ?? ''));
 
-if (!$clinicId || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-  http_response_code(400);
-  echo json_encode(["error" => "Invalid clinic_id or date"]);
+if ($clinicId <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+  echo json_encode(['ok' => false, 'message' => 'Invalid request.']);
   exit;
 }
 
-$dayOfWeek = (int)date('w', strtotime($date)); // 0-6
+// Load clinic hours
+$stmt = $pdo->prepare('SELECT is_open, open_time, close_time FROM clinics WHERE id = ? LIMIT 1');
+$stmt->execute([$clinicId]);
+$c = $stmt->fetch();
 
-// Closed dates
-$stmt = $pdo->prepare("SELECT 1 FROM clinic_closed_dates WHERE clinic_id=? AND closed_date=? LIMIT 1");
-$stmt->execute([$clinicId, $date]);
-if ($stmt->fetchColumn()) {
-  echo json_encode(["slots" => []]);
+if (!$c || (int)($c['is_open'] ?? 0) !== 1 || empty($c['open_time']) || empty($c['close_time'])) {
+  echo json_encode(['ok' => true, 'slots' => []]);
   exit;
 }
 
-// Weekly hours
-$stmt = $pdo->prepare("
-  SELECT start_time, end_time, slot_minutes, is_open
-  FROM clinic_hours
-  WHERE clinic_id=? AND day_of_week=? LIMIT 1
-");
-$stmt->execute([$clinicId, $dayOfWeek]);
-$hours = $stmt->fetch(PDO::FETCH_ASSOC);
+$open = substr((string)$c['open_time'], 0, 5);  // HH:MM
+$close = substr((string)$c['close_time'], 0, 5);
 
-if (!$hours || (int)$hours['is_open'] !== 1) {
-  echo json_encode(["slots" => []]);
-  exit;
-}
-
-$start = strtotime("$date " . $hours['start_time']);
-$end   = strtotime("$date " . $hours['end_time']);
-$slotMins = (int)$hours['slot_minutes'];
-
-// Booked times
-$stmt = $pdo->prepare("
-  SELECT APT_Time
-  FROM appointments
-  WHERE APT_ClinicID=? AND APT_Date=? AND APT_Status IN ('PENDING','APPROVED')
-");
+// Existing appointments for that day (exclude cancelled)
+$stmt = $pdo->prepare(
+  "SELECT apt_time FROM appointments
+   WHERE clinic_id = ? AND apt_date = ? AND status <> 'cancelled'"
+);
 $stmt->execute([$clinicId, $date]);
 $booked = [];
-foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $t) {
-  $booked[$t] = true;
+foreach ($stmt->fetchAll() as $r) {
+  $t = substr((string)($r['apt_time'] ?? ''), 0, 5);
+  if ($t) $booked[$t] = true;
 }
 
-// Generate slots
+// Generate 30-min slots
 $slots = [];
-for ($t = $start; $t + ($slotMins * 60) <= $end; $t += $slotMins * 60) {
-  $timeStr = date('H:i:s', $t);
-  if (!isset($booked[$timeStr])) {
-    $slots[] = date('H:i', $t);
-  }
+$start = DateTime::createFromFormat('Y-m-d H:i', $date . ' ' . $open);
+$end   = DateTime::createFromFormat('Y-m-d H:i', $date . ' ' . $close);
+
+if (!$start || !$end || $end <= $start) {
+  echo json_encode(['ok' => true, 'slots' => []]);
+  exit;
 }
 
-echo json_encode(["slots" => $slots]);
+while ($start < $end) {
+  $t = $start->format('H:i');
+  if (empty($booked[$t])) {
+    $slots[] = $t;
+  }
+  $start->modify('+30 minutes');
+}
+
+echo json_encode(['ok' => true, 'slots' => $slots]);
+exit;
