@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/_guard.php';
 
 $appTitle = 'AKAS | Doctors';
 $baseUrl  = '/AKAS';
@@ -52,6 +53,15 @@ function save_doctor_image(array $file, string $uploadDirFs, string $uploadDirWe
   return rtrim($uploadDirWeb, '/') . '/' . $name;
 }
 
+function status_badge(string $st): array {
+  $st = strtoupper($st);
+  return match ($st) {
+    'APPROVED' => ['label' => 'APPROVED', 'cls' => 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+    'DECLINED' => ['label' => 'DECLINED', 'cls' => 'bg-rose-50 text-rose-700 border-rose-200'],
+    default    => ['label' => 'PENDING',  'cls' => 'bg-amber-50 text-amber-700 border-amber-200'],
+  };
+}
+
 // Actions
 $action = (string)($_POST['action'] ?? '');
 
@@ -79,55 +89,256 @@ if ($action === 'delete') {
   exit;
 }
 
-// Add/Update
+// Add/Update/Reapply (same handler)
 if ($action === 'save') {
   $id = (int)($_POST['id'] ?? 0);
+  $reapplyFromId = (int)($_POST['reapply_from_id'] ?? 0); // if >0 => reapply same row
+
   $name = trim((string)($_POST['name'] ?? ''));
   $about = trim((string)($_POST['about'] ?? ''));
   $availability = trim((string)($_POST['availability'] ?? ''));
 
-  if ($name === '') {
-    flash_set('err', 'Doctor name is required.');
-    header('Location: ' . $baseUrl . '/admin/doctors.php');
+  // fields
+  $birthdate      = trim((string)($_POST['birthdate'] ?? ''));
+  $specialization = trim((string)($_POST['specialization'] ?? ''));
+  $prcNo          = trim((string)($_POST['prc_no'] ?? ''));
+  $schedule       = trim((string)($_POST['schedule'] ?? ''));
+  $email          = trim((string)($_POST['email'] ?? ''));
+  $contactNumber  = trim((string)($_POST['contact_number'] ?? ''));
+
+  // Validation
+  $errors = [];
+
+  if ($name === '' || !preg_match("/^[A-Za-zÀ-ÖØ-öø-ÿ'.\- ]{2,190}$/u", $name)) {
+    $errors[] = "Doctor name is required and can only contain letters, spaces, and . ' -";
+  }
+
+  if ($birthdate === '' || strtotime($birthdate) === false) {
+    $errors[] = 'Birthdate is required.';
+  } else {
+    $b = new DateTime($birthdate);
+    $t = new DateTime('today');
+    if ($b > $t) $errors[] = 'Birthdate cannot be in the future.';
+    if ($t->diff($b)->y < 18) $errors[] = 'Doctor must be at least 18 years old.';
+  }
+
+  if ($specialization === '' || !preg_match('/^[A-Za-z0-9À-ÖØ-öø-ÿ&\/().,\- ]{2,120}$/u', $specialization)) {
+    $errors[] = 'Specialization contains invalid characters.';
+  }
+
+  if ($prcNo === '' || !preg_match('/^[A-Za-z0-9\-\/ ]{3,50}$/', $prcNo)) {
+    $errors[] = 'PRC must be 3–50 characters and can include letters/numbers/-/ /.';
+  }
+
+  if ($schedule === '' || mb_strlen($schedule) > 300) {
+    $errors[] = 'Schedule is required and must be 300 characters or less.';
+  }
+
+  if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $errors[] = 'Valid email is required.';
+  }
+
+  if ($contactNumber === '' || !preg_match('/^9\d{9}$/', $contactNumber)) {
+    $errors[] = 'Contact number must be 10 digits starting with 9 (e.g., 9123456789).';
+  }
+
+  if ($errors) {
+    flash_set('err', implode(' ', $errors));
+    $redirId = ($id > 0 ? $id : ($reapplyFromId > 0 ? $reapplyFromId : 0));
+    header('Location: ' . $baseUrl . '/admin/doctors.php' . ($redirId > 0 ? '?edit=' . $redirId : ''));
     exit;
   }
 
   $newImage = save_doctor_image($_FILES['image'] ?? [], $uploadDirFs, $uploadDirWeb);
 
-  if ($id > 0) {
-    // Update
-    if ($newImage) {
-      $stmt = $pdo->prepare('UPDATE clinic_doctors SET name=?, about=?, availability=?, image_path=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND clinic_id=?');
-      $stmt->execute([$name, $about, $availability, $newImage, $id, $clinicId]);
-    } else {
-      $stmt = $pdo->prepare('UPDATE clinic_doctors SET name=?, about=?, availability=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND clinic_id=?');
-      $stmt->execute([$name, $about, $availability, $id, $clinicId]);
+  // ✅ REAPPLY: update SAME doctor row (only allowed if currently DECLINED)
+  if ($reapplyFromId > 0) {
+    $stmt = $pdo->prepare("SELECT approval_status FROM clinic_doctors WHERE id=? AND clinic_id=? LIMIT 1");
+    $stmt->execute([$reapplyFromId, $clinicId]);
+    $curSt = (string)($stmt->fetchColumn() ?: '');
+
+    if ($curSt === '') {
+      flash_set('err', 'Invalid reapply request.');
+      header('Location: ' . $baseUrl . '/admin/doctors.php');
+      exit;
     }
-    flash_set('ok', 'Doctor updated.');
-  } else {
-    // Insert
-    $stmt = $pdo->prepare('INSERT INTO clinic_doctors (clinic_id, name, about, availability, image_path) VALUES (?,?,?,?,?)');
-    $stmt->execute([$clinicId, $name, $about, $availability, $newImage]);
-    flash_set('ok', 'Doctor added.');
+
+    if (strtoupper($curSt) !== 'DECLINED') {
+      flash_set('err', 'You can only reapply a DECLINED doctor.');
+      header('Location: ' . $baseUrl . '/admin/doctors.php');
+      exit;
+    }
+
+    if ($newImage) {
+      $stmt = $pdo->prepare("
+        UPDATE clinic_doctors
+        SET name=?,
+            about=?,
+            availability=?,
+            image_path=?,
+            birthdate=?,
+            specialization=?,
+            prc_no=?,
+            schedule=?,
+            email=?,
+            contact_number=?,
+            approval_status='PENDING',
+            declined_reason=NULL,
+            created_via='CMS',
+            updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND clinic_id=?
+        LIMIT 1
+      ");
+      $stmt->execute([
+        $name, $about, $availability, $newImage,
+        $birthdate, $specialization, $prcNo, $schedule, $email, $contactNumber,
+        $reapplyFromId, $clinicId
+      ]);
+    } else {
+      $stmt = $pdo->prepare("
+        UPDATE clinic_doctors
+        SET name=?,
+            about=?,
+            availability=?,
+            birthdate=?,
+            specialization=?,
+            prc_no=?,
+            schedule=?,
+            email=?,
+            contact_number=?,
+            approval_status='PENDING',
+            declined_reason=NULL,
+            created_via='CMS',
+            updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND clinic_id=?
+        LIMIT 1
+      ");
+      $stmt->execute([
+        $name, $about, $availability,
+        $birthdate, $specialization, $prcNo, $schedule, $email, $contactNumber,
+        $reapplyFromId, $clinicId
+      ]);
+    }
+
+    flash_set('ok', 'Doctor re-applied (updated & sent for approval).');
+    header('Location: ' . $baseUrl . '/admin/doctors.php');
+    exit;
   }
 
+  // ✅ NORMAL UPDATE (edit existing doctor): update SAME row & set to PENDING
+  if ($id > 0) {
+    if ($newImage) {
+      $stmt = $pdo->prepare("
+        UPDATE clinic_doctors
+        SET name=?,
+            about=?,
+            availability=?,
+            image_path=?,
+            birthdate=?,
+            specialization=?,
+            prc_no=?,
+            schedule=?,
+            email=?,
+            contact_number=?,
+            approval_status='PENDING',
+            declined_reason=NULL,
+            created_via='CMS',
+            updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND clinic_id=?
+        LIMIT 1
+      ");
+      $stmt->execute([
+        $name, $about, $availability, $newImage,
+        $birthdate, $specialization, $prcNo, $schedule, $email, $contactNumber,
+        $id, $clinicId
+      ]);
+    } else {
+      $stmt = $pdo->prepare("
+        UPDATE clinic_doctors
+        SET name=?,
+            about=?,
+            availability=?,
+            birthdate=?,
+            specialization=?,
+            prc_no=?,
+            schedule=?,
+            email=?,
+            contact_number=?,
+            approval_status='PENDING',
+            declined_reason=NULL,
+            created_via='CMS',
+            updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND clinic_id=?
+        LIMIT 1
+      ");
+      $stmt->execute([
+        $name, $about, $availability,
+        $birthdate, $specialization, $prcNo, $schedule, $email, $contactNumber,
+        $id, $clinicId
+      ]);
+    }
+
+    flash_set('ok', 'Doctor updated (sent for approval).');
+    header('Location: ' . $baseUrl . '/admin/doctors.php');
+    exit;
+  }
+
+  // ✅ NORMAL INSERT (new doctor)
+  $stmt = $pdo->prepare("
+    INSERT INTO clinic_doctors
+      (clinic_id, name, about, availability, image_path,
+       birthdate, specialization, prc_no, schedule, email, contact_number,
+       approval_status, declined_reason, created_via)
+    VALUES
+      (?,?,?,?,?,
+       ?,?,?,?,?,?,
+       'PENDING', NULL, 'CMS')
+  ");
+  $stmt->execute([
+    $clinicId, $name, $about, $availability, $newImage,
+    $birthdate, $specialization, $prcNo, $schedule, $email, $contactNumber
+  ]);
+
+  flash_set('ok', 'Doctor added (pending approval).');
   header('Location: ' . $baseUrl . '/admin/doctors.php');
   exit;
 }
 
 // Edit mode
 $editId = (int)($_GET['edit'] ?? 0);
+$reapplyId = (int)($_GET['reapply'] ?? 0);
+
 $edit = null;
-if ($editId > 0) {
+$reapplyFromId = 0;
+
+// Reapply loads SAME doctor row (not new)
+if ($reapplyId > 0) {
+  $stmt = $pdo->prepare('SELECT * FROM clinic_doctors WHERE id=? AND clinic_id=? LIMIT 1');
+  $stmt->execute([$reapplyId, $clinicId]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+  if ($row) {
+    $reapplyFromId = (int)$row['id'];
+    $edit = $row;
+    flash_set('ok', 'Reapply mode: editing the same doctor record (no new row).');
+  }
+} elseif ($editId > 0) {
   $stmt = $pdo->prepare('SELECT * FROM clinic_doctors WHERE id=? AND clinic_id=? LIMIT 1');
   $stmt->execute([$editId, $clinicId]);
-  $edit = $stmt->fetch() ?: null;
+  $edit = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
 // List
-$stmt = $pdo->prepare('SELECT id, name, about, availability, image_path, created_at FROM clinic_doctors WHERE clinic_id=? ORDER BY id DESC');
+$stmt = $pdo->prepare('
+  SELECT id, name, about, availability, image_path, created_at, updated_at,
+         birthdate, specialization, prc_no, schedule, email, contact_number,
+         approval_status, declined_reason, created_via
+  FROM clinic_doctors
+  WHERE clinic_id=?
+  ORDER BY id DESC
+');
 $stmt->execute([$clinicId]);
-$doctors = $stmt->fetchAll();
+$doctors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $ok  = flash_get('ok');
 $err = flash_get('err');
@@ -167,54 +378,92 @@ include __DIR__ . '/../includes/partials/head.php';
   <!-- Add / Edit Form -->
   <section class="mt-6 rounded-3xl bg-white shadow-sm border border-slate-200 p-6">
     <h2 class="text-xl font-extrabold" style="color: var(--secondary);">
-      <?php echo $edit ? 'Edit Doctor' : 'Add Doctor'; ?>
+      <?php echo $edit ? (($reapplyFromId > 0) ? 'Reapply Doctor' : 'Edit Doctor') : 'Add Doctor'; ?>
     </h2>
 
     <form method="post" enctype="multipart/form-data" class="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-6">
       <input type="hidden" name="action" value="save" />
       <input type="hidden" name="id" value="<?php echo (int)($edit['id'] ?? 0); ?>" />
+      <input type="hidden" name="reapply_from_id" value="<?php echo (int)$reapplyFromId; ?>" />
 
       <div class="lg:col-span-2">
         <label class="block text-sm font-semibold text-slate-700">Doctor Name</label>
-        <input
-          type="text"
-          name="name"
-          required
+        <input type="text" name="name" required
           value="<?php echo h($edit['name'] ?? ''); ?>"
           class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
-          placeholder="e.g., Dr. Juan Dela Cruz"
-        />
+          placeholder="e.g., Dr. Juan Dela Cruz" />
+
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-slate-700">Birthdate</label>
+            <input type="date" name="birthdate" required
+              value="<?php echo h($edit['birthdate'] ?? ''); ?>"
+              class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-700">Specialization</label>
+            <input type="text" name="specialization" required maxlength="120"
+              value="<?php echo h($edit['specialization'] ?? ''); ?>"
+              class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+              placeholder="e.g., Pediatrics" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-700">PRC</label>
+            <input type="text" name="prc_no" required maxlength="50"
+              value="<?php echo h($edit['prc_no'] ?? ''); ?>"
+              class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+              placeholder="e.g., 0123456" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-700">Email</label>
+            <input type="email" name="email" required
+              value="<?php echo h($edit['email'] ?? ''); ?>"
+              class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+              placeholder="doctor@email.com" />
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-slate-700">Contact Number</label>
+            <div class="mt-2 flex">
+              <span class="inline-flex items-center px-4 rounded-l-2xl border border-slate-200 bg-slate-50 text-slate-600 font-semibold">+63</span>
+              <input type="text" name="contact_number" required maxlength="10"
+                value="<?php echo h($edit['contact_number'] ?? ''); ?>"
+                class="w-full h-12 rounded-r-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+                placeholder="9123456789" />
+            </div>
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-slate-700">Schedule</label>
+            <textarea name="schedule" required maxlength="300" rows="3"
+              class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+              placeholder="e.g., Mon–Fri 9:00 AM – 3:00 PM"><?php echo h($edit['schedule'] ?? ''); ?></textarea>
+          </div>
+        </div>
 
         <div class="mt-4">
           <label class="block text-sm font-semibold text-slate-700">Description / About</label>
-          <textarea
-            name="about"
-            rows="6"
+          <textarea name="about" rows="6"
             class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
-            placeholder="Short description about the doctor..."
-          ><?php echo h($edit['about'] ?? ''); ?></textarea>
+            placeholder="Short description about the doctor..."><?php echo h($edit['about'] ?? ''); ?></textarea>
         </div>
 
         <div class="mt-4">
           <label class="block text-sm font-semibold text-slate-700">Availability</label>
-          <textarea
-            name="availability"
-            rows="4"
+          <textarea name="availability" rows="4"
             class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
-            placeholder="Example:\nMon-Fri: 9:00 AM - 4:00 PM\nSat: 9:00 AM - 12:00 PM"
-          ><?php echo h($edit['availability'] ?? ''); ?></textarea>
+            placeholder="Example:\nMon-Fri: 9:00 AM - 4:00 PM\nSat: 9:00 AM - 12:00 PM"><?php echo h($edit['availability'] ?? ''); ?></textarea>
           <p class="mt-2 text-xs text-slate-500">Tip: Use one line per schedule to keep it readable.</p>
         </div>
       </div>
 
       <div class="rounded-3xl border border-slate-200 p-5">
         <label class="block text-sm font-semibold text-slate-700">Doctor Image</label>
-        <input
-          type="file"
-          name="image"
-          accept="image/png,image/jpeg,image/webp"
-          class="mt-2 block w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:font-semibold hover:file:bg-slate-200"
-        />
+        <input type="file" name="image" accept="image/png,image/jpeg,image/webp"
+          class="mt-2 block w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:font-semibold hover:file:bg-slate-200" />
 
         <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 flex items-center justify-center min-h-[160px]">
           <?php $preview = $edit['image_path'] ?? null; ?>
@@ -225,19 +474,15 @@ include __DIR__ . '/../includes/partials/head.php';
           <?php endif; ?>
         </div>
 
-        <button
-          type="submit"
+        <button type="submit"
           class="mt-5 w-full py-3 rounded-2xl font-extrabold text-white"
-          style="background: var(--primary);"
-        >
-          <?php echo $edit ? 'Save Changes' : 'Add Doctor'; ?>
+          style="background: var(--primary);">
+          <?php echo $edit ? (($reapplyFromId > 0) ? 'Submit Reapply' : 'Save Changes') : 'Add Doctor'; ?>
         </button>
 
         <?php if ($edit): ?>
-          <a
-            href="<?php echo $baseUrl; ?>/admin/doctors.php"
-            class="mt-3 block w-full text-center py-3 rounded-2xl font-bold border border-slate-200 bg-white hover:bg-slate-50"
-          >
+          <a href="<?php echo $baseUrl; ?>/admin/doctors.php"
+             class="mt-3 block w-full text-center py-3 rounded-2xl font-bold border border-slate-200 bg-white hover:bg-slate-50">
             Cancel
           </a>
         <?php endif; ?>
@@ -256,6 +501,14 @@ include __DIR__ . '/../includes/partials/head.php';
     <?php else: ?>
       <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
         <?php foreach ($doctors as $d): ?>
+          <?php
+            $st = (string)($d['approval_status'] ?? 'PENDING');
+            $badge = status_badge($st);
+            $declinedReason = trim((string)($d['declined_reason'] ?? ''));
+            $createdVia = (string)($d['created_via'] ?? '');
+            $isDeclined = (strtoupper($st) === 'DECLINED');
+          ?>
+
           <div class="rounded-3xl border border-slate-200 overflow-hidden">
             <div class="flex gap-4 p-4">
               <div class="h-16 w-16 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
@@ -267,35 +520,69 @@ include __DIR__ . '/../includes/partials/head.php';
               </div>
 
               <div class="min-w-0 flex-1">
-                <p class="font-extrabold text-slate-900 truncate"><?php echo h($d['name']); ?></p>
-                <p class="text-sm text-slate-600 line-clamp-2 mt-1"><?php echo h($d['about'] ?? ''); ?></p>
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="font-extrabold text-slate-900 truncate"><?php echo h($d['name']); ?></p>
+                    <p class="text-sm text-slate-600 line-clamp-2 mt-1"><?php echo h($d['about'] ?? ''); ?></p>
+                  </div>
+
+                  <span class="shrink-0 px-3 py-1 rounded-full text-xs font-bold border <?php echo h($badge['cls']); ?>">
+                    <?php echo h($badge['label']); ?>
+                  </span>
+                </div>
+
+                <?php if (!empty($d['specialization']) || !empty($d['prc_no'])): ?>
+                  <p class="text-xs text-slate-500 mt-2">
+                    🩺 <?php echo h($d['specialization'] ?? ''); ?>
+                    <?php if (!empty($d['prc_no'])): ?> • PRC: <?php echo h($d['prc_no']); ?><?php endif; ?>
+                  </p>
+                <?php endif; ?>
+
                 <?php if (!empty($d['availability'])): ?>
                   <p class="text-xs text-slate-500 mt-2 line-clamp-2">🗓 <?php echo h($d['availability']); ?></p>
+                <?php endif; ?>
+
+                <?php if ($isDeclined): ?>
+                  <div class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                    <p class="text-xs font-bold text-rose-700">Declined</p>
+                    <p class="text-xs text-rose-700 mt-1">
+                      Reason: <?php echo $declinedReason !== '' ? h($declinedReason) : 'No reason provided.'; ?>
+                    </p>
+                  </div>
+                <?php endif; ?>
+
+                <?php if (!empty($createdVia)): ?>
+                  <p class="text-[11px] text-slate-400 mt-2">Source: <?php echo h($createdVia); ?></p>
                 <?php endif; ?>
               </div>
             </div>
 
             <div class="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-200 bg-slate-50">
-              <a
-                href="<?php echo $baseUrl; ?>/admin/doctors.php?edit=<?php echo (int)$d['id']; ?>"
-                class="px-4 py-2 rounded-xl font-semibold text-white"
-                style="background: var(--secondary);"
-              >
-                Edit
-              </a>
+              <?php if ($isDeclined): ?>
+                <a href="<?php echo $baseUrl; ?>/admin/doctors.php?reapply=<?php echo (int)$d['id']; ?>"
+                   class="px-4 py-2 rounded-xl font-semibold text-white"
+                   style="background: var(--primary);">
+                  Reapply (CMS)
+                </a>
+              <?php else: ?>
+                <a href="<?php echo $baseUrl; ?>/admin/doctors.php?edit=<?php echo (int)$d['id']; ?>"
+                   class="px-4 py-2 rounded-xl font-semibold text-white"
+                   style="background: var(--secondary);">
+                  Edit
+                </a>
+              <?php endif; ?>
 
               <form method="post" onsubmit="return confirm('Delete this doctor?');">
                 <input type="hidden" name="action" value="delete" />
                 <input type="hidden" name="id" value="<?php echo (int)$d['id']; ?>" />
-                <button
-                  type="submit"
+                <button type="submit"
                   class="px-4 py-2 rounded-xl font-semibold text-white"
-                  style="background: #ef4444;"
-                >
+                  style="background: #ef4444;">
                   Delete
                 </button>
               </form>
             </div>
+
           </div>
         <?php endforeach; ?>
       </div>

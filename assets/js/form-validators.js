@@ -120,14 +120,25 @@
 
   /* ================= validators ================= */
 
+  const validateFullName = (val) => {
+  const v = (val || "").trim();
+
+  if (!v) return { ok: true, message: "" };
+
+  if (!/^[A-Za-z]+(?:\s[A-Za-z]+)*$/.test(v)) {
+    return { ok: false, message: "Full Name must contain letters and spaces only." };
+  }
+
+  return { ok: true, message: "" };
+};
+
   const validateEmail = (val) => {
     const v = (val || "").trim();
 
     // ✅ allow empty (optional fields)
     if (v === "") return { ok: true, message: "" };
 
-    const ok = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
-
+    const ok = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(v);
     return {
       ok,
       message: ok ? "" : "Enter a valid email (ex: name@gmail.com).",
@@ -194,20 +205,45 @@
   };
 
   const validateAge18 = (val) => {
-    const v = (val || "").trim();
-    if (!v) return { ok: true, message: "" };
+  const v = (val || "").trim();
+  if (!v) return { ok: true, message: "" };
 
-    const birth = new Date(v + "T00:00:00");
-    if (isNaN(birth.getTime())) return { ok: false, message: "Enter a valid birth date." };
+  const birth = new Date(v);
+  const today = new Date();
 
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  // remove time
+  birth.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
 
-    const ok = age >= 18;
-    return { ok, message: ok ? "" : "You must be at least 18 years old." };
+  // ✅ check future first
+  if (birth > today) {
+    return { ok: false, message: "Birth date cannot be in the future." };
+  }
+
+  // calculate age
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+
+  if (age < 18) {
+    return { ok: false, message: "You must be at least 18 years old." };
+  }
+
+  return { ok: true, message: "" };
+};
+
+const syncConfirmPassword = (confirmInput) => {
+    const targetName = (confirmInput.dataset.match || "").trim();
+    const passInput = document.querySelector(`[name="${targetName}"]`);
+    if (!passInput) return;
+
+    passInput.addEventListener("input", () => {
+      confirmInput.dispatchEvent(new Event("blur"));
+    });
   };
+
 
   /* ================= password toggle (SVG icons) ================= */
 
@@ -257,6 +293,15 @@
   /* ================= auto-wire ================= */
 
   document.addEventListener("DOMContentLoaded", () => {
+
+    // Full Name 
+    document.querySelectorAll('[data-validate="full-name"]').forEach((input) => {
+      wireInput({
+        input,
+        validate: validateFullName
+      });
+    });
+
     // Email
     document.querySelectorAll('[data-validate="email"]').forEach((input) => {
       wireInput({ input, validate: validateEmail });
@@ -293,6 +338,8 @@
     // Confirm password match
     document.querySelectorAll('[data-validate="password-confirm"]').forEach((input) => {
       wireInput({ input, validate: validatePasswordConfirm });
+      syncConfirmPassword(input); 
+      
     });
 
     // Age 18+

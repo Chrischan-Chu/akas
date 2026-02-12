@@ -64,22 +64,37 @@ function flash_get(string $key): ?string {
   unset($_SESSION['flash'][$key]);
   return $msg;
 }
+function flash_clear(?string $key = null): void {
+  if (!isset($_SESSION['flash'])) return;
+
+  if ($key === null) {
+    unset($_SESSION['flash']); // clear all flash messages
+    return;
+  }
+
+  unset($_SESSION['flash'][$key]); // clear one key
+  if (empty($_SESSION['flash'])) unset($_SESSION['flash']);
+}
+
 
 // --- Guards ---
-function auth_require_login(string $baseUrl = '/AKAS'): void {
+function auth_require_login(string $baseUrl = '/AKAS', string $loginPath = '/pages/login.php'): void {
   if (!auth_is_logged_in()) {
-    header('Location: ' . $baseUrl . '/pages/login.php');
+    header('Location: ' . $baseUrl . $loginPath);
     exit;
   }
 }
 
-function auth_require_role(string $role, string $baseUrl = '/AKAS'): void {
-  auth_require_login($baseUrl);
+
+function auth_require_role(string $role, string $baseUrl = '/AKAS', string $loginPath = '/pages/login.php'): void {
+  auth_require_login($baseUrl, $loginPath);
+
   if (auth_role() !== $role) {
     header('Location: ' . $baseUrl . '/index.php#top');
     exit;
   }
 }
+
 
 // Admin should ONLY see /admin/*.
 function auth_enforce_admin_dashboard_only(string $baseUrl = '/AKAS'): void {

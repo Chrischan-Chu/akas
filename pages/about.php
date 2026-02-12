@@ -2,10 +2,8 @@
   <section class="py-8 px-4 bg-white">
     <div class="max-w-6xl mx-auto">
 
-      <!-- Modern Card -->
       <div class="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
 
-        <!-- Icon banner -->
         <div class="px-8 py-5 flex items-center gap-3"
              style="background: linear-gradient(90deg,
                 var(--primary) 0%,
@@ -27,10 +25,9 @@
           </div>
         </div>
 
-        <!-- Content -->
+    
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 p-8 sm:p-10">
 
-          <!-- LEFT: Text -->
           <div class="text-slate-700 leading-relaxed">
             <p class="text-base">
               Many local clinics still use manual scheduling like logbooks, phone calls, and walk-ins. Because of that, patients often
@@ -49,7 +46,7 @@
               designed for real situations in the community—especially for small clinics that want to modernize without needing complicated systems.
             </p>
 
-            <!-- Quick highlights -->
+       
             <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Patients</p>
@@ -66,7 +63,6 @@
             </div>
           </div>
 
-          <!-- RIGHT: Illustration -->
           <div class="flex items-center justify-center">
             <div class="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-sm p-8">
 
@@ -81,7 +77,6 @@
                 </div>
               </div>
 
-              <!-- Minimal “illustration” blocks -->
               <div class="space-y-3">
                 <div class="rounded-2xl p-4 border border-slate-200"
                      style="background: rgba(64,183,255,.10);">

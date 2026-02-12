@@ -1,6 +1,29 @@
 <?php
 $appTitle = "AKAS | Clinic Sign Up";
 $baseUrl  = "/AKAS";
+
+require_once __DIR__ . '/../includes/auth.php';
+
+$declinedDoctorCount = 0;
+try {
+  if (auth_is_logged_in() && auth_role() === 'clinic_admin') {
+    $cid = (int)(auth_clinic_id() ?? 0);
+    if ($cid > 0) {
+      $pdo = db();
+      $stmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM clinic_doctors
+        WHERE clinic_id = ?
+          AND approval_status = 'DECLINED'
+      ");
+      $stmt->execute([$cid]);
+      $declinedDoctorCount = (int)$stmt->fetchColumn();
+    }
+  }
+} catch (Throwable $e) {
+  $declinedDoctorCount = 0; // fail silently
+}
+
 include "../includes/partials/head.php";
 ?>
 
@@ -11,9 +34,13 @@ include "../includes/partials/head.php";
     font-family: ui-monospace, "Courier New", monospace;
     letter-spacing: .14em;
   }
-  /* Step transition */
+
   .step { display: none; }
   .step.active { display: block; }
+
+  /* Modal */
+  .modal-backdrop{ display:none; }
+  .modal-backdrop.show{ display:flex; }
 </style>
 
 <main class="min-h-screen flex items-center justify-center px-4">
@@ -26,22 +53,19 @@ include "../includes/partials/head.php";
 
     <div class="grid grid-cols-1 lg:grid-cols-2 min-h-[520px]">
 
-      <!-- LEFT -->
       <div class="bg-[#FFFDF6] relative flex items-center justify-center p-6">
         <img
           src="<?php echo $baseUrl; ?>/assets/img/akas-logo.png"
           alt="AKAS Logo"
-          class="w-64 max-w-full"
+          class="w-44 sm:w-56 md:w-64 lg:w-72 xl:w-80 max-w-full"
         />
       </div>
 
-      <!-- RIGHT -->
       <div class="relative flex items-center justify-center p-4 sm:p-6 lg:p-8"
            style="background: var(--primary);">
 
         <div class="w-full max-w-sm px-2 sm:px-4 lg:px-0">
 
-          <!-- Title (changes per step, same design) -->
           <div id="titleStep1Wrap">
             <h1 class="auth-title text-3xl sm:text-4xl font-semibold text-white text-center">
               ADMIN SIGN UP
@@ -60,7 +84,6 @@ include "../includes/partials/head.php";
             </p>
           </div>
 
-          <!-- Progress -->
           <div class="mb-6">
             <div class="flex items-center justify-between text-xs font-semibold text-white/90">
               <span id="labelStep1" class="opacity-100">Admin Account</span>
@@ -71,18 +94,18 @@ include "../includes/partials/head.php";
             </div>
           </div>
 
-          <!-- FORM (single form, 2 steps) -->
-          <form id="signupWizard" action="signup-process.php" method="POST" enctype="multipart/form-data" class="space-y-4">
+          <form id="signupWizard"
+                action="<?php echo $baseUrl; ?>/pages/signup-process.php"
+                method="POST"
+                enctype="multipart/form-data"
+                class="space-y-4">
 
             <input type="hidden" name="role" value="clinic_admin" />
 
-            <!-- ================= STEP 1 ================= -->
+            <!-- STEP 1 -->
             <div id="step1" class="step active space-y-3">
-
-              <!-- Admin Name -->
               <div class="relative">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
-                  <!-- user icon -->
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -98,7 +121,6 @@ include "../includes/partials/head.php";
                 />
               </div>
 
-              <!-- Work ID (Optional) -->
               <div class="bg-white/90 rounded-xl px-4 py-3 border border-white/40">
                 <label class="block text-xs font-semibold text-slate-700 mb-2">
                   Work ID (Optional)
@@ -114,7 +136,6 @@ include "../includes/partials/head.php";
                 />
               </div>
 
-              <!-- Email -->
               <div class="relative">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -132,7 +153,6 @@ include "../includes/partials/head.php";
                 />
               </div>
 
-              <!-- Password -->
               <div class="relative">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -156,7 +176,6 @@ include "../includes/partials/head.php";
                         data-target="password"></button>
               </div>
 
-              <!-- Confirm Password -->
               <div class="relative">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -181,7 +200,6 @@ include "../includes/partials/head.php";
                         data-target="confirm_password"></button>
               </div>
 
-              <!-- Buttons -->
               <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <a
                   href="<?php echo $baseUrl; ?>/pages/signup.php"
@@ -200,10 +218,8 @@ include "../includes/partials/head.php";
               </div>
             </div>
 
-            <!-- ================= STEP 2 ================= -->
+            <!-- STEP 2 -->
             <div id="step2" class="step space-y-3">
-
-              <!-- Clinic Name -->
               <div class="relative">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -220,7 +236,47 @@ include "../includes/partials/head.php";
                 />
               </div>
 
-              <!-- Clinic Type -->
+              <!-- DOCTORS (Optional) -->
+              <div class="bg-white/90 rounded-xl px-4 py-4 border border-white/40">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      Doctors
+                      <?php if ($declinedDoctorCount > 0): ?>
+                        <span class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold
+                                     bg-rose-50 text-rose-700 border border-rose-200">
+                          ⚠ <?= (int)$declinedDoctorCount ?> Declined
+                        </span>
+                      <?php endif; ?>
+                    </p>
+
+                    <?php if ($declinedDoctorCount > 0): ?>
+                      <p class="text-[11px] text-rose-700 mt-1">
+                        You have declined doctor(s). You can reapply later in <b>Admin Dashboard → Doctors</b>.
+                      </p>
+                    <?php else: ?>
+                      <p class="text-xs text-slate-600">
+                        Add doctors now, or you can add them later in the admin dashboard.
+                      </p>
+                    <?php endif; ?>
+                  </div>
+
+                  <button
+                    type="button"
+                    id="openDoctorModal"
+                    class="shrink-0 px-3 py-2 rounded-lg font-semibold text-black shadow-sm hover:shadow transition"
+                    style="background: var(--secondary);">
+                    + Add Doctor
+                  </button>
+                </div>
+
+                <input type="hidden" name="doctors_json" id="doctorsJson" value="[]" />
+                <div id="doctorsList" class="mt-3 space-y-2"></div>
+              </div>
+
+              <!-- (rest of your Step 2 inputs remain unchanged) -->
+              <!-- ... keep everything else exactly as you already have ... -->
+
               <div class="bg-white/90 rounded-xl px-4 py-3 border border-white/40">
                 <label class="block text-xs font-semibold text-slate-700 mb-2">
                   Clinic Type / Category
@@ -254,7 +310,6 @@ include "../includes/partials/head.php";
                 </div>
               </div>
 
-              <!-- Other (shows only if Other is selected) -->
               <div id="otherSpecialtyWrap" class="hidden">
                 <input
                   type="text"
@@ -264,7 +319,6 @@ include "../includes/partials/head.php";
                 />
               </div>
 
-              <!-- Contact Number -->
               <div class="space-y-1">
                 <div class="flex gap-2">
                   <div class="w-20 h-11 flex items-center justify-center rounded-xl bg-white text-slate-700 font-semibold">
@@ -285,7 +339,6 @@ include "../includes/partials/head.php";
                 </div>
               </div>
 
-              <!-- Clinic Email (Optional) -->
               <div class="relative">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -302,7 +355,6 @@ include "../includes/partials/head.php";
                 />
               </div>
 
-              <!-- Clinic Logo (Optional) -->
               <div class="bg-white/90 rounded-xl px-4 py-3 border border-white/40">
                 <label class="block text-xs font-semibold text-slate-700 mb-2">
                   Clinic Logo (Optional)
@@ -317,7 +369,6 @@ include "../includes/partials/head.php";
                 />
               </div>
 
-              <!-- Business ID -->
               <div class="relative">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -338,7 +389,6 @@ include "../includes/partials/head.php";
                 />
               </div>
 
-              <!-- Buttons -->
               <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
@@ -366,6 +416,70 @@ include "../includes/partials/head.php";
 
 </main>
 
+<!-- ADD DOCTOR MODAL -->
+<div id="doctorModal" class="modal-backdrop fixed inset-0 z-50 items-center justify-center p-4" style="background: rgba(0,0,0,.55);">
+  <div class="w-full max-w-xl rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden">
+    <div class="px-5 py-4 flex items-center justify-between" style="background: var(--primary);">
+      <div>
+        <p class="text-white font-bold">Add Doctor</p>
+        <p class="text-white/80 text-xs">Fill in the doctor details. All fields are required.</p>
+      </div>
+      <button type="button" id="closeDoctorModal" class="text-white/90 hover:text-white text-xl leading-none">&times;</button>
+    </div>
+
+    <div class="p-5">
+      <!-- modal body unchanged -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+          <input id="docFullName" type="text" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700" placeholder="e.g., Juan Dela Cruz" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Birthdate</label>
+          <input id="docBirthdate" type="date" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Specialization</label>
+          <input id="docSpecialization" type="text" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700" placeholder="e.g., Pediatrics" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">PRC (License No.)</label>
+          <input id="docPrc" type="text" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700" placeholder="e.g., 1234567" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+          <input id="docEmail" type="text" data-validate="email" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700" placeholder="doctor@email.com" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Contact Number</label>
+          <div class="flex gap-2">
+            <div class="w-20 h-11 flex items-center justify-center rounded-xl bg-slate-50 text-slate-700 font-semibold border border-slate-200">
+              +63
+            </div>
+            <input id="docPhone" type="text" maxlength="10" inputmode="numeric" data-validate="phone-ph" class="flex-1 h-11 rounded-xl border border-slate-200 px-4 text-slate-700" placeholder="9123456789" />
+          </div>
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Schedule</label>
+          <textarea id="docSchedule" rows="3" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-700" placeholder="e.g., Mon–Fri 9:00 AM–3:00 PM"></textarea>
+          <p class="mt-1 text-[11px] text-slate-500">Tip: Keep it short and clear (max 300 characters).</p>
+        </div>
+      </div>
+
+      <div class="mt-5 flex items-center justify-end gap-2">
+        <button type="button" id="cancelDoctor" class="px-4 py-2 rounded-xl font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50">Cancel</button>
+        <button type="button" id="saveDoctor" class="px-4 py-2 rounded-xl font-bold text-black shadow-sm hover:shadow" style="background: var(--secondary);">Save Doctor</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="<?php echo $baseUrl; ?>/assets/js/form-validators.js"></script>
 
 <script>
@@ -376,40 +490,39 @@ include "../includes/partials/head.php";
   const nextBtn = document.getElementById('nextBtn');
   const backBtn = document.getElementById('backBtn');
 
-  const labelStep1 = document.getElementById('labelStep1');
-  const labelStep2 = document.getElementById('labelStep2');
-  const progressBar = document.getElementById('progressBar');
-
-  const titleStep1Wrap = document.getElementById('titleStep1Wrap');
-  const titleStep2Wrap = document.getElementById('titleStep2Wrap');
-
   const specialtySelect = document.getElementById("specialtySelect");
   const otherWrap = document.getElementById("otherSpecialtyWrap");
   const otherInput = otherWrap?.querySelector('input[name="specialty_other"]');
+
+  // ✅ Remember which fields were originally required (so we can toggle safely)
+  document.querySelectorAll('#signupWizard [required]').forEach(el => {
+    el.dataset.wasRequired = "1";
+  });
 
   function showStep(n){
     if(n === 1){
       step1.classList.add('active');
       step2.classList.remove('active');
-      labelStep1.classList.remove('opacity-60');
-      labelStep1.classList.add('opacity-100');
-      labelStep2.classList.add('opacity-60');
-      progressBar.style.width = '50%';
 
-      titleStep1Wrap?.classList.remove('hidden');
-      titleStep2Wrap?.classList.add('hidden');
+      toggleStepRequired(step1, true);
+      toggleStepRequired(step2, false);
       return;
     }
+
     step1.classList.remove('active');
     step2.classList.add('active');
-    labelStep1.classList.add('opacity-60');
-    labelStep2.classList.remove('opacity-60');
-    labelStep2.classList.add('opacity-100');
-    progressBar.style.width = '100%';
 
-    titleStep1Wrap?.classList.add('hidden');
-    titleStep2Wrap?.classList.remove('hidden');
+    toggleStepRequired(step1, false);
+    toggleStepRequired(step2, true);
   }
+
+  function toggleStepRequired(container, enabled){
+  // Only toggle fields that were originally required
+    container.querySelectorAll('[data-was-required="1"]').forEach(el => {
+      el.required = !!enabled;
+    });
+  }
+
 
   function toggleOtherSpecialty() {
     const isOther = specialtySelect?.value === "Other";
@@ -429,32 +542,34 @@ include "../includes/partials/head.php";
   toggleOtherSpecialty();
 
   nextBtn?.addEventListener('click', () => {
-  // ✅ trigger validators to set customValidity (password-confirm, etc.)
-  const form = document.getElementById('signupWizard');
-  form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    const step1Inputs = step1.querySelectorAll('input, select, textarea');
 
-  // Validate only step 1 fields
-  const step1Inputs = step1.querySelectorAll('input, select, textarea');
-  for (const el of step1Inputs) {
-    if (!el.checkValidity()) {
-      el.reportValidity();
-      return;
+    for (const el of step1Inputs) {
+      if (el.closest('.hidden')) continue;
+      if (!el.checkValidity()) {
+        el.reportValidity();
+        return;
+      }
     }
-  }
 
-  showStep(2);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-});
-
+    showStep(2);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
 
   backBtn?.addEventListener('click', () => {
     showStep(1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
-  showStep(1);
+  // ✅ If server sent us back with ?step=2, stay on Step 2
+  const urlStep = new URLSearchParams(window.location.search).get('step');
+  if (urlStep === '2') showStep(2);
+  else showStep(1);
+
 })();
 </script>
+
+<script src="<?php echo $baseUrl; ?>/assets/js/signup-admin-doctors.js"></script>
 
 </body>
 </html>

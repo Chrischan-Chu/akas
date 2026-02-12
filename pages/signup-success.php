@@ -3,7 +3,6 @@ $appTitle = "AKAS | Sign Up Success";
 $baseUrl  = "/AKAS";
 require_once __DIR__ . '/../includes/auth.php';
 
-// If they're already logged in, send where they belong
 if (auth_is_logged_in()) {
   header('Location: ' . ($baseUrl . (auth_role() === 'clinic_admin' ? '/admin/dashboard.php' : '/index.php#top')));
   exit;

@@ -44,7 +44,6 @@ include "../includes/partials/head.php";
       method="POST"
       class="grid gap-4">
 
-  <!-- Name -->
   <div>
     <label class="block text-xs font-bold text-slate-600 mb-2">Full Name</label>
     <input
@@ -55,8 +54,6 @@ include "../includes/partials/head.php";
       class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-200"
     />
   </div>
-
-  <!-- Gender -->
   <div>
     <label class="block text-xs font-bold text-slate-600 mb-2">Gender</label>
 
@@ -68,8 +65,6 @@ include "../includes/partials/head.php";
         class="appearance-none w-full rounded-xl bg-white px-4 pr-12 py-3
               text-slate-700 outline-none border border-slate-200
               focus:ring-2 focus:ring-slate-200">
-
-        <!-- default -->
         <option value="" disabled hidden <?= empty($me['gender']) ? 'selected' : '' ?>>
           Select a Gender
         </option>
@@ -80,8 +75,6 @@ include "../includes/partials/head.php";
           Prefer not to say
         </option>
       </select>
-
-      <!-- arrow (same style as your clinic dropdown) -->
       <div class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M6 9l6 6 6-6"/>
@@ -89,9 +82,6 @@ include "../includes/partials/head.php";
       </div>
     </div>
   </div>
-
-
-  <!-- Email -->
   <div>
     <label class="block text-xs font-bold text-slate-600 mb-2">Email (Read-Only)</label>
     <input
@@ -101,8 +91,6 @@ include "../includes/partials/head.php";
       class="w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50 text-slate-600"
     />
   </div>
-
-  <!-- Phone -->
   <div>
     <label class="block text-xs font-bold text-slate-600 mb-2">Phone Number</label>
 
@@ -125,8 +113,6 @@ include "../includes/partials/head.php";
       />
     </div>
   </div>
-
-  <!-- Birthdate -->
   <div>
     <label class="block text-xs font-bold text-slate-600 mb-2">Birthdate</label>
 
@@ -140,14 +126,10 @@ include "../includes/partials/head.php";
       class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-200"
     />
   </div>
-
-  <!-- Change Password -->
   <div class="rounded-2xl border border-slate-200 p-4">
   <div class="font-bold text-slate-900">Change Password (Optional)</div>
 
   <div class="grid gap-3 mt-3">
-
-    <!-- CURRENT PASSWORD (NEW) -->
     <input
       type="password"
       id="current_password"
@@ -155,8 +137,6 @@ include "../includes/partials/head.php";
       placeholder="Current password"
       class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-200"
     />
-
-    <!-- NEW PASSWORD -->
     <input
       type="password"
       id="new_password"
@@ -165,8 +145,6 @@ include "../includes/partials/head.php";
       data-validate="password-optional"
       class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-200"
     />
-
-    <!-- CONFIRM -->
     <input
       type="password"
       id="confirm_password"
@@ -179,9 +157,6 @@ include "../includes/partials/head.php";
 
   </div>
 </div>
-
-
-  <!-- Buttons -->
   <div class="flex flex-col sm:flex-row gap-3 mt-2">
     <a href="<?php echo $baseUrl; ?>/index.php#home"
        class="flex-1 text-center py-3 rounded-xl font-bold text-slate-900"

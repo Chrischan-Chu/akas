@@ -30,19 +30,13 @@ include "../includes/partials/head.php";
 
     <div class="grid grid-cols-1 lg:grid-cols-2 min-h-[560px]">
 
-      <div class="bg-[#FFFDF6] relative flex items-start justify-center pt-16 p-10">
+      <div class="bg-[#FFFDF6] relative flex items-center justify-center h-full">
+
         <img
           src="<?php echo $baseUrl; ?>/assets/img/akas-logo.png"
           alt="AKAS Logo"
-          class="w-80 max-w-full"
-        />
+          class="w-44 sm:w-56 md:w-64 lg:w-72 xl:w-80 max-w-full"
 
-        <img
-          src="<?php echo $baseUrl; ?>/assets/img/doctor.png"
-          alt="Doctor"
-          class="hidden lg:block absolute bottom-0 z-30 pointer-events-none
-                 -right-10 xl:-right-24
-                 w-[260px] lg:w-[300px] xl:w-[360px]"
         />
       </div>
 
@@ -76,8 +70,10 @@ include "../includes/partials/head.php";
                 type="text"
                 name="email"
                 placeholder="Email"
-                class="w-full rounded-xl bg-white px-12 py-3 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                data-validate="email"
                 required
+                class="w-full rounded-xl bg-white px-12 py-3 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                
               />
             </div>
 

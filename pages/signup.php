@@ -3,7 +3,6 @@ $appTitle = "AKAS | Choose Account Type";
 $baseUrl  = "/AKAS";
 require_once __DIR__ . '/../includes/auth.php';
 
-// If already logged in, send where they belong
 if (auth_is_logged_in()) {
   header('Location: ' . ($baseUrl . (auth_role() === 'clinic_admin' ? '/admin/dashboard.php' : '/index.php#top')));
   exit;
@@ -32,8 +31,6 @@ if (auth_is_logged_in()) {
 <body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-[var(--secondary)]/40 px-6">
 
   <main class="text-center w-full max-w-3xl">
-
-    <!-- TITLE -->
     <h1 class="text-5xl font-bold mb-4 text-[var(--primary)]">
       Welcome to AKAS
     </h1>
@@ -42,11 +39,7 @@ if (auth_is_logged_in()) {
       Choose how you want to continue
     </p>
 
-
-    <!-- CARDS -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-      <!-- USER -->
       <a href="signup-user.php"
          class="bg-[var(--accent)] text-white rounded-2xl py-8 px-6 text-2xl font-bold
                 shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-2
@@ -58,8 +51,6 @@ if (auth_is_logged_in()) {
         </span>
       </a>
 
-
-      <!-- ADMIN -->
       <a href="signup-admin.php"
          class="bg-[var(--primary)] text-white rounded-2xl py-8 px-6 text-2xl font-bold
                 shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-2
@@ -74,7 +65,7 @@ if (auth_is_logged_in()) {
     </div>
 
 
-    <!-- BACK -->
+
     <div class="mt-14">
       <a href="/AKAS/index.php#home"
          class="text-sm text-[var(--primary)] hover:underline transition">

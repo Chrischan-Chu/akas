@@ -1,13 +1,16 @@
 <?php
-// includes/partials/head.php
 if (!isset($appTitle)) { $appTitle = "AKAS"; }
 if (!isset($baseUrl))  { $baseUrl  = "/AKAS"; }
 
-// ✅ Auth bootstrap (starts session + guards admin routes)
 require_once dirname(__DIR__) . "/auth.php";
-auth_enforce_admin_dashboard_only($baseUrl);
 
-// Cache-bust Tailwind build when file changes
+/**
+ * IMPORTANT:
+ * We DO NOT force clinic_admin/superadmin to stay inside /admin/*
+ * because they should be able to view the public website (View Website button).
+ * Admin page protection is handled by /admin/_guard.php and auth_require_role().
+ */
+
 $cssFile = dirname(__DIR__, 2) . "/assets/css/output.css";
 $cssVer  = file_exists($cssFile) ? filemtime($cssFile) : time();
 ?>
@@ -20,10 +23,7 @@ $cssVer  = file_exists($cssFile) ? filemtime($cssFile) : time();
 
   <link rel="stylesheet" href="<?php echo $baseUrl; ?>/assets/css/output.css?v=<?php echo $cssVer; ?>">
 
-
-
   <script>
-    // ✅ If page loads with a hash (#clinics), disable smooth scrolling BEFORE paint
     (function () {
       if (location.hash) {
         document.documentElement.classList.add("nohash-snap");

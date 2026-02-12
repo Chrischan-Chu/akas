@@ -9,7 +9,7 @@ $success = isset($_GET['sent']);
 
 <section id="contact" class="scroll-mt-24" style="background-color: white;">
 
-  <!-- HEADER -->
+ 
   <section class="py-6 text-center" style="background:var(--primary)">
     <div class="max-w-6xl mx-auto px-4">
       <h1 class="text-3xl tracking-widest font-bold text-white">CONTACT</h1>
@@ -20,7 +20,7 @@ $success = isset($_GET['sent']);
   </section>
 
 
-  <!-- FORM -->
+ 
   <section class="py-12 px-4 ">
     <div class="max-w-6xl mx-auto">
 
@@ -36,10 +36,8 @@ $success = isset($_GET['sent']);
       <div class="rounded-3xl shadow-sm p-6 md:p-10 text-white" style="background-color: var(--secondary);">
         <form class="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-          <!-- LEFT SIDE -->
+       
           <div class="space-y-5">
-
-            <!-- Clinic Select -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 Choose Clinic
@@ -59,7 +57,7 @@ $success = isset($_GET['sent']);
                   <?php endforeach; ?>
                 </select>
 
-                <!-- Custom Arrow -->
+      
                 <div class="pointer-events-none absolute inset-y-0 right-4 flex items-center text-black">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path d="M6 9l6 6 6-6"/>
@@ -71,30 +69,25 @@ $success = isset($_GET['sent']);
                 Your message will be sent to the selected clinic.
               </p>
             </div>
-
-
-            <!-- Name -->
+          
             <input type="text"
               placeholder="Your Name"
               class="w-full rounded-xl px-4 py-3 text-black placeholder-black"
               style="background-color: white;" required>
 
 
-            <!-- Email -->
             <input type="email"
               placeholder="Email"
               class="w-full rounded-xl px-4 py-3 text-black placeholder-black"
               style="background-color: white;" required>
 
 
-            <!-- Subject -->
             <input type="text"
               placeholder="Subject"
               class="w-full rounded-xl px-4 py-3 text-black placeholder-black"
               style="background-color: white; " required>
 
 
-            <!-- Category -->
             <div class="relative">
               <select
                 name="category"
@@ -118,7 +111,6 @@ $success = isset($_GET['sent']);
           </div>
 
 
-          <!-- RIGHT SIDE -->
           <div class="flex flex-col">
 
             <textarea
@@ -154,7 +146,6 @@ $success = isset($_GET['sent']);
   </section>
 
 
-  <!-- FOOTER CONTACT -->
   <section class="py-16 px-4 text-white" style="background:var(--primary)">
     <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
 

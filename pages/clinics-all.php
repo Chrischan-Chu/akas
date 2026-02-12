@@ -1,10 +1,10 @@
 <?php
-// pages/clinics-all.php — All Clinics page (with working tabs + search filter)
+
 $appTitle  = "AKAS | All Clinics";
 $baseUrl   = "/AKAS";
 include __DIR__ . "/../includes/partials/head.php";
 
-// Tabs
+
 $tabs = [
   "all"       => "All",
   "general"   => "General",
@@ -13,15 +13,15 @@ $tabs = [
   "derma"     => "Derma",
 ];
 
-// Get active tab + query (shareable URL)
+
 $activeTab = $_GET["tab"] ?? "all";
 if (!isset($tabs[$activeTab])) $activeTab = "all";
 $q = trim($_GET["q"] ?? "");
 
-// ✅ DB data (Clinic Admin accounts + their CMS details)
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
 
-/** Map the stored specialty text into one of our tab keys */
+
 function clinic_category_from_specialty(string $specialty): string {
   $s = strtolower($specialty);
   if (str_contains($s, 'dental')) return 'dental';
@@ -30,14 +30,21 @@ function clinic_category_from_specialty(string $specialty): string {
   return 'general';
 }
 
-$rows = db()->query(
-  "SELECT
+$isSuperAdmin = auth_is_logged_in() && auth_role() === 'super_admin';
+
+$sql = "SELECT
         c.id AS clinic_id,
         c.clinic_name, c.specialty, c.specialty_other, c.logo_path,
         c.description, c.address, c.contact, c.email, c.is_open, c.open_time, c.close_time
-     FROM clinics c
- ORDER BY c.clinic_name ASC"
-)->fetchAll();
+     FROM clinics c ";
+
+if (!$isSuperAdmin) {
+  $sql .= "WHERE c.approval_status = 'APPROVED' ";
+}
+
+$sql .= "ORDER BY c.clinic_name ASC";
+
+$rows = db()->query($sql)->fetchAll();
 
 $clinics = [];
 foreach ($rows as $r) {
@@ -46,7 +53,7 @@ foreach ($rows as $r) {
 
   $specialty = (string)($r['specialty'] ?? '');
   $specialtyOther = (string)($r['specialty_other'] ?? '');
-  // Display: if specialty is "Other", show the custom text only
+
   $displayType = ($specialty === 'Other' && $specialtyOther !== '') ? $specialtyOther : $specialty;
   $category  = clinic_category_from_specialty($specialty);
 
@@ -66,7 +73,7 @@ foreach ($rows as $r) {
   ];
 }
 
-// Server-side filter: tab + search
+
 $qLower = strtolower($q);
 $clinics = array_values(array_filter($clinics, function ($c) use ($activeTab, $qLower) {
   if ($activeTab !== 'all' && ($c['category'] ?? '') !== $activeTab) return false;
@@ -85,7 +92,7 @@ $clinics = array_values(array_filter($clinics, function ($c) use ($activeTab, $q
 <main class="flex-1 px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
   <div class="max-w-6xl mx-auto">
 
-    <!-- Header Card -->
+
     <section class="rounded-3xl p-6 sm:p-8 bg-white/70 border-white/60 shadow-sm">
       <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
@@ -111,10 +118,10 @@ $clinics = array_values(array_filter($clinics, function ($c) use ($activeTab, $q
         </a>
       </div>
 
-      <!-- Tabs + Search (aligned + balanced) -->
+ 
       <div class="mt-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 
-        <!-- LEFT: Tabs -->
+    
         <div class="flex-shrink-0">
           <div class="inline-flex gap-2 p-1 rounded-full bg-white border border-slate-200 shadow-sm">
 
@@ -134,7 +141,7 @@ $clinics = array_values(array_filter($clinics, function ($c) use ($activeTab, $q
           </div>
         </div>
 
-        <!-- RIGHT: Search -->
+
         <form class="flex items-center gap-3 w-full lg:w-[420px]" method="get" action="">
           <input type="hidden" name="tab" value="<?php echo htmlspecialchars($activeTab); ?>">
 
@@ -163,12 +170,12 @@ $clinics = array_values(array_filter($clinics, function ($c) use ($activeTab, $q
 
       </div>
 
-    <!-- RESULTS -->
+                                  
     <section class="mt-8">
       <div id="clinicGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <?php foreach ($clinics as $c): ?>
           <?php
-            // Return URL keeps tab + query when you go back from profile
+  
             $returnUrl = $baseUrl . "/pages/clinics-all.php?tab=" . urlencode($activeTab) . "&q=" . urlencode($q);
           ?>
           <a
@@ -260,7 +267,7 @@ $clinics = array_values(array_filter($clinics, function ($c) use ($activeTab, $q
 
       </div>
 
-      <!-- Empty state -->
+      
       <div id="emptyState" class="hidden mt-10 text-center">
         <div class="mx-auto max-w-md rounded-3xl bg-white/70 border border-white/60 p-8 shadow-sm">
           <h3 class="text-lg font-extrabold text-slate-900">No clinics found</h3>
@@ -277,7 +284,7 @@ $clinics = array_values(array_filter($clinics, function ($c) use ($activeTab, $q
 <?php include __DIR__ . "/../includes/partials/footer.php"; ?>
 
 <script>
-// ✅ Instant client-side filtering (so it’s not “just styled”)
+
 (function () {
   const input = document.getElementById("clinicSearch");
   const cards = Array.from(document.querySelectorAll(".clinic-card"));

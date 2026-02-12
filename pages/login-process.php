@@ -4,19 +4,45 @@ declare(strict_types=1);
 $baseUrl = '/AKAS';
 require_once __DIR__ . '/../includes/auth.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-  header('Location: ' . $baseUrl . '/pages/login.php');
+function redirect(string $to): void {
+  header('Location: ' . $to);
   exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+  redirect($baseUrl . '/pages/login.php');
 }
 
 $email = strtolower(trim((string)($_POST['email'] ?? '')));
+$email = preg_replace('/\s+/', '', $email);
 $password = (string)($_POST['password'] ?? '');
 
-if ($email === '' || $password === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-  flash_set('error', 'Please enter your email and password.');
-  header('Location: ' . $baseUrl . '/pages/login.php');
-  exit;
+
+if ($email === '' || $password === '') {
+  flash_set('error', 'Invalid email or password.');
+  redirect($baseUrl . '/pages/login.php');
 }
+
+
+if (!preg_match('/^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/', $email)) {
+  flash_set('error', 'Enter a valid email (ex: name@gmail.com).');
+  redirect($baseUrl . '/pages/login.php');
+}
+
+$pdo = db();
+$stmt = $pdo->prepare('SELECT id, role, name, email, password_hash, clinic_id FROM accounts WHERE email = ? LIMIT 1');
+$stmt->execute([$email]);
+$row = $stmt->fetch();
+
+
+if (!$row || !password_verify($password, (string)$row['password_hash'])) {
+  flash_set('error', 'Invalid email or password.');
+  redirect($baseUrl . '/pages/login.php');
+}
+
+
+
+
 
 $pdo = db();
 $stmt = $pdo->prepare('SELECT id, role, name, email, password_hash, clinic_id FROM accounts WHERE email = ? LIMIT 1');

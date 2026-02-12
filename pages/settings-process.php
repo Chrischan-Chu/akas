@@ -13,8 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $name      = trim((string)($_POST['name'] ?? ''));
 $gender = trim((string)($_POST['gender'] ?? ''));
-$phone     = trim((string)($_POST['phone'] ?? ''));      // expects 10 digits, starts with 9
-$birthdate = trim((string)($_POST['birthdate'] ?? ''));  // YYYY-MM-DD from <input type="date">
+$phone     = trim((string)($_POST['phone'] ?? ''));     
+$birthdate = trim((string)($_POST['birthdate'] ?? '')); 
 $currentPass = (string)($_POST['current_password'] ?? '');
 $newPass     = (string)($_POST['new_password'] ?? '');
 $confirm     = (string)($_POST['confirm_password'] ?? '');
@@ -32,12 +32,8 @@ if (!in_array($gender, $allowedGender, true)) {
   header('Location: ' . $baseUrl . '/pages/settings.php');
   exit;
 }
-
-
-/* ---------------- Phone validation (optional field) ---------------- */
 $phoneVal = null;
 if ($phone !== '') {
-  // keep digits only (extra safety)
   $phone = preg_replace('/\D+/', '', $phone) ?? '';
   if (!preg_match('/^9\d{9}$/', $phone)) {
     flash_set('error', 'Enter a valid PH mobile number (ex: 9123456789).');
@@ -46,45 +42,44 @@ if ($phone !== '') {
   }
   $phoneVal = $phone;
 }
-
-/* ---------------- Birthdate validation (optional field, must be 18+) ---------------- */
 $birthdateVal = null;
 if ($birthdate !== '') {
-  $d = date_create($birthdate);
+  $d = DateTime::createFromFormat('Y-m-d', $birthdate);
   if (!$d) {
     flash_set('error', 'Enter a valid birth date.');
-    header('Location: ' . $baseUrl . '/pages/settings.php');
-    exit;
+    redirect($baseUrl . '/pages/signup-user.php');
   }
 
-  $birthdateVal = $d->format('Y-m-d');
-
-  // 18+ check
+  $d->setTime(0, 0, 0);
   $today = new DateTime('today');
+  $today->setTime(0, 0, 0);
+
+  // ✅ NEW: future date check
+  if ($d > $today) {
+    flash_set('error', 'Birth date cannot be in the future.');
+    redirect($baseUrl . '/pages/signup-user.php');
+  }
+
   $age = $d->diff($today)->y;
   if ($age < 18) {
     flash_set('error', 'You must be at least 18 years old.');
-    header('Location: ' . $baseUrl . '/pages/settings.php');
-    exit;
+    redirect($baseUrl . '/pages/signup-user.php');
   }
+
+  $birthdateVal = $d->format('Y-m-d');
 }
 
-$pdo = db();
 
-/* ---------------- Password update (optional but secure) ---------------- */
+$pdo = db();
 $setPassword = false;
 $hash = null;
 
 if ($newPass !== '' || $confirm !== '') {
-
-  // must provide current password
   if ($currentPass === '') {
     flash_set('error', 'Enter your current password.');
     header('Location: ' . $baseUrl . '/pages/settings.php');
     exit;
   }
-
-  // fetch current hash from DB
   $stmt = $pdo->prepare('SELECT password_hash FROM accounts WHERE id = ? LIMIT 1');
   $stmt->execute([auth_user_id()]);
   $row = $stmt->fetch();
@@ -94,8 +89,6 @@ if ($newPass !== '' || $confirm !== '') {
     header('Location: ' . $baseUrl . '/pages/settings.php');
     exit;
   }
-
-  // password strength rules
   $minLen = strlen($newPass) >= 8;
   $hasUpper = preg_match('/[A-Z]/', $newPass) === 1;
   $hasSpecial = preg_match('/[^A-Za-z0-9]/', $newPass) === 1;
@@ -116,20 +109,11 @@ if ($newPass !== '' || $confirm !== '') {
   $setPassword = true;
 }
 
-
-
-/* ---------------- Save ---------------- */
-
 $changes = [];
-
-// fetch current values first
 $stmt = $pdo->prepare('SELECT name, gender, phone, birthdate FROM accounts WHERE id = ? LIMIT 1');
 $stmt->execute([auth_user_id()]);
 $old = $stmt->fetch() ?: [];
 
-/* ---- detect changes ---- */
-
-// name
 if ($name !== ($old['name'] ?? '')) {
   $changes[] = 'Full Name';
 }
@@ -137,24 +121,22 @@ if ($name !== ($old['name'] ?? '')) {
 if ($gender !== ($old['gender'] ?? '')) {
   $changes[] = 'Gender';
 }
-// phone
+
 $oldPhone = $old['phone'] ?? null;
 if ($phoneVal !== $oldPhone) {
   $changes[] = 'Phone Number';
 }
 
-// birthdate
+
 $oldBirth = $old['birthdate'] ?? null;
 if ($birthdateVal !== $oldBirth) {
   $changes[] = 'Birthdate';
 }
 
-// password
 if ($setPassword) {
   $changes[] = 'Password';
 }
 
-/* ---- save ---- */
 
 if ($setPassword) {
   $stmt = $pdo->prepare('UPDATE accounts SET name=?, gender=?, phone=?, birthdate=?, password_hash=? WHERE id=?');
@@ -164,10 +146,8 @@ if ($setPassword) {
   $stmt->execute([$name, $gender, $phoneVal, $birthdateVal, auth_user_id()]);
 }
 
-// Keep navbar name updated
 $_SESSION['auth']['name'] = $name;
 
-/* ---- build message ---- */
 
 if ($changes) {
 

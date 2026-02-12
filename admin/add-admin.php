@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/_guard.php';
 
 $appTitle = 'AKAS | Add Admin Account';
 $baseUrl  = '/AKAS';

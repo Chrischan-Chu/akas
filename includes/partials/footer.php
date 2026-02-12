@@ -1,5 +1,4 @@
 <?php
-// includes/partials/footer.php
 ?>
 <section class = "bg-gray-900">
 <footer class="bg-gray-900 text-white text-center py-4">

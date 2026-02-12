@@ -2,15 +2,24 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
 $pdo = db();
 
-// Show the latest 3 clinics
-$stmt = $pdo->query("SELECT id,
-                            clinic_name, specialty, specialty_other, logo_path,
-                            description, address
-                     FROM clinics
-                     ORDER BY updated_at DESC
-                     LIMIT 3");
+$isSuperAdmin = auth_is_logged_in() && auth_role() === 'super_admin';
+
+
+$sql = "SELECT id,
+               clinic_name, specialty, specialty_other, logo_path,
+               description, address
+        FROM clinics ";
+
+if (!$isSuperAdmin) {
+  $sql .= "WHERE approval_status = 'APPROVED' ";
+}
+
+$sql .= "ORDER BY updated_at DESC LIMIT 3";
+
+$stmt = $pdo->query($sql);
 $clinics = $stmt->fetchAll() ?: [];
 
 function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
@@ -21,7 +30,6 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
 
     <div class="max-w-6xl mx-auto">
 
-      <!-- Header -->
       <div class="flex items-center justify-between gap-4 mb-8">
         <h2 class="text-3xl md:text-4xl font-extrabold text-white">
           Clinics
@@ -35,7 +43,6 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
       </div>
 
 
-      <!-- BIGGER GRID -->
       <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-6 px-8 lg:px-0">
 
         <?php foreach ($clinics as $c): ?>
@@ -45,10 +52,10 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
 
             <div class="p-8 min-h-[210px] flex flex-col justify-between">
 
-              <!-- Top -->
+           
               <div class="flex items-center gap-5">
 
-                <!-- Bigger icon -->
+            
                 <div class="h-20 w-20 rounded-3xl flex items-center justify-center shadow-sm overflow-hidden"
                      style="background: #40b7ff26;">
                   <?php if (!empty($c['logo_path'])): ?>
@@ -70,22 +77,23 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
                       $display = ($spec === 'Other' && $specOther !== '') ? $specOther : $spec;
                     ?>
                     <?php echo h($display); ?>
-                    <?php if (!empty($c['address'])): ?>
-                      • <?php echo h((string)$c['address']); ?>
-                    <?php endif; ?>
+                  </p>
+
+                  <p class="text-slate-500 text-xs truncate mt-0.5">
+                    <?php echo !empty($c['address']) ? h((string)$c['address']) : '—'; ?>
                   </p>
                 </div>
 
               </div>
 
 
-              <!-- Middle -->
+     
               <p class="text-slate-600 mt-5 text-base leading-relaxed line-clamp-3">
                 <?php echo !empty($c['description']) ? h((string)$c['description']) : 'No clinic description yet.'; ?>
               </p>
 
 
-              <!-- Bottom -->
+              
               <div class="mt-6 text-sm font-bold group-hover:translate-x-1 transition"
                    style="color: var(--secondary);">
                 View profile →

@@ -25,6 +25,7 @@ $stmt = $pdo->prepare(
       email,
       description,
       address,
+      approval_status,
       is_open,
       open_time,
       close_time,
@@ -41,20 +42,54 @@ if (!$clinic) {
   exit;
 }
 
-// Extra details saved from admin CMS (same clinics row)
+// Hide unapproved clinics from the public.
+$approval = (string)($clinic['approval_status'] ?? 'APPROVED');
+$viewerRole = auth_role();
+$canViewUnapproved = ($viewerRole === 'super_admin')
+  || ($viewerRole === 'clinic_admin' && auth_clinic_id() === $clinicId);
+
+if ($approval !== 'APPROVED' && !$canViewUnapproved) {
+  header('Location: ' . $baseUrl . '/index.php#clinics');
+  exit;
+}
+
+
 $details = $clinic ?: [];
-
-// Doctors
-$stmt = $pdo->prepare('SELECT id, name, about, availability, image_path FROM clinic_doctors WHERE clinic_id=? ORDER BY id DESC');
-$stmt->execute([$clinicId]);
-$doctors = $stmt->fetchAll();
-
-$clinicName = (string)($clinic['clinic_name'] ?? 'Clinic');
-$appTitle = $clinicName . " | AKAS";
 
 $isLoggedIn = auth_is_logged_in();
 $role = auth_role();
 $isUser = $isLoggedIn && $role === 'user';
+$isAdminViewer = $isLoggedIn && in_array($role, ['clinic_admin','super_admin'], true);
+
+// Doctors
+if ($isAdminViewer) {
+  // clinic admin + super admin: see all doctors (including pending/declined registration doctors)
+  $stmt = $pdo->prepare('
+    SELECT id, name, about, availability, image_path
+    FROM clinic_doctors
+    WHERE clinic_id=?
+    ORDER BY id DESC
+  ');
+  $stmt->execute([$clinicId]);
+} else {
+  // public users: only approved registration doctors + CMS doctors
+  $stmt = $pdo->prepare('
+    SELECT id, name, about, availability, image_path
+    FROM clinic_doctors
+    WHERE clinic_id=?
+      AND approval_status="APPROVED"
+    ORDER BY id DESC
+  ');
+  $stmt->execute([$clinicId]);
+}
+
+$doctors = $stmt->fetchAll();
+
+
+
+$clinicName = (string)($clinic['clinic_name'] ?? 'Clinic');
+$appTitle = $clinicName . " | AKAS";
+
 
 $return = $_GET['return'] ?? ($baseUrl . "/index.php#clinics");
 if (strpos($return, $baseUrl) !== 0) {
@@ -96,7 +131,6 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
   </div>
 </section>
 
-<!-- MAIN INFO -->
 <section class="py-10 px-4">
   <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
 
@@ -107,7 +141,7 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
            alt="Clinic">
     </div>
 
-    <!-- ✅ Everyone can open and view -->
+  
     <div id="openBooking" class="rounded-2xl p-6 cursor-pointer select-none flex flex-col" style="background:var(--primary)">
       <div class="bg-white rounded-xl flex-1 min-h-[200px] flex items-center justify-center">
         <span class="text-gray-400 font-semibold">CALENDAR</span>
@@ -122,11 +156,11 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
   </div>
 </section>
 
-<!-- CLINIC DESCRIPTION / DETAILS -->
+
 <section class="px-4 pb-10">
   <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-    <!-- About / Description -->
+   
     <div class="lg:col-span-2 min-w-0 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
       <h3 class="text-xl font-extrabold" style="color:var(--secondary)">About the Clinic</h3>
 
@@ -169,7 +203,6 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
       </div>
     </div>
 
-    <!-- Quick Info Card -->
     <div class="self-start lg:sticky lg:top-24">
       <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
         <h3 class="text-lg font-extrabold" style="color:var(--secondary)">Clinic Info</h3>
@@ -205,7 +238,11 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
         </div>
 
         <div class="mt-5 rounded-xl p-4 text-xs text-slate-600" style="background: rgba(15,23,42,.04);">
-          Tip: Log in to book an appointment. You can still view the schedule without logging in.
+          <?php if ($isAdminViewer): ?>
+            Admin accounts can view schedules, but can’t book appointments.
+          <?php else: ?>
+            Tip: Log in to book an appointment. You can still view the schedule without logging in.
+          <?php endif; ?>
         </div>
       </div>
     </div>
@@ -214,7 +251,7 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
   </div>
 </section>
 
-<!-- BOOKING MODAL -->
+
 <section id="bookingModal"
          class="hidden fixed inset-0 transition-opacity duration-200 z-50 bg-black/40 px-4 flex items-center justify-center">
   <div class="max-w-6xl w-full max-h-[90vh] overflow-auto bg-white rounded-2xl shadow-lg p-6 md:p-8 relative">
@@ -232,7 +269,7 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
 
     <form class="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-      <!-- LEFT -->
+   
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -253,7 +290,7 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
         </div>
       </div>
 
-      <!-- RIGHT -->
+
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
@@ -274,7 +311,7 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
         </div>
       </div>
 
-      <!-- CALENDAR -->
+
       <div class="md:col-span-2">
         <div class="rounded-xl p-4 md:p-5" style="background:var(--primary)">
           <div class="flex items-center justify-between mb-3">
@@ -310,8 +347,8 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
             <p class="mt-3 text-xs text-gray-500">Time slots (mock UI for now):</p>
             <div id="slotGrid" class="mt-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2"></div>
 
-            <!-- ✅ Login required note + buttons -->
-            <?php if (!$isUser): ?>
+            
+            <?php if (!$isLoggedIn): ?>
               <p class="mt-3 text-xs text-red-600">
                 You have to login first before booking an appointment.
               </p>
@@ -327,6 +364,13 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
                  style="border-color: rgba(15,23,42,.18); color: white; background-color: var(--accent);">
                 Sign Up
               </a>
+
+            <?php elseif ($isAdminViewer): ?>
+
+              <p class="mt-3 text-xs text-slate-600">
+                You’re logged in as an admin. You can view schedules, but you can’t book appointments.
+              </p>
+
             <?php else: ?>
 
               <button type="button" id="bookBtn" disabled
@@ -344,7 +388,6 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
   </div>
 </section>
 
-<!-- DOCTORS (unchanged) -->
 <section class="py-10 px-4">
   <div class="max-w-6xl mx-auto">
     <?php if (empty($doctors)): ?>
@@ -356,7 +399,7 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
         <?php foreach($doctors as $d): ?>
           <a
             href="#"
-            class="doctorCard block"
+            class="doctorCard block group"
             data-doctor-id="<?php echo (int)$d['id']; ?>"
             data-clinic-id="<?php echo (int)$clinicId; ?>"
           >
@@ -368,10 +411,34 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
                   <img src="<?php echo $baseUrl; ?>/assets/img/doctor1.png" class="w-20" alt="Doctor">
                 <?php endif; ?>
               </div>
-              <div class="p-6 text-white" style="background:var(--primary)">
-                <h5 class="font-semibold truncate"><?php echo h((string)$d['name']); ?></h5>
-                <p class="text-sm line-clamp-2"><?php echo h((string)($d['about'] ?? '')); ?></p>
-              </div>
+            <div class="p-6 text-white h-28 flex flex-col justify-center"
+                  style="background:var(--primary)">
+              <h5 class="font-semibold">
+  <?php echo h((string)$d['name']); ?>
+</h5>
+
+<?php
+  $about = trim((string)($d['about'] ?? ''));
+  $short = mb_strlen($about) > 80
+      ? mb_substr($about, 0, 80) . '...'
+      : $about;
+?>
+
+<p class="text-sm text-white/90 mt-1">
+  <?php echo h($short); ?>
+</p>
+
+<span
+  class="mt-2 inline-block text-sm font-semibold cursor-pointer
+         group-hover:underline transition"
+  style="color: var(--secondary);"
+>
+  Read Full Profile →
+</span>
+
+
+
+            </div>
             </div>
           </a>
         <?php endforeach; ?>
@@ -380,7 +447,6 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
   </div>
 </section>
 
-<!-- Doctor Modal (unchanged in this file) -->
 <div id="doctorModal" class="fixed inset-0 z-[9999] hidden" aria-hidden="true">
   <div id="doctorBackdrop" class="absolute inset-0 bg-black/55"></div>
   <div class="relative h-full w-full flex items-center justify-center p-4 sm:p-6">

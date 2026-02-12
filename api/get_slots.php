@@ -30,13 +30,13 @@ $close = substr((string)$c['close_time'], 0, 5);
 
 // Existing appointments for that day (exclude cancelled)
 $stmt = $pdo->prepare(
-  "SELECT apt_time FROM appointments
-   WHERE clinic_id = ? AND apt_date = ? AND status <> 'cancelled'"
+  "SELECT APT_Time FROM appointments
+   WHERE APT_ClinicID = ? AND APT_Date = ? AND APT_Status IN ('PENDING','APPROVED')"
 );
 $stmt->execute([$clinicId, $date]);
 $booked = [];
 foreach ($stmt->fetchAll() as $r) {
-  $t = substr((string)($r['apt_time'] ?? ''), 0, 5);
+  $t = substr((string)($r['APT_Time'] ?? ''), 0, 5);
   if ($t) $booked[$t] = true;
 }
 

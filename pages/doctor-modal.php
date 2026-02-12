@@ -18,14 +18,19 @@ if ($doctorId <= 0 || $clinicId <= 0) {
   exit;
 }
 
-$stmt = $pdo->prepare('SELECT d.id, d.name, d.about, d.availability, d.image_path,
-                              c.clinic_name, c.specialty, c.specialty_other
-                       FROM clinic_doctors d
-                       JOIN clinics c ON c.id = d.clinic_id
-                       WHERE d.id = ? AND d.clinic_id = ?
-                       LIMIT 1');
+$stmt = $pdo->prepare('
+  SELECT d.id, d.name, d.about, d.availability, d.image_path,
+         d.birthdate, d.specialization, d.prc_no, d.schedule, d.email, d.contact_number,
+         c.clinic_name, c.specialty, c.specialty_other
+  FROM clinic_doctors d
+  JOIN clinics c ON c.id = d.clinic_id
+  WHERE d.id = ?
+    AND d.clinic_id = ?
+  LIMIT 1
+');
 $stmt->execute([$doctorId, $clinicId]);
 $doctor = $stmt->fetch();
+
 
 if (!$doctor) {
   echo '<div class="rounded-2xl bg-slate-50 border border-slate-200 p-6"><p class="font-extrabold text-slate-900">Doctor not found.</p></div>';
@@ -44,7 +49,6 @@ $availabilityLines = array_values(array_filter(array_map('trim', preg_split('/\r
 <div class="max-h-[70vh] sm:max-h-[75vh] overflow-y-auto pr-2 sm:pr-3 overscroll-contain">
   <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
-    <!-- LEFT CARD -->
     <div class="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-7 flex flex-col items-center text-center border border-slate-100">
       <div class="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden flex items-center justify-center" style="background:rgba(255,161,84,.35)">
         <img src="<?php echo h((string)$img); ?>" loading="lazy" decoding="async" class="w-full h-full object-cover" alt="Doctor" />
@@ -59,7 +63,6 @@ $availabilityLines = array_values(array_filter(array_map('trim', preg_split('/\r
       </div>
     </div>
 
-    <!-- RIGHT CARD -->
     <div class="lg:col-span-3 rounded-3xl p-6 sm:p-7 text-white"
          style="background:linear-gradient(135deg, rgba(64,183,255,.96), rgba(11,56,105,.92));">
 
@@ -96,6 +99,19 @@ $availabilityLines = array_values(array_filter(array_map('trim', preg_split('/\r
           <?php endif; ?>
         </div>
       </div>
+             
+       <div class="mt-6">
+        <h4 class="font-bold text-base sm:text-lg">Contact Information</h4>
+         <div class="mt-3 rounded-2xl bg-white/10 overflow-hidden border border-white/20 p-4 space-y-2">
+      <div class="mt-3 text-sm text-slate-700 space-y-1">
+        <div><b>Specialization:</b> <?php echo h($doctor['specialization'] ?? '—'); ?></div>
+        <div><b>PRC:</b> <?php echo h($doctor['prc_no'] ?? '—'); ?></div>
+        <div><b>Birthdate:</b> <?php echo h($doctor['birthdate'] ?? '—'); ?></div>
+        <div><b>Email:</b> <?php echo h($doctor['email'] ?? '—'); ?></div>
+        <div><b>Contact:</b> <?php echo h($doctor['contact_number'] ?? '—'); ?></div>
+        <div><b>Schedule:</b> <?php echo nl2br(h($doctor['schedule'] ?? '—')); ?></div>
+      </div>
+
 
     </div>
   </div>
