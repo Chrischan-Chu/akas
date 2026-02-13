@@ -3,6 +3,11 @@ $appTitle = "AKAS | Clinic Sign Up";
 $baseUrl  = "/AKAS";
 
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/google_config.php';
+
+// ✅ flash messages (so you can see why "Create Clinic" bounces back)
+$errMsg = flash_get('error');
+$okMsg  = flash_get('success');
 
 $declinedDoctorCount = 0;
 try {
@@ -23,6 +28,8 @@ try {
 } catch (Throwable $e) {
   $declinedDoctorCount = 0; // fail silently
 }
+
+$locked = (($_GET['locked'] ?? '') === '1');
 
 include "../includes/partials/head.php";
 ?>
@@ -94,6 +101,19 @@ include "../includes/partials/head.php";
             </div>
           </div>
 
+          <!-- ✅ SHOW FLASH MESSAGES HERE -->
+          <?php if (!empty($errMsg)): ?>
+            <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
+              <?php echo htmlspecialchars((string)$errMsg, ENT_QUOTES, 'UTF-8'); ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (!empty($okMsg)): ?>
+            <div class="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-700 text-sm">
+              <?php echo htmlspecialchars((string)$okMsg, ENT_QUOTES, 'UTF-8'); ?>
+            </div>
+          <?php endif; ?>
+
           <form id="signupWizard"
                 action="<?php echo $baseUrl; ?>/pages/signup-process.php"
                 method="POST"
@@ -101,6 +121,12 @@ include "../includes/partials/head.php";
                 class="space-y-4">
 
             <input type="hidden" name="role" value="clinic_admin" />
+
+            <input type="hidden" name="google_locked" value="<?php echo $locked ? '1' : '0'; ?>" />
+            <?php if ($locked && auth_is_logged_in() && auth_role() === 'clinic_admin'): ?>
+              <input type="hidden" name="admin_name" value="<?php echo htmlspecialchars(auth_name() ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
+              <input type="hidden" name="email" value="<?php echo htmlspecialchars(auth_email() ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
+            <?php endif; ?>
 
             <!-- STEP 1 -->
             <div id="step1" class="step active space-y-3">
@@ -274,9 +300,7 @@ include "../includes/partials/head.php";
                 <div id="doctorsList" class="mt-3 space-y-2"></div>
               </div>
 
-              <!-- (rest of your Step 2 inputs remain unchanged) -->
-              <!-- ... keep everything else exactly as you already have ... -->
-
+              <!-- Clinic Type -->
               <div class="bg-white/90 rounded-xl px-4 py-3 border border-white/40">
                 <label class="block text-xs font-semibold text-slate-700 mb-2">
                   Clinic Type / Category
@@ -465,11 +489,64 @@ include "../includes/partials/head.php";
           </div>
         </div>
 
-        <div class="sm:col-span-2">
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Schedule</label>
-          <textarea id="docSchedule" rows="3" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-700" placeholder="e.g., Mon–Fri 9:00 AM–3:00 PM"></textarea>
-          <p class="mt-1 text-[11px] text-slate-500">Tip: Keep it short and clear (max 300 characters).</p>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Availability</label>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="sm:col-span-1">
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Slot length</label>
+            <select id="docSlotMins" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700">
+              <option value="30" selected>30 minutes</option>
+              <option value="15">15 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Start time</label>
+            <input id="docStartTime" type="time" step="1800"
+                  class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700"
+                  value="09:00" />
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">End time</label>
+            <input id="docEndTime" type="time" step="1800"
+                  class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700"
+                  value="17:00" />
+          </div>
         </div>
+
+        <div class="mt-3">
+          <label class="block text-[11px] font-semibold text-slate-600 mb-2">Days available</label>
+          <div class="flex flex-wrap gap-2">
+            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+              <input type="checkbox" class="mr-2" id="dMon" checked>Mon
+            </label>
+            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+              <input type="checkbox" class="mr-2" id="dTue" checked>Tue
+            </label>
+            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+              <input type="checkbox" class="mr-2" id="dWed" checked>Wed
+            </label>
+            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+              <input type="checkbox" class="mr-2" id="dThu" checked>Thu
+            </label>
+            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+              <input type="checkbox" class="mr-2" id="dFri" checked>Fri
+            </label>
+            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+              <input type="checkbox" class="mr-2" id="dSat">Sat
+            </label>
+            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+              <input type="checkbox" class="mr-2" id="dSun">Sun
+            </label>
+          </div>
+        </div>
+
+        <p class="mt-2 text-[11px] text-slate-500">
+          Start/End must be within clinic hours. Booking uses 30-min slots.
+        </p>
+
       </div>
 
       <div class="mt-5 flex items-center justify-end gap-2">
@@ -517,12 +594,11 @@ include "../includes/partials/head.php";
   }
 
   function toggleStepRequired(container, enabled){
-  // Only toggle fields that were originally required
+    // Only toggle fields that were originally required
     container.querySelectorAll('[data-was-required="1"]').forEach(el => {
       el.required = !!enabled;
     });
   }
-
 
   function toggleOtherSpecialty() {
     const isOther = specialtySelect?.value === "Other";
@@ -553,18 +629,74 @@ include "../includes/partials/head.php";
     }
 
     showStep(2);
+
+    // update title/progress
+    document.getElementById('titleStep1Wrap')?.classList.add('hidden');
+    document.getElementById('titleStep2Wrap')?.classList.remove('hidden');
+
+    const bar = document.getElementById('progressBar');
+    if (bar) bar.style.width = '100%';
+    document.getElementById('labelStep1')?.classList.add('opacity-60');
+    document.getElementById('labelStep2')?.classList.remove('opacity-60');
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
   backBtn?.addEventListener('click', () => {
     showStep(1);
+
+    document.getElementById('titleStep2Wrap')?.classList.add('hidden');
+    document.getElementById('titleStep1Wrap')?.classList.remove('hidden');
+
+    const bar = document.getElementById('progressBar');
+    if (bar) bar.style.width = '50%';
+    document.getElementById('labelStep2')?.classList.add('opacity-60');
+    document.getElementById('labelStep1')?.classList.remove('opacity-60');
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
-  // ✅ If server sent us back with ?step=2, stay on Step 2
-  const urlStep = new URLSearchParams(window.location.search).get('step');
-  if (urlStep === '2') showStep(2);
-  else showStep(1);
+  // ✅ Handle ?step=2 and Google-locked Step 2
+  const qs = new URLSearchParams(window.location.search);
+  const urlStep = qs.get('step');
+  const locked = qs.get('locked') === '1';
+
+  if (locked) {
+    showStep(2);
+
+    // Hide step 1 completely
+    step1.classList.remove('active');
+    step1.style.display = 'none';
+
+    // Disable step 1 inputs so they won't override hidden values
+    step1.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
+
+    // Hide back button in step 2
+    if (backBtn) backBtn.style.display = 'none';
+
+    // Update title + progress UI
+    document.getElementById('titleStep1Wrap')?.classList.add('hidden');
+    document.getElementById('titleStep2Wrap')?.classList.remove('hidden');
+
+    const bar = document.getElementById('progressBar');
+    if (bar) bar.style.width = '100%';
+    document.getElementById('labelStep1')?.classList.add('opacity-60');
+    document.getElementById('labelStep2')?.classList.remove('opacity-60');
+  } else {
+    if (urlStep === '2') {
+      showStep(2);
+
+      document.getElementById('titleStep1Wrap')?.classList.add('hidden');
+      document.getElementById('titleStep2Wrap')?.classList.remove('hidden');
+
+      const bar = document.getElementById('progressBar');
+      if (bar) bar.style.width = '100%';
+      document.getElementById('labelStep1')?.classList.add('opacity-60');
+      document.getElementById('labelStep2')?.classList.remove('opacity-60');
+    } else {
+      showStep(1);
+    }
+  }
 
 })();
 </script>

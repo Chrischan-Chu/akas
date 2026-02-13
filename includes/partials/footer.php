@@ -5,5 +5,7 @@
   © <?php echo date('Y'); ?> AKAS Capstone Project. All Rights Reserved.
 </footer>
 </section>
+<script src="<?php echo $baseUrl; ?>/assets/js/global.js?v=<?php echo time(); ?>"></script>
+
 </body>
 </html>

@@ -30,4 +30,5 @@ $cssVer  = file_exists($cssFile) ? filemtime($cssFile) : time();
       }
     })();
   </script>
+  <script src="<?php echo $baseUrl; ?>/assets/js/global.js" defer></script>
 </head>

@@ -12,9 +12,12 @@ function redirect(string $to): void {
 
 // clinic_admin goes back to step=2
 function backToSignup(string $baseUrl, string $role): void {
+  $locked = ((string)($_POST['google_locked'] ?? '0') === '1');
+
   if ($role === 'clinic_admin') {
-    redirect($baseUrl . '/pages/signup-admin.php?step=2');
+    redirect($baseUrl . ($locked ? '/pages/signup-admin.php?step=2&locked=1' : '/pages/signup-admin.php?step=2'));
   }
+
   redirect($baseUrl . '/pages/signup-user.php');
 }
 
@@ -22,9 +25,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   redirect($baseUrl . '/pages/signup.php');
 }
 
+/**
+ * ✅ Allow logged-in clinic_admin with NO clinic yet to finish Step 2 (Google flow)
+ * Everyone else who is logged in should be redirected away.
+ */
 if (auth_is_logged_in()) {
-  $to = $baseUrl . (auth_role() === 'clinic_admin' ? '/admin/dashboard.php' : '/index.php#top');
-  redirect($to);
+  if (auth_role() === 'clinic_admin' && (int)(auth_clinic_id() ?? 0) <= 0) {
+    // allow to proceed
+  } else {
+    $to = $baseUrl . (auth_role() === 'clinic_admin' ? '/admin/dashboard.php' : '/index.php#top');
+    redirect($to);
+  }
 }
 
 $role = trim((string)($_POST['role'] ?? ''));
@@ -33,8 +44,11 @@ if (!in_array($role, ['user', 'clinic_admin'], true)) {
   redirect($baseUrl . '/pages/signup.php');
 }
 
+$googleLocked = ((string)($_POST['google_locked'] ?? '0') === '1');
+
 $email = strtolower(trim((string)($_POST['email'] ?? '')));
 $email = preg_replace('/\s+/', '', $email);
+
 $password = (string)($_POST['password'] ?? '');
 $confirmPassword = (string)($_POST['confirm_password'] ?? '');
 
@@ -43,62 +57,81 @@ if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
   backToSignup($baseUrl, $role);
 }
 
+// stricter email regex (optional)
 if (!preg_match('/^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/', $email)) {
   flash_set('error', 'Please enter a valid email address.');
   backToSignup($baseUrl, $role);
 }
 
-$minLen = strlen($password) >= 8;
-$hasUpper = preg_match('/[A-Z]/', $password) === 1;
-$hasSpecial = preg_match('/[^A-Za-z0-9]/', $password) === 1;
+if (!$googleLocked) {
+  $minLen = strlen($password) >= 8;
+  $hasUpper = preg_match('/[A-Z]/', $password) === 1;
+  $hasSpecial = preg_match('/[^A-Za-z0-9]/', $password) === 1;
 
-if (!($minLen && $hasUpper && $hasSpecial)) {
-  flash_set('error', 'Password must be 8+ chars, with 1 uppercase and 1 special character.');
-  backToSignup($baseUrl, $role);
-}
+  if (!($minLen && $hasUpper && $hasSpecial)) {
+    flash_set('error', 'Password must be 8+ chars, with 1 uppercase and 1 special character.');
+    backToSignup($baseUrl, $role);
+  }
 
-if ($password !== $confirmPassword) {
-  flash_set('error', 'Passwords do not match.');
-  backToSignup($baseUrl, $role);
+  if ($password !== $confirmPassword) {
+    flash_set('error', 'Passwords do not match.');
+    backToSignup($baseUrl, $role);
+  }
 }
 
 $pdo = db();
 
-// unique email
+// ✅ Unique email check
 $stmt = $pdo->prepare('SELECT id FROM accounts WHERE email = ? LIMIT 1');
 $stmt->execute([$email]);
-if ($stmt->fetch()) {
-  flash_set('error', 'Email is already registered. Please login.');
-  redirect($baseUrl . '/pages/login.php');
+$existingId = (int)($stmt->fetchColumn() ?? 0);
+
+if ($existingId > 0) {
+  // ✅ Google clinic-admin flow: allow if this is the same logged-in account
+  if ($googleLocked && auth_is_logged_in() && auth_role() === 'clinic_admin') {
+    if ($existingId !== (int)auth_user_id()) {
+      flash_set('error', 'Email is already registered. Please use your own Google account.');
+      backToSignup($baseUrl, $role);
+    }
+  } else {
+    flash_set('error', 'Email is already registered. Please login.');
+    redirect($baseUrl . '/pages/login.php');
+  }
 }
 
-$hash = password_hash($password, PASSWORD_DEFAULT);
+// Password hash
+$hash = $googleLocked
+  ? password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT)
+  : password_hash($password, PASSWORD_DEFAULT);
 
 /**
- * USER SIGNUP
+ * =========================
+ * USER SIGNUP (NORMAL ONLY)
+ * =========================
+ * Requirement: normal signups must login after registering.
  */
 if ($role === 'user') {
   $name = trim((string)($_POST['name'] ?? ''));
-  $name = preg_replace('/\s+/', ' ', $name); 
+  $name = preg_replace('/\s+/', ' ', $name);
+
   $gender = trim((string)($_POST['gender'] ?? ''));
   $phone = trim((string)($_POST['contact_number'] ?? ''));
   $birthdate = trim((string)($_POST['birthdate'] ?? ''));
 
   if ($name === '') {
-  flash_set('error', 'Please enter your full name.');
-  redirect($baseUrl . '/pages/signup-user.php');
-}
+    flash_set('error', 'Please enter your full name.');
+    redirect($baseUrl . '/pages/signup-user.php');
+  }
 
-if (mb_strlen($name) > 50) {
-  flash_set('error', 'Full name must be 50 characters or less.');
-  redirect($baseUrl . '/pages/signup-user.php');
-}
+  if (mb_strlen($name) > 50) {
+    flash_set('error', 'Full name must be 50 characters or less.');
+    redirect($baseUrl . '/pages/signup-user.php');
+  }
 
-
-if (!preg_match('/^[A-Za-z]+(?:\s[A-Za-z]+)*$/', $name)) {
-  flash_set('error', 'Full name must contain letters and spaces only.');
-  redirect($baseUrl . '/pages/signup-user.php');
-}
+  if (!preg_match('/^[A-Za-z]+(?:\s[A-Za-z]+)*$/', $name)) {
+    flash_set('error', 'Full name must contain letters and spaces only.');
+    redirect($baseUrl . '/pages/signup-user.php');
+  }
 
   $allowedGenders = ['Male', 'Female', 'Prefer not to say'];
   if (!in_array($gender, $allowedGenders, true)) {
@@ -117,32 +150,30 @@ if (!preg_match('/^[A-Za-z]+(?:\s[A-Za-z]+)*$/', $name)) {
   }
 
   $birthdateVal = null;
-if ($birthdate !== '') {
-  $d = DateTime::createFromFormat('Y-m-d', $birthdate);
-  if (!$d) {
-    flash_set('error', 'Enter a valid birth date.');
-    redirect($baseUrl . '/pages/signup-user.php');
+  if ($birthdate !== '') {
+    $d = DateTime::createFromFormat('Y-m-d', $birthdate);
+    if (!$d) {
+      flash_set('error', 'Enter a valid birth date.');
+      redirect($baseUrl . '/pages/signup-user.php');
+    }
+
+    $d->setTime(0, 0, 0);
+    $today = new DateTime('today');
+    $today->setTime(0, 0, 0);
+
+    if ($d > $today) {
+      flash_set('error', 'Birth date cannot be in the future.');
+      redirect($baseUrl . '/pages/signup-user.php');
+    }
+
+    $age = $d->diff($today)->y;
+    if ($age < 18) {
+      flash_set('error', 'You must be at least 18 years old.');
+      redirect($baseUrl . '/pages/signup-user.php');
+    }
+
+    $birthdateVal = $d->format('Y-m-d');
   }
-
-  $d->setTime(0, 0, 0);
-  $today = new DateTime('today');
-  $today->setTime(0, 0, 0);
-
-  
-  if ($d > $today) {
-    flash_set('error', 'Birth date cannot be in the future.');
-    redirect($baseUrl . '/pages/signup-user.php');
-  }
-
-  $age = $d->diff($today)->y;
-  if ($age < 18) {
-    flash_set('error', 'You must be at least 18 years old.');
-    redirect($baseUrl . '/pages/signup-user.php');
-  }
-
-  $birthdateVal = $d->format('Y-m-d');
-}
-
 
   $ins = $pdo->prepare('
     INSERT INTO accounts (role, name, gender, email, password_hash, phone, birthdate)
@@ -150,12 +181,18 @@ if ($birthdate !== '') {
   ');
   $ins->execute(['user', $name, $gender, $email, $hash, $phoneVal, $birthdateVal]);
 
-  redirect($baseUrl . '/pages/signup-success.php?role=' . urlencode($role));
+  flash_set('success', 'Account created successfully. Please log in.');
+  redirect($baseUrl . '/pages/login.php');
 }
 
 /**
+ * =========================
  * CLINIC ADMIN SIGNUP
+ * =========================
+ * Normal: Step 1+2 then login later (not auto-login).
+ * Google: Step 2 only (locked), then logout after submission and login later.
  */
+
 $adminName      = trim((string)($_POST['admin_name'] ?? ''));
 $clinicName     = trim((string)($_POST['clinic_name'] ?? ''));
 $specialty      = trim((string)($_POST['specialty'] ?? ''));
@@ -164,7 +201,7 @@ $contactNumber  = trim((string)($_POST['contact_number'] ?? ''));
 $clinicEmail    = strtolower(trim((string)($_POST['clinic_email'] ?? '')));
 $businessId     = trim((string)($_POST['business_id'] ?? ''));
 
-// OPTIONAL fields (your form currently does NOT send these — safe to keep optional)
+// OPTIONAL (safe)
 $address     = trim((string)($_POST['address'] ?? ''));
 $description = trim((string)($_POST['description'] ?? ''));
 
@@ -179,6 +216,20 @@ if ($doctorsJson !== '') {
     $doctors = [];
   }
 }
+
+// ✅ FILTER OUT "EMPTY DOCTORS" (fixes false Doctor #1 errors)
+if (!is_array($doctors)) $doctors = [];
+$doctors = array_values(array_filter($doctors, function ($d) {
+  if (!is_array($d)) return false;
+
+  // Any of these being present means it's a "real" doctor
+  $name = trim((string)($d['full_name'] ?? $d['name'] ?? $d['fullName'] ?? ''));
+  $email = trim((string)($d['email'] ?? ''));
+  $spec = trim((string)($d['specialization'] ?? ''));
+  $prc  = trim((string)($d['prc'] ?? $d['prc_no'] ?? $d['prcNo'] ?? ''));
+
+  return ($name !== '' || $email !== '' || $spec !== '' || $prc !== '');
+}));
 
 if ($adminName === '') {
   flash_set('error', 'Please enter the admin name.');
@@ -221,27 +272,46 @@ if ($stmt->fetch()) {
 }
 
 // Validate doctors payload (optional)
-if (!is_array($doctors)) $doctors = [];
 if (count($doctors) > 20) {
   flash_set('error', 'Too many doctors added. Please keep it at 20 or less.');
   backToSignup($baseUrl, 'clinic_admin');
 }
 
+// ✅ More flexible doctor validation (accepts multiple key names + auto-schedule)
 foreach ($doctors as $i => $d) {
   if (!is_array($d)) {
     flash_set('error', 'Invalid doctor data. Please re-add the doctor(s).');
     backToSignup($baseUrl, 'clinic_admin');
   }
 
-  $fullName = trim((string)($d['full_name'] ?? ''));
-  $birth    = trim((string)($d['birthdate'] ?? ''));
-  $spec     = trim((string)($d['specialization'] ?? ''));
-  $prc      = trim((string)($d['prc'] ?? ''));
-  $sched    = trim((string)($d['schedule'] ?? ''));
+  $fullName = trim((string)($d['full_name'] ?? $d['name'] ?? $d['fullName'] ?? ''));
+  $birth    = trim((string)($d['birthdate'] ?? $d['birth_date'] ?? ''));
+  $spec     = trim((string)($d['specialization'] ?? $d['specialty'] ?? ''));
+  $prc      = trim((string)($d['prc'] ?? $d['prc_no'] ?? $d['prcNo'] ?? ''));
   $dEmail   = strtolower(trim((string)($d['email'] ?? '')));
-  $phone    = trim((string)($d['contact_number'] ?? ''));
+  $phone    = trim((string)($d['contact_number'] ?? $d['phone'] ?? $d['contact'] ?? ''));
 
-  if ($fullName === '' || $birth === '' || $spec === '' || $prc === '' || $sched === '' || $dEmail === '' || $phone === '') {
+  // schedule: accept schedule OR availability OR build from parts
+  $sched = trim((string)($d['schedule'] ?? $d['availability'] ?? ''));
+
+  // If your JS stores pieces, build a simple schedule string
+  if ($sched === '') {
+    $slot = trim((string)($d['slot_mins'] ?? $d['slotMins'] ?? ''));
+    $start = trim((string)($d['start_time'] ?? $d['startTime'] ?? ''));
+    $end = trim((string)($d['end_time'] ?? $d['endTime'] ?? ''));
+    $days = $d['days'] ?? null; // could be array like ["Mon","Tue"]
+
+    if ($start !== '' && $end !== '') {
+      $daysText = '';
+      if (is_array($days) && $days) {
+        $daysText = implode(',', array_map('strval', $days));
+      }
+      $sched = trim(($daysText !== '' ? $daysText . ' ' : '') . $start . '-' . $end . ($slot !== '' ? ' (' . $slot . 'm)' : ''));
+    }
+  }
+
+  // ✅ Required doctor fields (schedule required only if doctor exists)
+  if ($fullName === '' || $birth === '' || $spec === '' || $prc === '' || $dEmail === '' || $phone === '' || $sched === '') {
     flash_set('error', 'Please complete all doctor fields (Doctor #' . ($i + 1) . ').');
     backToSignup($baseUrl, 'clinic_admin');
   }
@@ -252,8 +322,10 @@ foreach ($doctors as $i => $d) {
     backToSignup($baseUrl, 'clinic_admin');
   }
 
-  $birthVal = $birthObj->format('Y-m-d');
+  $birthObj->setTime(0, 0, 0);
   $today = new DateTime('today');
+  $today->setTime(0, 0, 0);
+
   if ($birthObj > $today) {
     flash_set('error', 'Doctor birthdate cannot be in the future (Doctor #' . ($i + 1) . ').');
     backToSignup($baseUrl, 'clinic_admin');
@@ -265,9 +337,15 @@ foreach ($doctors as $i => $d) {
     backToSignup($baseUrl, 'clinic_admin');
   }
 
+  if (!filter_var($dEmail, FILTER_VALIDATE_EMAIL)) {
+    flash_set('error', 'Invalid doctor email (Doctor #' . ($i + 1) . ').');
+    backToSignup($baseUrl, 'clinic_admin');
+  }
+
+  // ✅ normalize
   $doctors[$i] = [
     'full_name' => $fullName,
-    'birthdate' => $birthVal,
+    'birthdate' => $birthObj->format('Y-m-d'),
     'specialization' => $spec,
     'prc' => $prc,
     'schedule' => $sched,
@@ -314,7 +392,7 @@ $workIdPath = upload_image_optional(
 try {
   $pdo->beginTransaction();
 
-  // Insert clinic (matches your SQL structure; extra fields are optional)
+  // Insert clinic
   $insClinic = $pdo->prepare('
     INSERT INTO clinics
       (clinic_name, specialty, specialty_other, logo_path, business_id, contact, email,
@@ -338,19 +416,36 @@ try {
     $businessIdDigits,
     $contactDigits,
     ($clinicEmail !== '' ? $clinicEmail : null),
-
     ($description !== '' ? $description : null),
     ($address !== '' ? $address : null),
   ]);
 
   $clinicId = (int)$pdo->lastInsertId();
 
-  // Insert admin account linked to clinic
-  $insAdmin = $pdo->prepare('
-    INSERT INTO accounts (role, clinic_id, name, email, password_hash, phone, admin_work_id_path)
-    VALUES (?,?,?,?,?,?,?)
-  ');
-  $insAdmin->execute(['clinic_admin', $clinicId, $adminName, $email, $hash, null, $workIdPath]);
+  // Insert / attach admin account linked to clinic
+  if ($googleLocked) {
+    if (!auth_is_logged_in() || auth_role() !== 'clinic_admin' || (int)(auth_clinic_id() ?? 0) > 0) {
+      flash_set('error', 'Invalid clinic registration state. Please login again.');
+      backToSignup($baseUrl, 'clinic_admin');
+    }
+
+    $acctId = (int)auth_user_id();
+
+    $updAdmin = $pdo->prepare("
+      UPDATE accounts
+      SET clinic_id = ?, name = ?, email = ?
+      WHERE id = ? AND role = 'clinic_admin'
+      LIMIT 1
+    ");
+    $updAdmin->execute([$clinicId, $adminName, $email, $acctId]);
+
+  } else {
+    $insAdmin = $pdo->prepare('
+      INSERT INTO accounts (role, clinic_id, name, email, password_hash, phone, admin_work_id_path)
+      VALUES (?,?,?,?,?,?,?)
+    ');
+    $insAdmin->execute(['clinic_admin', $clinicId, $adminName, $email, $hash, null, $workIdPath]);
+  }
 
   // Insert doctors (optional)
   if (!empty($doctors)) {
@@ -385,4 +480,10 @@ try {
   backToSignup($baseUrl, 'clinic_admin');
 }
 
-redirect($baseUrl . '/pages/signup-pending.php');
+// ✅ Always require login after admin registration
+if ($googleLocked && auth_is_logged_in()) {
+  auth_logout();
+}
+
+flash_set('success', 'Clinic registration submitted. Please wait for approval, then log in.');
+redirect($baseUrl . '/pages/login.php');

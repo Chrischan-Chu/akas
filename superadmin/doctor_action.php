@@ -13,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $doctorId = (int)($_POST['doctor_id'] ?? 0);
 $action   = (string)($_POST['action'] ?? '');
+// Note: clinic_doctors table (current schema) has no declined_reason column.
+// We still accept the input (if present) but we won't try to store it.
 $reason   = trim((string)($_POST['reason'] ?? ''));
 
 if ($doctorId <= 0 || !in_array($action, ['approve','decline'], true)) {
@@ -53,7 +55,6 @@ if ($action === 'approve') {
   $upd = $pdo->prepare("
     UPDATE clinic_doctors
     SET approval_status='APPROVED',
-        declined_reason=NULL,
         updated_at=NOW()
     WHERE id=:id
     LIMIT 1
@@ -63,17 +64,14 @@ if ($action === 'approve') {
 }
 
 if ($action === 'decline') {
-  $declineReason = ($reason !== '' ? $reason : 'Doctor declined');
-
   $upd = $pdo->prepare("
     UPDATE clinic_doctors
     SET approval_status='DECLINED',
-        declined_reason=:r,
         updated_at=NOW()
     WHERE id=:id
     LIMIT 1
   ");
-  $upd->execute([':id' => $doctorId, ':r' => $declineReason]);
+  $upd->execute([':id' => $doctorId]);
   flash_set('success', 'Doctor declined.');
 }
 

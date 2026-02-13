@@ -9,8 +9,6 @@ require_once __DIR__ . '/../_guard.php';
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AKAS Super Admin</title>
-
-  <!-- Tailwind CDN (works immediately, no build needed) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>

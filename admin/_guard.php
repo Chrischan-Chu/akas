@@ -8,8 +8,8 @@ auth_require_role('clinic_admin', $baseUrl);
 
 $clinicId = (int)auth_clinic_id();
 if ($clinicId <= 0) {
-  auth_logout();
-  header('Location: ' . $baseUrl . '/pages/login.php');
+  // Incomplete clinic signup (Google admin)
+  header('Location: ' . $baseUrl . '/pages/signup-admin.php?step=2&locked=1');
   exit;
 }
 

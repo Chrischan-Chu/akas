@@ -79,8 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reapp
 
           $resetDocs = $pdo->prepare("
             UPDATE clinic_doctors
-            SET approval_status = 'PENDING',
-                declined_reason = NULL
+            SET approval_status = 'PENDING'
             WHERE clinic_id = :cid
               AND created_via = 'REGISTRATION'
           ");
@@ -142,7 +141,6 @@ if (!empty($clinics)) {
       birthdate,
       schedule,
       approval_status,
-      declined_reason,
       created_at
     FROM clinic_doctors
     WHERE clinic_id IN ($placeholders)
@@ -271,7 +269,7 @@ $error = flash_get('error');
 
                 <form class="inline ml-2" method="POST" action="<?= $baseUrl ?>/superadmin/clinic_action.php">
                   <input type="hidden" name="clinic_id" value="<?= (int)$c['id'] ?>">
-                  <input name="reason" class="border rounded-full px-3 py-2 text-sm w-52" placeholder="Decline reason (optional)">
+                  <input name="declined_reason" class="border rounded-full px-3 py-2 text-sm w-52" placeholder="Decline reason (optional)">
                   <button name="action" value="decline"
                           class="px-4 py-2 rounded-full text-white text-sm bg-red-500">
                     Decline
@@ -339,7 +337,7 @@ $error = flash_get('error');
 
                                 <form class="inline ml-2" method="POST" action="<?= $baseUrl ?>/superadmin/doctor_action.php">
                                   <input type="hidden" name="doctor_id" value="<?= (int)($d['id'] ?? 0) ?>">
-                                  <input name="reason"
+                                  <input name="declined_reason"
                                          class="border rounded-full px-2 py-1 text-xs w-44"
                                          placeholder="Reason (optional)">
                                   <button name="action" value="decline"

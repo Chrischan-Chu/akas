@@ -1,6 +1,8 @@
 <?php
 $appTitle = "AKAS | User Sign Up";
 $baseUrl  = "/AKAS";
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/google_config.php';
 include "../includes/partials/head.php";
 ?>
 
@@ -39,6 +41,45 @@ include "../includes/partials/head.php";
           <p class="text-center text-white text-sm mb-5">
             Create your user account to book appointments.
           </p>
+
+          
+          <div class="mt-4 mb-4">
+            <form id="googleUserSignupForm" action="<?php echo $baseUrl; ?>/pages/google-auth.php" method="POST">
+              <input type="hidden" name="mode" value="signup">
+              <input type="hidden" name="role" value="user">
+              <input type="hidden" name="credential" id="googleCredentialUserSignup">
+            </form>
+
+            <div id="g_id_onload"
+                 data-client_id="<?php echo htmlspecialchars(GOOGLE_CLIENT_ID); ?>"
+                 data-callback="onGoogleUserSignup"
+                 data-auto_prompt="false">
+            </div>
+
+            <div class="flex justify-center">
+              <div class="g_id_signin"
+                   data-type="standard"
+                   data-size="large"
+                   data-theme="outline"
+                   data-text="signup_with"
+                   data-shape="pill"
+                   data-logo_alignment="left">
+              </div>
+            </div>
+
+            <script>
+              function onGoogleUserSignup(response) {
+                document.getElementById('googleCredentialUserSignup').value = response.credential;
+                document.getElementById('googleUserSignupForm').submit();
+              }
+            </script>
+
+            <div class="flex items-center gap-3 mt-4">
+              <div class="h-px flex-1 bg-white/40"></div>
+              <div class="text-xs text-white/90 font-semibold">OR</div>
+              <div class="h-px flex-1 bg-white/40"></div>
+            </div>
+          </div>
 
           <form action="signup-process.php" method="POST" class="space-y-3">
             <input type="hidden" name="role" value="user" />
@@ -217,5 +258,6 @@ include "../includes/partials/head.php";
 </main>
 <script src="<?php echo $baseUrl; ?>/assets/js/form-validators.js"></script>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </body>
 </html>

@@ -9,13 +9,22 @@ $allowed = ['PENDING','APPROVED','DECLINED'];
 if (!in_array($status, $allowed, true)) $status = 'PENDING';
 
 $stmt = $pdo->prepare("
-  SELECT d.id, d.clinic_id, d.name, d.specialization, d.prc_no, d.schedule, d.email, d.contact_number,
-         d.approval_status, d.declined_reason, d.created_at,
-         c.clinic_name
+  SELECT
+    d.id,
+    d.clinic_id,
+    d.name,
+    d.specialization,
+    d.prc_no,
+    d.schedule,
+    d.email,
+    d.contact_number,
+    d.approval_status,
+    d.created_at,
+    c.clinic_name
   FROM clinic_doctors d
   JOIN clinics c ON c.id = d.clinic_id
   WHERE d.approval_status = :status
-    AND d.created_via = 'CMS'
+    AND d.created_via IN ('CMS','REGISTRATION')
   ORDER BY d.created_at DESC, d.id DESC
 ");
 $stmt->execute([':status' => $status]);
@@ -109,11 +118,7 @@ function h($v): string {
                 <?= h($d['approval_status'] ?? '-') ?>
               </span>
 
-              <?php if (($d['approval_status'] ?? '') === 'DECLINED' && !empty($d['declined_reason'])): ?>
-                <div class="text-slate-500 text-xs mt-1">
-                  Reason: <?= h($d['declined_reason']) ?>
-                </div>
-              <?php endif; ?>
+              <?php // Note: clinic_doctors table currently has no declined_reason column. ?>
             </td>
 
             <!-- Actions -->
@@ -130,9 +135,6 @@ function h($v): string {
 
                 <form class="inline ml-2" method="POST" action="<?= $baseUrl ?>/superadmin/doctor_action.php">
                   <input type="hidden" name="doctor_id" value="<?= (int)$d['id'] ?>">
-                  <input name="reason"
-                         class="border rounded-full px-3 py-2 text-sm w-56"
-                         placeholder="Decline reason (optional)">
                   <button name="action" value="decline"
                           class="px-4 py-2 rounded-full text-white text-sm bg-red-500">
                     Decline

@@ -61,6 +61,27 @@ $role = auth_role();
 $isUser = $isLoggedIn && $role === 'user';
 $isAdminViewer = $isLoggedIn && in_array($role, ['clinic_admin','super_admin'], true);
 
+// Logged-in user info (for prefill)
+$viewer = [
+  'name' => '',
+  'email' => '',
+  'phone' => '',
+];
+
+if ($isUser) {
+  $uid = (int)auth_user_id();
+
+  $st = $pdo->prepare("SELECT name, email, phone FROM accounts WHERE id = ? LIMIT 1");
+  $st->execute([$uid]);
+  $u = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+
+  $viewer['name']  = (string)($u['name'] ?? '');
+  $viewer['email'] = (string)($u['email'] ?? '');
+  $viewer['phone'] = (string)($u['phone'] ?? '');
+}
+
+
+
 // Doctors
 if ($isAdminViewer) {
   // clinic admin + super admin: see all doctors (including pending/declined registration doctors)
@@ -103,7 +124,8 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
 
 <body class="bg-blue-100 overflow-x-hidden"
       data-base-url="<?php echo htmlspecialchars($baseUrl, ENT_QUOTES); ?>"
-      data-is-user="<?php echo $isUser ? '1' : '0'; ?>">
+      data-is-user="<?php echo $isUser ? '1' : '0'; ?>"
+      data-clinic-id="<?php echo (int)$clinicId; ?>">
 
 <?php include "../includes/partials/navbar.php"; ?>
 
@@ -273,8 +295,14 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-          <input type="text" class="w-full rounded-md px-4 py-2 text-white placeholder-white/70"
-                 style="background:var(--primary)" placeholder="Full name">
+          <input id="patientName" name="patient_name" type="text"
+          class="w-full rounded-md px-4 py-2 text-white placeholder-white/70"
+          style="background:var(--primary)"
+          placeholder="Full name"
+          value="<?php echo h($viewer['name']); ?>"
+          <?php echo $isUser ? 'readonly' : ''; ?>
+          required>
+
         </div>
 
         <div>
@@ -294,14 +322,26 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
-          <input type="text" class="w-full rounded-md px-4 py-2 text-white placeholder-white/70"
-                 style="background:var(--primary)" placeholder="09xx xxx xxxx">
+          <input id="patientContact" name="patient_contact" type="text"
+            class="w-full rounded-md px-4 py-2 text-white placeholder-white/70"
+            style="background:var(--primary)"
+            placeholder="09xx xxx xxxx"
+            value="<?php echo h($viewer['phone']); ?>"
+            <?php echo $isUser ? 'readonly' : ''; ?>
+            required>
+
         </div>
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-          <input type="email" class="w-full rounded-md px-4 py-2 text-white placeholder-white/70"
-                 style="background:var(--primary)" placeholder="name@email.com">
+          <input id="patientEmail" name="patient_email" type="email"
+            class="w-full rounded-md px-4 py-2 text-white placeholder-white/70"
+            style="background:var(--primary)"
+            placeholder="name@email.com"
+            value="<?php echo h($viewer['email']); ?>"
+            <?php echo $isUser ? 'readonly' : ''; ?>
+            required>
+
         </div>
 
         <div>
@@ -346,6 +386,26 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
 
             <p class="mt-3 text-xs text-gray-500">Time slots (mock UI for now):</p>
             <div id="slotGrid" class="mt-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2"></div>
+
+            <p class="mt-4 text-xs text-gray-500">Select doctor:</p>
+            <select id="doctorSelect"
+                    class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    <?php echo (!$isUser ? 'disabled' : ''); ?>>
+              <option value="">Select a doctor</option>
+
+              <?php foreach ($doctors as $d): ?>
+                <option value="<?php echo (int)$d['id']; ?>">
+                  <?php echo h((string)$d['name']); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+
+            <textarea id="notes"
+              class="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              rows="3"
+              placeholder="Notes (optional)"
+          <?php echo (!$isUser ? 'disabled' : ''); ?>></textarea>
+
 
             
             <?php if (!$isLoggedIn): ?>
@@ -464,5 +524,7 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
   </div>
 </div>
 
+<script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
 <script src="<?php echo $baseUrl; ?>/assets/js/clinic-profile.js"></script>
+
 <?php include "../includes/partials/footer.php"; ?>

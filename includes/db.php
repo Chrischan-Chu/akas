@@ -4,6 +4,8 @@
 
 declare(strict_types=1);
 
+putenv('KtC7rw.-df6sw:fEo5tVYYnOpj_RrNA450TNLUaST_v6qYWplSC79SdmU');
+
 function db(): PDO {
   static $pdo = null;
   if ($pdo instanceof PDO) return $pdo;
