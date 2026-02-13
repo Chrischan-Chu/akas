@@ -481,9 +481,11 @@ try {
 }
 
 // ✅ Always require login after admin registration
+// ✅ If Google admin finished Step 2, log them out (they must login later)
 if ($googleLocked && auth_is_logged_in()) {
   auth_logout();
 }
 
-flash_set('success', 'Clinic registration submitted. Please wait for approval, then log in.');
-redirect($baseUrl . '/pages/login.php');
+// ✅ Redirect to pending page (NOT login)
+redirect($baseUrl . '/admin/pending.php');
+

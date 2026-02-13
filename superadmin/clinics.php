@@ -79,7 +79,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reapp
 
           $resetDocs = $pdo->prepare("
             UPDATE clinic_doctors
-            SET approval_status = 'PENDING'
+            SET approval_status = 'PENDING',
+                declined_reason = NULL,
+                declined_at = NULL,
+                approved_at = NULL
             WHERE clinic_id = :cid
               AND created_via = 'REGISTRATION'
           ");

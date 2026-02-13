@@ -52,10 +52,17 @@ CREATE TABLE `accounts` (
   `phone` varchar(32) DEFAULT NULL,
   `birthdate` date DEFAULT NULL,
   `admin_work_id_path` varchar(255) DEFAULT NULL,
+
+  -- ✅ Auth (local / google)
+  `auth_provider` enum('local','google') NOT NULL DEFAULT 'local',
+  `google_sub` varchar(64) DEFAULT NULL,
+  `google_picture` varchar(255) DEFAULT NULL,
+
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_email` (`email`),
   KEY `idx_clinic_id` (`clinic_id`),
+  KEY `idx_google_sub` (`google_sub`),
   CONSTRAINT `fk_accounts_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -76,10 +83,20 @@ CREATE TABLE `clinic_doctors` (
   `about` text DEFAULT NULL,
   `availability` varchar(255) DEFAULT NULL,
   `image_path` varchar(255) DEFAULT NULL,
+
+  -- ✅ Doctor approval workflow
+  `approval_status` enum('PENDING','APPROVED','DECLINED') NOT NULL DEFAULT 'PENDING',
+  `approved_at` datetime DEFAULT NULL,
+  `declined_at` datetime DEFAULT NULL,
+  `declined_reason` varchar(255) DEFAULT NULL,
+  `created_via` enum('CMS','REGISTRATION') NOT NULL DEFAULT 'CMS',
+
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_clinic_id` (`clinic_id`),
+  KEY `idx_doc_status` (`approval_status`),
+  KEY `idx_doc_via` (`created_via`),
   CONSTRAINT `fk_clinic_doctors_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
