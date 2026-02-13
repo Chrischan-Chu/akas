@@ -24,7 +24,7 @@
   }
 
   // -----------------------------
-  // CALENDAR (Month grid -> click day -> show slots)
+  // CALENDAR + SLOTS
   // -----------------------------
   const calendarGrid = document.getElementById("calendarGrid");
   const monthLabel = document.getElementById("monthLabel");
@@ -36,15 +36,6 @@
 
   // global refresh hook for Ably
   window.__refreshSlotsIfSelected = null;
-
-  const patientName = document.getElementById("patientName")?.value || "";
-  const patientEmail = document.getElementById("patientEmail")?.value || "";
-  const patientContact = document.getElementById("patientContact")?.value || "";
-
-  form.append("patient_name", patientName);
-  form.append("patient_email", patientEmail);
-  form.append("patient_contact", patientContact);
-
 
   if (
     calendarGrid &&
@@ -58,6 +49,8 @@
     let viewDate = new Date();
     let selectedDate = null;
     let selectedSlot = null;
+
+    let lastMeta = null; // ✅ store latest meta for UI/booking guards
 
     const monthNames = [
       "January","February","March","April","May","June",
@@ -73,8 +66,16 @@
       if (IS_USER) bookBtn.disabled = true;
     }
 
+    function fmtPHTime(ts) {
+      // ts: "YYYY-MM-DD HH:MM:SS"
+      if (!ts) return "";
+      const d = new Date(ts.replace(" ", "T") + "+08:00"); // force PH offset
+      if (Number.isNaN(d.getTime())) return ts;
+      return d.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
+    }
+
     async function fetchSlotsFromApi(ymd) {
-      if (!CLINIC_ID) return [];
+      if (!CLINIC_ID) return { slots: [], meta: null };
 
       const url = `${BASE_URL}/api/get_slots.php?clinic_id=${CLINIC_ID}&date=${encodeURIComponent(ymd)}`;
       const res = await fetch(url, { credentials: "same-origin", cache: "no-store" });
@@ -82,22 +83,91 @@
 
       if (!data.ok) throw new Error(data.message || "Failed to load slots.");
 
-      return Array.isArray(data.slots) ? data.slots : [];
+      return {
+        slots: Array.isArray(data.slots) ? data.slots : [],
+        meta: data.meta || null,
+      };
+    }
+
+    function statusLabel(status) {
+      switch (status) {
+        case "AVAILABLE": return "Available";
+        case "PAST": return "Past";
+        case "NOT_YET_OPEN": return "Not yet open";
+        case "BLOCKED": return "Blocked";
+        case "BOOKED_APPROVED": return "Booked";
+        case "BOOKED_PENDING": return "Pending";
+        default: return status || "Unavailable";
+      }
+    }
+
+    function applySlotStyles(btn, status, available) {
+      btn.className = "rounded-lg border px-2 py-1 text-sm font-semibold transition";
+
+      if (available) {
+        btn.classList.add("bg-green-100", "border-green-300", "hover:bg-green-200");
+        btn.style.color = "#0f172a";
+        return;
+      }
+
+      // different unavailable flavors
+      if (status === "NOT_YET_OPEN") {
+        btn.classList.add("bg-slate-100", "border-slate-300", "opacity-80", "cursor-not-allowed");
+        btn.style.color = "#334155";
+      } else if (status === "PAST") {
+        btn.classList.add("bg-slate-100", "border-slate-300", "opacity-70", "cursor-not-allowed");
+        btn.style.color = "#64748b";
+      } else {
+        // booked/blocked/etc
+        btn.classList.add("bg-red-100", "border-red-300", "opacity-70", "cursor-not-allowed");
+        btn.style.color = "#7f1d1d";
+      }
     }
 
     async function renderSlots() {
       clearSlots();
+      lastMeta = null;
+
       if (!selectedDate) return;
 
       const ymd = toYMD(selectedDate);
 
-      let slots;
+      let slots, meta;
       try {
-        slots = await fetchSlotsFromApi(ymd);
+        const out = await fetchSlotsFromApi(ymd);
+        slots = out.slots;
+        meta = out.meta;
+        lastMeta = meta;
       } catch (e) {
         console.error(e);
         slotGrid.innerHTML = `<div class="text-sm text-slate-600">Failed to load slots.</div>`;
         return;
+      }
+
+      // ✅ day-level clinic status messages
+      const clinicStatus = meta?.clinic_status || "";
+      if (clinicStatus === "CLOSED_FULL") {
+        slotGrid.innerHTML = `
+          <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <p class="font-bold text-slate-900">Closed</p>
+            <p class="text-sm text-slate-600 mt-1">All slots for this day are already taken.</p>
+          </div>
+        `;
+        return;
+      }
+
+      if (clinicStatus === "CLOSED_NOT_YET_OPEN") {
+        const gate = fmtPHTime(meta?.booking_gate_open);
+        slotGrid.innerHTML = `
+          <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <p class="font-bold text-slate-900">Booking not available yet</p>
+            <p class="text-sm text-slate-600 mt-1">
+              Booking opens at <b>${gate || "the allowed time"}</b> (PH time).
+            </p>
+          </div>
+        `;
+        // still show slots if API returned them
+        // (they will be NOT_YET_OPEN and disabled)
       }
 
       if (!slots.length) {
@@ -105,28 +175,24 @@
         return;
       }
 
+      // show slots
       slots.forEach((s) => {
-        // expecting: {time:"09:00", status:"AVAILABLE"|"NOT_AVAILABLE"}
+        // full mode expects: {time:"09:00", status:"AVAILABLE"|..., can_book:true|false}
         const time = typeof s === "string" ? s : (s.time || "");
         const status = typeof s === "string" ? "AVAILABLE" : (s.status || "AVAILABLE");
+        const canBook = typeof s === "string" ? true : !!s.can_book;
+
         if (!time) return;
 
-        const available = status === "AVAILABLE";
+        const available = (status === "AVAILABLE" && canBook);
 
         const b = document.createElement("button");
         b.type = "button";
         b.textContent = time;
         b.disabled = !available;
+        b.title = statusLabel(status);
 
-        b.className = "rounded-lg border px-2 py-1 text-sm font-semibold transition";
-
-        if (available) {
-          b.classList.add("bg-green-100", "border-green-300", "hover:bg-green-200");
-          b.style.color = "#0f172a";
-        } else {
-          b.classList.add("bg-red-100", "border-red-300", "opacity-70", "cursor-not-allowed");
-          b.style.color = "#7f1d1d";
-        }
+        applySlotStyles(b, status, available);
 
         b.addEventListener("click", () => {
           if (!available) return;
@@ -137,7 +203,8 @@
           });
 
           b.classList.add("text-white");
-          b.style.background = getComputedStyle(document.documentElement).getPropertyValue("--primary");
+          b.style.background = getComputedStyle(document.documentElement)
+            .getPropertyValue("--primary");
 
           selectedSlot = time;
           if (IS_USER) bookBtn.disabled = false;
@@ -210,85 +277,98 @@
     });
 
     bookBtn.addEventListener("click", async () => {
-  if (!IS_USER) {
-    window.location.href = `${BASE_URL}/pages/login.php`;
-    return;
-  }
+      if (!IS_USER) {
+        window.location.href = `${BASE_URL}/pages/login.php`;
+        return;
+      }
 
-  if (!selectedDate || !selectedSlot) {
-    alert("Please select a date and time slot first.");
-    return;
-  }
+      if (!selectedDate || !selectedSlot) {
+        alert("Please select a date and time slot first.");
+        return;
+      }
 
-  // ✅ doctor dropdown (change the id if yours is different)
-  const doctorSelect =
-    document.getElementById("doctorSelect") ||
-    document.querySelector('select[name="doctor_id"]');
+      // extra guard: if API says CLOSED_FULL or gate not open yet
+      const clinicStatus = lastMeta?.clinic_status || "";
+      if (clinicStatus === "CLOSED_FULL") {
+        alert("All slots are already taken for this day.");
+        return;
+      }
+      if (clinicStatus === "CLOSED_NOT_YET_OPEN") {
+        const gate = fmtPHTime(lastMeta?.booking_gate_open);
+        alert(`Booking is not available yet. It opens at ${gate || "the allowed time"} (PH time).`);
+        return;
+      }
 
-  const doctorId = parseInt(doctorSelect?.value || "0", 10);
+      // doctor dropdown
+      const doctorSelect =
+        document.getElementById("doctorSelect") ||
+        document.querySelector('select[name="doctor_id"]');
 
-  if (!doctorId) {
-    alert("Please select a doctor first.");
-    return;
-  }
+      const doctorId = parseInt(doctorSelect?.value || "0", 10);
+      if (!doctorId) {
+        alert("Please select a doctor first.");
+        return;
+      }
 
-  // optional notes
-  const notesEl =
-    document.getElementById("notes") ||
-    document.querySelector('textarea[name="notes"]');
+      const notesEl =
+        document.getElementById("notes") ||
+        document.querySelector('textarea[name="notes"]');
 
-  const notes = (notesEl?.value || "").trim();
+      const notes = (notesEl?.value || "").trim();
+      const dateYMD = toYMD(selectedDate);
 
-  const dateYMD = toYMD(selectedDate);
+      // ✅ patient fields: pulled from readonly inputs (logged-in prefill)
+      const patientName = document.getElementById("patientName")?.value || "";
+      const patientEmail = document.getElementById("patientEmail")?.value || "";
+      const patientContact = document.getElementById("patientContact")?.value || "";
 
-  const form = new FormData();
-  form.append("clinic_id", String(CLINIC_ID));
-  form.append("doctor_id", String(doctorId));
-  form.append("date", dateYMD);
-  form.append("time", selectedSlot); // "HH:MM"
-  form.append("notes", notes);
+      const form = new FormData();
+      form.append("clinic_id", String(CLINIC_ID));
+      form.append("doctor_id", String(doctorId));
+      form.append("date", dateYMD);
+      form.append("time", selectedSlot); // HH:MM
+      form.append("notes", notes);
 
-  // disable button while booking
-  bookBtn.disabled = true;
-  const oldText = bookBtn.textContent;
-  bookBtn.textContent = "Booking...";
+      // Only include these if your PHP accepts them (safe even if ignored)
+      form.append("patient_name", patientName);
+      form.append("patient_email", patientEmail);
+      form.append("patient_contact", patientContact);
 
-  try {
-    const res = await fetch(`${BASE_URL}/api/book_appointment.php`, {
-      method: "POST",
-      body: form,
-      credentials: "same-origin",
+      // disable button while booking
+      bookBtn.disabled = true;
+      const oldText = bookBtn.textContent;
+      bookBtn.textContent = "Booking...";
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/book_appointment.php`, {
+          method: "POST",
+          body: form,
+          credentials: "same-origin",
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          alert(data.error || "Booking failed.");
+          throw new Error("Booking failed");
+        }
+
+        alert(data.message || "Booked!");
+        await renderSlots();
+
+        // close modal after booking
+        if (bookingModal) {
+          bookingModal.classList.add("hidden");
+          document.body.style.overflow = "";
+        }
+      } catch (e) {
+        console.error(e);
+        alert("Network error. Please try again.");
+      } finally {
+        bookBtn.textContent = oldText;
+        bookBtn.disabled = !(IS_USER && selectedDate && selectedSlot);
+      }
     });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      alert(data.error || "Booking failed.");
-      throw new Error("Booking failed");
-    }
-
-
-    alert(data.message || "Booked!");
-
-    // ✅ refresh slots immediately (Ably will also notify other users)
-    await renderSlots();
-
-    // optional: close modal after booking
-    if (bookingModal) {
-      bookingModal.classList.add("hidden");
-      document.body.style.overflow = "";
-    }
-    } catch (e) {
-      console.error(e);
-      alert("Network error. Please try again.");
-    } finally {
-      // restore button UI
-      bookBtn.textContent = oldText;
-      // enable only if still a slot selected
-      bookBtn.disabled = !(IS_USER && selectedDate && selectedSlot);
-    }
-  });
-
 
     // expose refresh for Ably
     window.__refreshSlotsIfSelected = () => {
