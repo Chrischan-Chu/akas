@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 $baseUrl = '/AKAS';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/email_verification.php';
 flash_clear();
 
 function redirect(string $to): void {
@@ -180,7 +181,22 @@ if ($role === 'user') {
     VALUES (?,?,?,?,?,?,?)
   ');
   $ins->execute(['user', $name, $gender, $email, $hash, $phoneVal, $birthdateVal]);
+  $newId = (int)$pdo->lastInsertId();
 
+  // ✅ Manual accounts require email verification
+  if (!$googleLocked) {
+    $token = akas_create_email_verify_token($pdo, $newId, 30);
+    $sent  = akas_send_verification_email($baseUrl, $email, $name, $token);
+
+    flash_set('success', $sent
+      ? 'Account created! Please check your email to verify your account before logging in.'
+      : 'Account created, but we could not send the verification email. Please configure SMTP and resend verification.'
+    );
+
+    redirect($baseUrl . '/pages/signup-success.php?role=user');
+  }
+
+  // (fallback) Google-created users are already verified
   flash_set('success', 'Account created successfully. Please log in.');
   redirect($baseUrl . '/pages/login.php');
 }
@@ -440,11 +456,13 @@ try {
     $updAdmin->execute([$clinicId, $adminName, $email, $acctId]);
 
   } else {
+    $adminAccountId = 0;
     $insAdmin = $pdo->prepare('
       INSERT INTO accounts (role, clinic_id, name, email, password_hash, phone, admin_work_id_path)
       VALUES (?,?,?,?,?,?,?)
     ');
     $insAdmin->execute(['clinic_admin', $clinicId, $adminName, $email, $hash, null, $workIdPath]);
+    $adminAccountId = (int)$pdo->lastInsertId();
   }
 
   // Insert doctors (optional)
@@ -479,6 +497,17 @@ try {
   flash_set('error', 'Sign up failed. Please try again.');
   backToSignup($baseUrl, 'clinic_admin');
 }
+
+  // ✅ Send email verification for MANUAL admin accounts
+  if (!$googleLocked && $adminAccountId > 0) {
+    $token = akas_create_email_verify_token($pdo, $adminAccountId, 30);
+    $sent  = akas_send_verification_email($baseUrl, $email, $adminName, $token);
+
+    flash_set('success', $sent
+      ? 'Registration submitted! Please verify your email (check inbox/spam). After verification, you can log in, but your clinic will still need superadmin approval.'
+      : 'Registration submitted, but we could not send the verification email. Please configure SMTP and resend verification.'
+    );
+  }
 
 // ✅ Always require login after admin registration
 // ✅ If Google admin finished Step 2, log them out (they must login later)

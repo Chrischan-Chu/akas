@@ -12,6 +12,8 @@ if (auth_is_logged_in()) {
   exit;
 }
 
+$successMsg = flash_get('success');
+$errorMsg = flash_get('error');
 include __DIR__ . "/../includes/partials/head.php";
 ?>
 
@@ -28,12 +30,19 @@ include __DIR__ . "/../includes/partials/head.php";
     </div>
 
     <div class="p-8 sm:p-10 bg-white">
+      <?php if (!empty($errorMsg)): ?>
+        <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><?php echo htmlspecialchars($errorMsg); ?></div>
+      <?php endif; ?>
+      <?php if (!empty($successMsg)): ?>
+        <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><?php echo htmlspecialchars($successMsg); ?></div>
+      <?php endif; ?>
+
       <div class="rounded-2xl border border-slate-200 p-5 text-slate-700">
         <p class="font-semibold mb-2">What happens next?</p>
         <ul class="list-disc pl-5 space-y-1 text-sm">
-          <li>Our team will review your submitted clinic details and documents.</li>
-          <li>Please wait up to <span class="font-semibold">48 hours</span> for verification.</li>
-          <li>Once approved, you can log in using the email and password you used during sign up.</li>
+          <li>Verify your email address (check inbox/spam) so you can log in.</li>
+          <li>Our superadmin will review your submitted clinic details and documents.</li>
+          <li>After approval, you can log in and access your Admin Dashboard.</li>
         </ul>
       </div>
 
@@ -41,6 +50,9 @@ include __DIR__ . "/../includes/partials/head.php";
         <a href="<?php echo $baseUrl; ?>/pages/login.php"
            class="flex-1 text-center py-3 rounded-xl font-bold text-white"
            style="background: var(--secondary);">Go to Login</a>
+        <a href="<?php echo $baseUrl; ?>/pages/resend-verification.php"
+           class="flex-1 text-center py-3 rounded-xl font-bold text-slate-900"
+           style="background: var(--accent);">Resend Verification</a>
         <a href="<?php echo $baseUrl; ?>/index.php#top"
            class="flex-1 text-center py-3 rounded-xl font-bold text-slate-900"
            style="background: var(--accent);">Back to Website</a>

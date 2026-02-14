@@ -17,8 +17,10 @@ $cssVer  = file_exists($cssFile) ? filemtime($cssFile) : time();
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
+  
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="<?= $baseUrl ?>/assets/img/akas-logo.png ">
   <title><?php echo htmlspecialchars($appTitle); ?></title>
 
   <link rel="stylesheet" href="<?php echo $baseUrl; ?>/assets/css/output.css?v=<?php echo $cssVer; ?>">

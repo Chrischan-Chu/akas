@@ -11,6 +11,8 @@ if (auth_is_logged_in()) {
 $role = $_GET['role'] ?? 'user';
 $isAdmin = ($role === 'clinic_admin');
 
+$successMsg = flash_get('success');
+$errorMsg = flash_get('error');
 include "../includes/partials/head.php";
 ?>
 
@@ -27,14 +29,20 @@ include "../includes/partials/head.php";
     </div>
 
     <div class="p-8 sm:p-10 bg-white">
+      <?php if (!empty($errorMsg)): ?>
+        <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><?php echo htmlspecialchars($errorMsg); ?></div>
+      <?php endif; ?>
+      <?php if (!empty($successMsg)): ?>
+        <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><?php echo htmlspecialchars($successMsg); ?></div>
+      <?php endif; ?>
+
       <div class="rounded-2xl border border-slate-200 p-5 text-slate-700">
         <p class="font-semibold mb-2">Next step:</p>
         <ul class="list-disc pl-5 space-y-1 text-sm">
-          <li>Login using the email + password you used in sign up.</li>
+          <li>Check your email and click the verification link.</li>
+          <li>After verifying, log in using the email + password you used in sign up.</li>
           <?php if ($isAdmin): ?>
-            <li>After login, you will be sent to your Admin Dashboard (and you won't see the public pages).</li>
-          <?php else: ?>
-            <li>After login, you will be redirected to the main website.</li>
+            <li>If your clinic is still pending approval, you will be sent to the Admin Pending page after login.</li>
           <?php endif; ?>
         </ul>
       </div>
@@ -43,6 +51,9 @@ include "../includes/partials/head.php";
         <a href="<?php echo $baseUrl; ?>/pages/login.php"
            class="flex-1 text-center py-3 rounded-xl font-bold text-white"
            style="background: var(--secondary);">Go to Login</a>
+        <a href="<?php echo $baseUrl; ?>/pages/resend-verification.php"
+           class="flex-1 text-center py-3 rounded-xl font-bold text-slate-900"
+           style="background: var(--accent);">Resend Verification</a>
         <a href="<?php echo $baseUrl; ?>/index.php#top"
            class="flex-1 text-center py-3 rounded-xl font-bold text-slate-900"
            style="background: var(--accent);">Back to Website</a>

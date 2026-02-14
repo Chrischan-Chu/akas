@@ -1,12 +1,25 @@
 # Node
 node_modules/
 
-# Environment files
+# PHP / Composer
+/vendor/
+
+# Environment variables
 .env
+
+# IDE
+.idea/
 
 # OS junk
 .DS_Store
 Thumbs.db
 
+# Cache / temp
+tmp/
+.phpunit.result.cache
+
 # Logs
 *.log
+
+# Swap files
+.*.swp

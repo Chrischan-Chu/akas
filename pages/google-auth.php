@@ -52,7 +52,7 @@ $acc = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if ($acc) {
   // Update Google fields
-  $upd = $pdo->prepare("UPDATE accounts SET auth_provider='google', google_sub=?, google_picture=?, name=? WHERE id=?");
+  $upd = $pdo->prepare("UPDATE accounts SET auth_provider='google', google_sub=?, google_picture=?, name=?, email_verified_at = COALESCE(email_verified_at, NOW()), email_verify_token_hash = NULL, email_verify_expires_at = NULL WHERE id=?");
   $upd->execute([$sub, ($pic !== '' ? $pic : null), $name, (int)$acc['id']]);
 
   // CLINIC ADMIN: special routing
@@ -84,31 +84,38 @@ if ($acc) {
   redirect_to($baseUrl . '/index.php#home');
 }
 
-// No existing account: create depending on role
+// No existing account found
+if ($mode !== 'signup') {
+  // Google LOGIN only: do not create accounts
+  flash_set('error', 'No account found. Please sign up to continue.');
+  redirect_to($baseUrl . '/pages/login.php');
+}
+
+// Google SIGNUP: create account depending on role
 if ($role === 'clinic_admin') {
-  // Create incomplete clinic admin (clinic_id null) then force step 2 locked
   $dummyHash = google_make_dummy_password_hash();
 
   $ins = $pdo->prepare("
-    INSERT INTO accounts (role, clinic_id, name, email, password_hash, auth_provider, google_sub, google_picture)
-    VALUES ('clinic_admin', NULL, ?, ?, ?, 'google', ?, ?)
+    INSERT INTO accounts (role, clinic_id, name, email, password_hash, auth_provider, google_sub, google_picture, email_verified_at)
+    VALUES ('clinic_admin', NULL, ?, ?, ?, 'google', ?, ?, NOW())
   ");
   $ins->execute([$name, $email, $dummyHash, $sub, ($pic !== '' ? $pic : null)]);
 
   $newId = (int)$pdo->lastInsertId();
   auth_set($newId, 'clinic_admin', $name, $email, null);
-
   redirect_to($baseUrl . '/pages/signup-admin.php?step=2&locked=1');
 }
 
 // Default: create user
 $dummyHash = google_make_dummy_password_hash();
 $ins = $pdo->prepare("
-  INSERT INTO accounts (role, name, gender, email, password_hash, phone, birthdate, auth_provider, google_sub, google_picture)
-  VALUES ('user', ?, NULL, ?, ?, NULL, NULL, 'google', ?, ?)
+  INSERT INTO accounts (role, name, gender, email, password_hash, phone, birthdate, auth_provider, google_sub, google_picture, email_verified_at)
+  VALUES ('user', ?, NULL, ?, ?, NULL, NULL, 'google', ?, ?, NOW())
 ");
 $ins->execute([$name, $email, $dummyHash, $sub, ($pic !== '' ? $pic : null)]);
 
 $newId = (int)$pdo->lastInsertId();
 auth_set($newId, 'user', $name, $email, null);
 redirect_to($baseUrl . '/index.php#home');
+
+

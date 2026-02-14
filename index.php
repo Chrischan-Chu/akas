@@ -17,5 +17,4 @@ include "includes/partials/head.php";
 
 <?php include "includes/partials/footer.php"; ?>
 <button id="backToTop" type="button" aria-label="Back to top">↑</button>
-<script src="/AKAS/assets/js/global.js" defer></script>
 <script src="/AKAS/assets/js/contact.js" defer></script>

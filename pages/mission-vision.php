@@ -1,4 +1,3 @@
-<section id="mission-vision" class="scroll-mt-24">
   <section class="py-8 px-4 bg-white">
     <div class="max-w-6xl mx-auto">
 
@@ -28,6 +27,7 @@
 
           </div>
         </div>
+
         <div class="group rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden
                     transition transform-gpu hover:-translate-y-1 hover:shadow-md">
           <div class="px-8 py-5 flex items-center gap-3 text-white"
@@ -58,4 +58,5 @@
 
     </div>
   </section>
+
 </section>

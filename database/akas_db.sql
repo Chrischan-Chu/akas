@@ -58,11 +58,17 @@ CREATE TABLE `accounts` (
   `google_sub` varchar(64) DEFAULT NULL,
   `google_picture` varchar(255) DEFAULT NULL,
 
+  -- ✅ Email verification (manual/local accounts)
+  `email_verified_at` datetime DEFAULT NULL,
+  `email_verify_token_hash` varchar(64) DEFAULT NULL,
+  `email_verify_expires_at` datetime DEFAULT NULL,
+
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_email` (`email`),
   KEY `idx_clinic_id` (`clinic_id`),
   KEY `idx_google_sub` (`google_sub`),
+  KEY `idx_email_verified` (`email_verified_at`),
   CONSTRAINT `fk_accounts_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
