@@ -10,7 +10,7 @@ use Ably\AblyRest;
 $key = getenv('ABLY_API_KEY') ?: '';
 if ($key === '') {
   http_response_code(500);
-  echo json_encode(['error' => 'Missing ABLY_API_KEY']);
+  echo json_encode(['error' => 'KtC7rw.-df6sw:fEo5tVYYnOpj_RrNA450TNLUaST_v6qYWplSC79SdmU']);
   exit;
 }
 

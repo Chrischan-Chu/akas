@@ -96,13 +96,11 @@ if ($action === 'save') {
 
   $name = trim((string)($_POST['name'] ?? ''));
   $about = trim((string)($_POST['about'] ?? ''));
-  $availability = trim((string)($_POST['availability'] ?? ''));
 
   // fields
   $birthdate      = trim((string)($_POST['birthdate'] ?? ''));
   $specialization = trim((string)($_POST['specialization'] ?? ''));
   $prcNo          = trim((string)($_POST['prc_no'] ?? ''));
-  $schedule       = trim((string)($_POST['schedule'] ?? ''));
   $email          = trim((string)($_POST['email'] ?? ''));
   $contactNumber  = trim((string)($_POST['contact_number'] ?? ''));
 
@@ -130,10 +128,6 @@ if ($action === 'save') {
     $errors[] = 'PRC must be 3–50 characters and can include letters/numbers/-/ /.';
   }
 
-  if ($schedule === '' || mb_strlen($schedule) > 300) {
-    $errors[] = 'Schedule is required and must be 300 characters or less.';
-  }
-
   if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $errors[] = 'Valid email is required.';
   }
@@ -142,12 +136,63 @@ if ($action === 'save') {
     $errors[] = 'Contact number must be 10 digits starting with 9 (e.g., 9123456789).';
   }
 
+  // ---------------------------------------------
+  // BUILD WEEKLY SCHEDULE JSON (15,20,30 only)
+  // ---------------------------------------------
+  $days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  $scheduleArr = [];
+
+  $hasAtLeastOneDay = false;
+
+  foreach ($days as $day) {
+    $enabled = in_array($day, $_POST['days'] ?? [], true);
+
+    $start = trim((string)($_POST["start_$day"] ?? ''));
+    $end   = trim((string)($_POST["end_$day"] ?? ''));
+    $interval = (int)($_POST["interval_$day"] ?? 30);
+
+    if (!in_array($interval, [15,20,30], true)) {
+      $errors[] = "$day interval must be 15, 20, or 30 minutes.";
+    }
+
+    if ($enabled) {
+      $hasAtLeastOneDay = true;
+
+      if (!preg_match('/^\d{2}:\d{2}$/', $start)) {
+        $errors[] = "$day start time is invalid.";
+      }
+      if (!preg_match('/^\d{2}:\d{2}$/', $end)) {
+        $errors[] = "$day end time is invalid.";
+      }
+
+      $s = DateTime::createFromFormat('H:i', $start);
+      $e = DateTime::createFromFormat('H:i', $end);
+
+      if (!$s || !$e || $e <= $s) {
+        $errors[] = "$day end time must be after start time.";
+      }
+    }
+
+    $scheduleArr[$day] = [
+      'enabled'   => $enabled,
+      'start'     => $start,
+      'end'       => $end,
+      'slot_mins' => $interval,
+    ];
+  }
+
+  if (!$hasAtLeastOneDay) {
+    $errors[] = "Please enable at least one working day.";
+  }
+
   if ($errors) {
     flash_set('err', implode(' ', $errors));
     $redirId = ($id > 0 ? $id : ($reapplyFromId > 0 ? $reapplyFromId : 0));
     header('Location: ' . $baseUrl . '/admin/doctors.php' . ($redirId > 0 ? '?edit=' . $redirId : ''));
     exit;
   }
+
+  $schedule = json_encode($scheduleArr, JSON_UNESCAPED_SLASHES);
 
   $newImage = save_doctor_image($_FILES['image'] ?? [], $uploadDirFs, $uploadDirWeb);
 
@@ -174,7 +219,6 @@ if ($action === 'save') {
         UPDATE clinic_doctors
         SET name=?,
             about=?,
-            availability=?,
             image_path=?,
             birthdate=?,
             specialization=?,
@@ -190,7 +234,7 @@ if ($action === 'save') {
         LIMIT 1
       ");
       $stmt->execute([
-        $name, $about, $availability, $newImage,
+        $name, $about, $newImage,
         $birthdate, $specialization, $prcNo, $schedule, $email, $contactNumber,
         $reapplyFromId, $clinicId
       ]);
@@ -199,7 +243,6 @@ if ($action === 'save') {
         UPDATE clinic_doctors
         SET name=?,
             about=?,
-            availability=?,
             birthdate=?,
             specialization=?,
             prc_no=?,
@@ -214,7 +257,7 @@ if ($action === 'save') {
         LIMIT 1
       ");
       $stmt->execute([
-        $name, $about, $availability,
+        $name, $about,
         $birthdate, $specialization, $prcNo, $schedule, $email, $contactNumber,
         $reapplyFromId, $clinicId
       ]);
@@ -232,7 +275,6 @@ if ($action === 'save') {
         UPDATE clinic_doctors
         SET name=?,
             about=?,
-            availability=?,
             image_path=?,
             birthdate=?,
             specialization=?,
@@ -248,7 +290,7 @@ if ($action === 'save') {
         LIMIT 1
       ");
       $stmt->execute([
-        $name, $about, $availability, $newImage,
+        $name, $about, $newImage,
         $birthdate, $specialization, $prcNo, $schedule, $email, $contactNumber,
         $id, $clinicId
       ]);
@@ -257,7 +299,6 @@ if ($action === 'save') {
         UPDATE clinic_doctors
         SET name=?,
             about=?,
-            availability=?,
             birthdate=?,
             specialization=?,
             prc_no=?,
@@ -272,7 +313,7 @@ if ($action === 'save') {
         LIMIT 1
       ");
       $stmt->execute([
-        $name, $about, $availability,
+        $name, $about,
         $birthdate, $specialization, $prcNo, $schedule, $email, $contactNumber,
         $id, $clinicId
       ]);
@@ -286,18 +327,27 @@ if ($action === 'save') {
   // ✅ NORMAL INSERT (new doctor)
   $stmt = $pdo->prepare("
     INSERT INTO clinic_doctors
-      (clinic_id, name, about, availability, image_path,
-       birthdate, specialization, prc_no, schedule, email, contact_number,
-       approval_status, declined_reason, created_via)
+      (clinic_id, name, about, image_path,
+      birthdate, specialization, prc_no, schedule, email, contact_number,
+      approval_status, declined_reason, created_via)
     VALUES
-      (?,?,?,?,?,
-       ?,?,?,?,?,?,
-       'PENDING', NULL, 'CMS')
+      (?,?,?,?,?,?,?,?,?,?, 
+      'PENDING', NULL, 'CMS')
   ");
+
   $stmt->execute([
-    $clinicId, $name, $about, $availability, $newImage,
-    $birthdate, $specialization, $prcNo, $schedule, $email, $contactNumber
+    $clinicId,
+    $name,
+    $about,
+    $newImage,
+    $birthdate,
+    $specialization,
+    $prcNo,
+    $schedule,
+    $email,
+    $contactNumber
   ]);
+
 
   flash_set('ok', 'Doctor added (pending approval).');
   header('Location: ' . $baseUrl . '/admin/doctors.php');
@@ -330,7 +380,7 @@ if ($reapplyId > 0) {
 
 // List
 $stmt = $pdo->prepare('
-  SELECT id, name, about, availability, image_path, created_at, updated_at,
+  SELECT id, name, about, image_path, created_at, updated_at,
          birthdate, specialization, prc_no, schedule, email, contact_number,
          approval_status, declined_reason, created_via
   FROM clinic_doctors
@@ -344,6 +394,14 @@ $ok  = flash_get('ok');
 $err = flash_get('err');
 
 include __DIR__ . '/../includes/partials/head.php';
+
+// Parse schedule JSON for prefilling
+function parse_schedule_json(?string $raw): array {
+  if (!$raw) return [];
+  $j = json_decode($raw, true);
+  return is_array($j) ? $j : [];
+}
+$pref = parse_schedule_json($edit['schedule'] ?? '');
 ?>
 
 <body class="min-h-screen bg-slate-50">
@@ -437,27 +495,102 @@ include __DIR__ . '/../includes/partials/head.php';
           </div>
 
           <div class="md:col-span-2">
-            <label class="block text-sm font-semibold text-slate-700">Schedule</label>
-            <textarea name="schedule" required maxlength="300" rows="3"
-              class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
-              placeholder="e.g., Mon–Fri 9:00 AM – 3:00 PM"><?php echo h($edit['schedule'] ?? ''); ?></textarea>
+            <div class="mt-4">
+              <label class="block text-sm font-semibold text-slate-700">Description / About</label>
+              <textarea name="about" rows="6"
+                class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+                placeholder="Short description about the doctor..."><?php echo h($edit['about'] ?? ''); ?></textarea>
+            </div>
           </div>
+
+          <!-- ✅ NEW Weekly Schedule UI (keeps your look) -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-slate-700 mb-3">Weekly Schedule</label>
+
+            <div class="space-y-3">
+              <?php
+              $days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+              foreach ($days as $day):
+                $row = $pref[$day] ?? [];
+                $enabled = (bool)($row['enabled'] ?? false);
+                $start = (string)($row['start'] ?? '');
+                $end = (string)($row['end'] ?? '');
+                $slot = (int)($row['slot_mins'] ?? 30);
+                if (!in_array($slot, [15,20,30], true)) $slot = 30;
+              ?>
+                <?php
+                $row = $pref[$day] ?? [];
+                $enabled = (bool)($row['enabled'] ?? false);
+                $start = (string)($row['start'] ?? '');
+                $end = (string)($row['end'] ?? '');
+                $slot = (int)($row['slot_mins'] ?? 30);
+                if (!in_array($slot, [15,20,30], true)) $slot = 30;
+
+                $wrapId = "row_$day";
+                $chkId  = "chk_$day";
+              ?>
+              <div id="<?php echo $wrapId; ?>"
+                  class="schedule-row flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 transition-all duration-200">
+                
+                <!-- Day Checkbox -->
+                <label class="flex items-center gap-2 w-24 font-semibold text-slate-700">
+                  <input id="<?php echo $chkId; ?>"
+                        type="checkbox"
+                        name="days[]"
+                        value="<?php echo $day; ?>"
+                        class="day-toggle h-4 w-4 rounded border-slate-300"
+                        <?php echo $enabled ? 'checked' : ''; ?>
+                        data-target="<?php echo $wrapId; ?>">
+                  <?php echo $day; ?>
+                </label>
+
+                <!-- Start -->
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold text-slate-500">Start</span>
+                  <input type="time"
+                        name="start_<?php echo $day; ?>"
+                        value="<?php echo h($start); ?>"
+                        class="time-field h-10 w-[130px] rounded-xl border border-slate-200 px-3 bg-white text-sm cursor-pointer
+                                focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+                        onclick="this.showPicker && this.showPicker();"
+                        <?php echo $enabled ? '' : 'disabled'; ?>>
+                </div>
+
+                <!-- End -->
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold text-slate-500">End</span>
+                  <input type="time"
+                        name="end_<?php echo $day; ?>"
+                        value="<?php echo h($end); ?>"
+                        class="time-field h-10 w-[130px] rounded-xl border border-slate-200 px-3 bg-white text-sm cursor-pointer
+                                focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+                        onclick="this.showPicker && this.showPicker();"
+                        <?php echo $enabled ? '' : 'disabled'; ?>>
+                </div>
+
+                <!-- Interval -->
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold text-slate-500">Interval</span>
+                  <select name="interval_<?php echo $day; ?>"
+                          class="time-field h-10 rounded-xl border border-slate-200 px-3 bg-white text-sm
+                                focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+                          <?php echo $enabled ? '' : 'disabled'; ?>>
+                    <option value="15" <?php echo $slot===15?'selected':''; ?>>15 mins</option>
+                    <option value="20" <?php echo $slot===20?'selected':''; ?>>20 mins</option>
+                    <option value="30" <?php echo $slot===30?'selected':''; ?>>30 mins</option>
+                  </select>
+                </div>
+
+              </div>
+
+              <?php endforeach; ?>
+            </div>
+
+            <p class="mt-3 text-xs text-slate-500">Only checked days will be considered active.</p>
+          </div>
+
         </div>
 
-        <div class="mt-4">
-          <label class="block text-sm font-semibold text-slate-700">Description / About</label>
-          <textarea name="about" rows="6"
-            class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
-            placeholder="Short description about the doctor..."><?php echo h($edit['about'] ?? ''); ?></textarea>
-        </div>
-
-        <div class="mt-4">
-          <label class="block text-sm font-semibold text-slate-700">Availability</label>
-          <textarea name="availability" rows="4"
-            class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
-            placeholder="Example:\nMon-Fri: 9:00 AM - 4:00 PM\nSat: 9:00 AM - 12:00 PM"><?php echo h($edit['availability'] ?? ''); ?></textarea>
-          <p class="mt-2 text-xs text-slate-500">Tip: Use one line per schedule to keep it readable.</p>
-        </div>
       </div>
 
       <div class="rounded-3xl border border-slate-200 p-5">
@@ -531,17 +664,6 @@ include __DIR__ . '/../includes/partials/head.php';
                   </span>
                 </div>
 
-                <?php if (!empty($d['specialization']) || !empty($d['prc_no'])): ?>
-                  <p class="text-xs text-slate-500 mt-2">
-                    🩺 <?php echo h($d['specialization'] ?? ''); ?>
-                    <?php if (!empty($d['prc_no'])): ?> • PRC: <?php echo h($d['prc_no']); ?><?php endif; ?>
-                  </p>
-                <?php endif; ?>
-
-                <?php if (!empty($d['availability'])): ?>
-                  <p class="text-xs text-slate-500 mt-2 line-clamp-2">🗓 <?php echo h($d['availability']); ?></p>
-                <?php endif; ?>
-
                 <?php if ($isDeclined): ?>
                   <div class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
                     <p class="text-xs font-bold text-rose-700">Declined</p>
@@ -590,6 +712,40 @@ include __DIR__ . '/../includes/partials/head.php';
   </section>
 
 </main>
+
+<script>
+  (function () {
+    function updateRow(rowEl, enabled) {
+      if (!rowEl) return;
+
+      const fields = rowEl.querySelectorAll('.time-field');
+      fields.forEach(f => {
+        f.disabled = !enabled;
+      });
+
+      // animation + greyed out
+      rowEl.classList.toggle('is-disabled', !enabled);
+
+      // subtle “pop” when enabling
+      if (enabled) {
+        rowEl.classList.add('ring-2', 'ring-[var(--secondary)]/20');
+        setTimeout(() => rowEl.classList.remove('ring-2', 'ring-[var(--secondary)]/20'), 180);
+      }
+    }
+
+    // init all rows on load
+    document.querySelectorAll('.day-toggle').forEach(chk => {
+      const rowId = chk.getAttribute('data-target');
+      const rowEl = document.getElementById(rowId);
+      updateRow(rowEl, chk.checked);
+
+      chk.addEventListener('change', () => {
+        updateRow(rowEl, chk.checked);
+      });
+    });
+  })();
+</script>
+
 
 </body>
 </html>

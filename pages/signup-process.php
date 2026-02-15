@@ -454,6 +454,9 @@ try {
       LIMIT 1
     ");
     $updAdmin->execute([$clinicId, $adminName, $email, $acctId]);
+    // ✅ update session too, so pending.php sees clinic_id
+auth_set($acctId, 'clinic_admin', $adminName, $email, $clinicId);
+
 
   } else {
     $adminAccountId = 0;
@@ -471,19 +474,57 @@ try {
       INSERT INTO clinic_doctors
         (clinic_id, name, birthdate, specialization, prc_no, schedule, email, contact_number, approval_status, created_via)
       VALUES
-        (?,?,?,?,?,?,?,?,?,?)
+        (?,?,?,?,?,?,?,?,?,?,?)
     ');
 
+    // Helper: convert availability JSON to a readable schedule string (for the schedule column)
+    $fmtSchedule = function (?string $availabilityJson): ?string {
+      if (!$availabilityJson) return null;
+      $a = json_decode($availabilityJson, true);
+      if (!is_array($a)) return null;
+
+      $days = $a['days'] ?? null;
+      $start = (string)($a['start'] ?? '');
+      $end   = (string)($a['end'] ?? '');
+      $mins  = (int)($a['slot_mins'] ?? 0);
+
+      $dayLabel = '';
+      if (is_array($days)) {
+        sort($days);
+        $days = array_values(array_map('intval', $days));
+        if ($days === [1,2,3,4,5]) $dayLabel = 'Mon–Fri';
+        elseif ($days === [0,1,2,3,4,5,6]) $dayLabel = 'Daily';
+        else {
+          $map = [0=>'Sun',1=>'Mon',2=>'Tue',3=>'Wed',4=>'Thu',5=>'Fri',6=>'Sat'];
+          $labels = [];
+          foreach ($days as $d) { if (isset($map[$d])) $labels[] = $map[$d]; }
+          $dayLabel = implode(', ', $labels);
+        }
+      }
+
+      $parts = [];
+      if ($dayLabel !== '') $parts[] = $dayLabel;
+      if ($start !== '' && $end !== '') $parts[] = $start . '–' . $end;
+      if ($mins > 0) $parts[] = $mins . 'm slots';
+
+      return $parts ? implode(' • ', $parts) : null;
+    };
+
     foreach ($doctors as $d) {
+      // Coming from signup-admin-doctors.js:
+      // - $d['availability'] is a JSON string like {"days":[1,2,3,4,5],"start":"09:00","end":"17:00","slot_mins":30}
+      $availabilityJson = (string)($d['availability'] ?? '');
+
       $insDoc->execute([
         $clinicId,
-        $d['full_name'],
-        $d['birthdate'],
-        $d['specialization'],
-        $d['prc'],
-        $d['schedule'],
-        $d['email'],
-        $d['contact_number'],
+        (string)($d['full_name'] ?? ''),
+        (string)($d['birthdate'] ?? null),
+        (string)($d['specialization'] ?? null),
+        (string)($d['prc'] ?? null),
+        $fmtSchedule($availabilityJson),         // schedule (readable)
+        ($availabilityJson !== '' ? $availabilityJson : null), // availability (JSON for calendar)
+        (string)($d['email'] ?? null),
+        (string)($d['contact_number'] ?? null),
         'PENDING',
         'REGISTRATION',
       ]);
@@ -511,9 +552,7 @@ try {
 
 // ✅ Always require login after admin registration
 // ✅ If Google admin finished Step 2, log them out (they must login later)
-if ($googleLocked && auth_is_logged_in()) {
-  auth_logout();
-}
+
 
 // ✅ Redirect to pending page (NOT login)
 redirect($baseUrl . '/admin/pending.php');
