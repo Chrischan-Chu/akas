@@ -10,13 +10,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 
 return [
-    'host' => 'smtp-relay.brevo.com',
-    'port' => 587,
-
-    // These are defined in config.production.php
-    'username' => defined('SMTP_USERNAME') ? SMTP_USERNAME : '',
-    'password' => defined('SMTP_PASSWORD') ? SMTP_PASSWORD : '',
-
-    'from_email' => 'akas.appointment.system@gmail.com',
-    'from_name'  => 'AKAS Appointment System',
+  'host' => 'smtp-relay.brevo.com',
+  'port' => 587,
+  'username' => 'a266b1001@smtp-brevo.com',
+  'password' => 'paste_key_here',
+  'from_email' => 'akas.appointment.system@gmail.com',
+  'from_name' => 'AKAS Appointment System',
 ];
