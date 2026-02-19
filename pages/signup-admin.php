@@ -1,6 +1,6 @@
 <?php
 $appTitle = "AKAS | Clinic Sign Up";
-$baseUrl  = "/AKAS";
+$baseUrl  = "";
 
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/google_config.php';

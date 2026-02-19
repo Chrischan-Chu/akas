@@ -1,6 +1,6 @@
 <?php
 $appTitle = "AKAS | Sign Up Success";
-$baseUrl  = "/AKAS";
+$baseUrl  = "";
 require_once __DIR__ . '/../includes/auth.php';
 
 if (auth_is_logged_in()) {

@@ -1,7 +1,7 @@
 <?php
+require_once dirname(__DIR__, 2) . "/config.php";
 if (!isset($appTitle)) { $appTitle = "AKAS"; }
-if (!isset($baseUrl))  { $baseUrl  = "/AKAS"; }
-
+if (!isset($baseUrl) || $baseUrl === "") { $baseUrl = defined('BASE_URL') ? (string)BASE_URL : ""; }
 require_once dirname(__DIR__) . "/auth.php";
 
 /**

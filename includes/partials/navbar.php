@@ -1,5 +1,5 @@
 <?php
-if (!isset($baseUrl)) $baseUrl = "/AKAS";
+if (!isset($baseUrl)) $baseUrl = "";
 
 require_once dirname(__DIR__) . "/auth.php";
 

@@ -1,7 +1,7 @@
 <?php
 
 $appTitle  = "AKAS | All Clinics";
-$baseUrl   = "/AKAS";
+$baseUrl   = "";
 include __DIR__ . "/../includes/partials/head.php";
 
 

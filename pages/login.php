@@ -1,6 +1,6 @@
 <?php
 $appTitle = "AKAS | Login";
-$baseUrl  = "/AKAS";
+$baseUrl  = "";
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/google_config.php';
 
@@ -167,8 +167,6 @@ include "../includes/partials/head.php";
 
             <div class="mt-3 text-xs text-black/80">
               <a href="#" class="hover:underline">Forgot password?</a>
-              <span class="mx-2 text-black/40">•</span>
-              <a href="<?php echo $baseUrl; ?>/pages/resend-verification.php<?php echo $emailPrefill ? ('?email=' . urlencode($emailPrefill)) : ''; ?>" class="hover:underline">Resend verification</a>
             </div>
 
             <!-- Login button ONLY -->

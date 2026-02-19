@@ -1,12 +1,14 @@
 <?php
+require_once __DIR__ . '/../config.php';
 declare(strict_types=1);
 
 require_once __DIR__ . '/mailer.php';
 
 /**
- * Build absolute base URL like: http://localhost/AKAS  or https://example.com/AKAS
+ * Build absolute base URL like: http://localhost{BASE_URL}  or https://example.com{BASE_URL}
  */
-function akas_abs_base_url(string $baseUrl = '/AKAS'): string {
+function akas_abs_base_url(string $baseUrl = ''): string {
+  if ($baseUrl === '' && defined('BASE_URL')) { $baseUrl = (string)BASE_URL; }
   $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
   $scheme = $https ? 'https' : 'http';
   $host = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');

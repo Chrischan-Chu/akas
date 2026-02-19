@@ -3,7 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/_guard.php';
 
 $appTitle = 'AKAS | Admin Dashboard';
-$baseUrl  = '/AKAS';
+$baseUrl  = '';
 
 require_once __DIR__ . '/../includes/auth.php';
 auth_require_role('clinic_admin', $baseUrl);

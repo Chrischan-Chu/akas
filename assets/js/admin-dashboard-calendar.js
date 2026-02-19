@@ -24,7 +24,7 @@
   const mDone = document.getElementById("admDoneBtn");
   const mMsg = document.getElementById("admModalMsg");
 
-  if (!BASE_URL || !CLINIC_ID) return;
+  if (!CLINIC_ID) return;
   if (!calGrid || !monthLabel || !prevBtn || !nextBtn || !selectedText || !listWrap) return;
 
   const monthNames = [

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 header("Content-Type: text/html; charset=UTF-8");
 
-$baseUrl  = '/AKAS';
+$baseUrl  = '';
 require_once __DIR__ . '/../includes/db.php';
 
 $pdo = db();

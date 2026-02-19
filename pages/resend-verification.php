@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 $appTitle = "AKAS | Resend Verification";
-$baseUrl  = "/AKAS";
+$baseUrl  = "";
 
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/email_verification.php';

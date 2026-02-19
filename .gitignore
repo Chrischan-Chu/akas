@@ -23,3 +23,7 @@ tmp/
 
 # Swap files
 .*.swp
+
+# Local/production config (do not commit secrets)
+config.local.php
+config.production.php

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 $appTitle = "AKAS | Registration Pending";
-$baseUrl  = "/AKAS";
+$baseUrl  = "";
 
 require_once __DIR__ . '/../includes/auth.php';
 

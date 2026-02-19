@@ -565,7 +565,7 @@
   // Modal elements already exist: #openBooking, #doctorSelect
   // ==============================
   (() => {
-    const baseUrl = document.body?.dataset?.baseUrl || "/AKAS";
+    const baseUrl = document.body?.dataset?.baseUrl || "";
     const clinicId = document.body?.dataset?.clinicId || "0";
 
     const doctorSel = document.getElementById("previewDoctorSelect");

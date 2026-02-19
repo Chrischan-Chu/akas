@@ -3,10 +3,16 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
+}
+
+// Provide a consistent base URL for redirects/links
+if (!isset($baseUrl) || $baseUrl === '') {
+  $baseUrl = defined('BASE_URL') ? (string)BASE_URL : '';
 }
 
 function auth_is_logged_in(): bool {
@@ -78,7 +84,7 @@ function flash_clear(?string $key = null): void {
 
 
 // --- Guards ---
-function auth_require_login(string $baseUrl = '/AKAS', string $loginPath = '/pages/login.php'): void {
+function auth_require_login(string $baseUrl = '', string $loginPath = '/pages/login.php'): void {
   if (!auth_is_logged_in()) {
     header('Location: ' . $baseUrl . $loginPath);
     exit;
@@ -86,7 +92,7 @@ function auth_require_login(string $baseUrl = '/AKAS', string $loginPath = '/pag
 }
 
 
-function auth_require_role(string $role, string $baseUrl = '/AKAS', string $loginPath = '/pages/login.php'): void {
+function auth_require_role(string $role, string $baseUrl = '', string $loginPath = '/pages/login.php'): void {
   auth_require_login($baseUrl, $loginPath);
 
   if (auth_role() !== $role) {
@@ -97,7 +103,7 @@ function auth_require_role(string $role, string $baseUrl = '/AKAS', string $logi
 
 
 // Admin should ONLY see /admin/*.
-function auth_enforce_admin_dashboard_only(string $baseUrl = '/AKAS'): void {
+function auth_enforce_admin_dashboard_only(string $baseUrl = ''): void {
   if (!auth_is_logged_in()) return;
   if (auth_role() !== 'clinic_admin') return;
 

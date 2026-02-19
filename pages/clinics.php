@@ -35,7 +35,7 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
           Clinics
         </h2>
 
-        <a href="/AKAS/pages/clinics-all.php"
+        <a href="/pages/clinics-all.php"
            class="px-6 h-11 flex items-center rounded-full font-semibold text-white shadow-sm hover:opacity-95 transition"
            style="background-color: var(--primary);">
           View All Clinics
@@ -47,7 +47,7 @@ function h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
 
         <?php foreach ($clinics as $c): ?>
 
-          <a href="/AKAS/pages/clinic-profile.php?id=<?php echo urlencode((string)$c['id']); ?>"
+          <a href="/pages/clinic-profile.php?id=<?php echo urlencode((string)$c['id']); ?>"
              class="group block bg-white rounded-3xl shadow-sm hover:shadow-lg transition overflow-hidden">
 
             <div class="p-8 min-h-[210px] flex flex-col justify-between">
