@@ -8,9 +8,9 @@ declare(strict_types=1);
  * - In production, store these as environment variables instead.
  */
 return [
-  'host' => 'smtp-relay.brevo.com',
+  'host' => 'paste_hostname_here',
   'port' => 587,
-  'username' => 'a266b1001@smtp-brevo.com',
+  'username' => 'past_username_here',
   'password' => 'paste_key_here',
   'from_email' => 'akas.appointment.system@gmail.com',
   'from_name' => 'AKAS Appointment System',
