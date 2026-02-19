@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 $appTitle = "AKAS | Appointment Scheduling System";
 include "includes/partials/head.php";
 ?>
