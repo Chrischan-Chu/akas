@@ -137,14 +137,17 @@ include "../includes/partials/head.php";
                       d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                   </svg>
                 </span>
-
-                <input
-                  type="text"
-                  name="admin_name"
-                  placeholder="Admin Full Name"
-                  required
-                  class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
-                />
+<input
+  type="text"
+  name="admin_name"
+  placeholder="Admin Full Name"
+  required
+  data-validate="full-name"
+ class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400
+       border border-slate-200
+       focus:outline-none focus:ring-2 focus:ring-white/60
+       ring-offset-0"
+/>
               </div>
 
               <div class="bg-white/90 rounded-xl px-4 py-3 border border-white/40">
@@ -559,153 +562,12 @@ include "../includes/partials/head.php";
   </div>
 </div>
 
-<script src="<?php echo $baseUrl; ?>/assets/js/form-validators.js"></script>
+<?php $v1 = @filemtime(__DIR__ . '/../assets/js/form-validators.js') ?: time(); ?>
+<script src="/assets/js/form-validators.js?v=<?= (int)$v1 ?>"></script>
 
-<script>
-(function(){
-  const step1 = document.getElementById('step1');
-  const step2 = document.getElementById('step2');
-
-  const nextBtn = document.getElementById('nextBtn');
-  const backBtn = document.getElementById('backBtn');
-
-  const specialtySelect = document.getElementById("specialtySelect");
-  const otherWrap = document.getElementById("otherSpecialtyWrap");
-  const otherInput = otherWrap?.querySelector('input[name="specialty_other"]');
-
-  // ✅ Remember which fields were originally required (so we can toggle safely)
-  document.querySelectorAll('#signupWizard [required]').forEach(el => {
-    el.dataset.wasRequired = "1";
-  });
-
-  function showStep(n){
-    if(n === 1){
-      step1.classList.add('active');
-      step2.classList.remove('active');
-
-      toggleStepRequired(step1, true);
-      toggleStepRequired(step2, false);
-      return;
-    }
-
-    step1.classList.remove('active');
-    step2.classList.add('active');
-
-    toggleStepRequired(step1, false);
-    toggleStepRequired(step2, true);
-  }
-
-  function toggleStepRequired(container, enabled){
-    // Only toggle fields that were originally required
-    container.querySelectorAll('[data-was-required="1"]').forEach(el => {
-      el.required = !!enabled;
-    });
-  }
-
-  function toggleOtherSpecialty() {
-    const isOther = specialtySelect?.value === "Other";
-    if (!otherWrap || !otherInput) return;
-
-    if (isOther) {
-      otherWrap.classList.remove("hidden");
-      otherInput.required = true;
-    } else {
-      otherWrap.classList.add("hidden");
-      otherInput.required = false;
-      otherInput.value = "";
-    }
-  }
-
-  specialtySelect?.addEventListener("change", toggleOtherSpecialty);
-  toggleOtherSpecialty();
-
-  nextBtn?.addEventListener('click', () => {
-    const step1Inputs = step1.querySelectorAll('input, select, textarea');
-
-    for (const el of step1Inputs) {
-      if (el.closest('.hidden')) continue;
-      if (!el.checkValidity()) {
-        el.reportValidity();
-        return;
-      }
-    }
-
-    showStep(2);
-
-    // update title/progress
-    document.getElementById('titleStep1Wrap')?.classList.add('hidden');
-    document.getElementById('titleStep2Wrap')?.classList.remove('hidden');
-
-    const bar = document.getElementById('progressBar');
-    if (bar) bar.style.width = '100%';
-    document.getElementById('labelStep1')?.classList.add('opacity-60');
-    document.getElementById('labelStep2')?.classList.remove('opacity-60');
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-
-  backBtn?.addEventListener('click', () => {
-    showStep(1);
-
-    document.getElementById('titleStep2Wrap')?.classList.add('hidden');
-    document.getElementById('titleStep1Wrap')?.classList.remove('hidden');
-
-    const bar = document.getElementById('progressBar');
-    if (bar) bar.style.width = '50%';
-    document.getElementById('labelStep2')?.classList.add('opacity-60');
-    document.getElementById('labelStep1')?.classList.remove('opacity-60');
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-
-  // ✅ Handle ?step=2 and Google-locked Step 2
-  const qs = new URLSearchParams(window.location.search);
-  const urlStep = qs.get('step');
-  const locked = qs.get('locked') === '1';
-
-  if (locked) {
-    showStep(2);
-
-    // Hide step 1 completely
-    step1.classList.remove('active');
-    step1.style.display = 'none';
-
-    // Disable step 1 inputs so they won't override hidden values
-    step1.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
-
-    // Hide back button in step 2
-    if (backBtn) backBtn.style.display = 'none';
-
-    // Update title + progress UI
-    document.getElementById('titleStep1Wrap')?.classList.add('hidden');
-    document.getElementById('titleStep2Wrap')?.classList.remove('hidden');
-
-    const bar = document.getElementById('progressBar');
-    if (bar) bar.style.width = '100%';
-    document.getElementById('labelStep1')?.classList.add('opacity-60');
-    document.getElementById('labelStep2')?.classList.remove('opacity-60');
-  } else {
-    if (urlStep === '2') {
-      showStep(2);
-
-      document.getElementById('titleStep1Wrap')?.classList.add('hidden');
-      document.getElementById('titleStep2Wrap')?.classList.remove('hidden');
-
-      const bar = document.getElementById('progressBar');
-      if (bar) bar.style.width = '100%';
-      document.getElementById('labelStep1')?.classList.add('opacity-60');
-      document.getElementById('labelStep2')?.classList.remove('opacity-60');
-    } else {
-      showStep(1);
-    }
-  }
-
-})();
-</script>
-<?php $v = filemtime(__DIR__ . '/../assets/js/form-validators.js'); ?>
-<script src="/assets/js/form-validators.js?v=<?= $v ?>"></script>
+<?php $v2 = @filemtime(__DIR__ . '/../assets/js/signup-admin.js') ?: time(); ?>
+<script src="/assets/js/signup-admin.js?v=<?= (int)$v2 ?>"></script>
 
 <script src="<?php echo $baseUrl; ?>/assets/js/signup-admin-doctors.js"></script>
-
 </body>
 </html>
