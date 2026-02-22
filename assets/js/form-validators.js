@@ -10,6 +10,84 @@
     el.classList.remove("ring-2", "ring-red-400");
   };
 
+  const debounce = (fn, ms = 400) => {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  };
+
+  // Resolve app base URL from the script tag that loaded this file.
+  // This avoids hardcoding "/AKAS" or assuming the site is at web root.
+  const getAppBaseUrl = () => {
+    const script = document.querySelector('script[src*="/assets/js/form-validators.js"]');
+    if (!script?.src) return "";
+
+    try {
+      const u = new URL(script.src, window.location.href);
+      // Strip "/assets/js/form-validators.js" from pathname
+      u.pathname = u.pathname.replace(/\/assets\/js\/form-validators\.js(?:\?.*)?$/, "");
+      return u.pathname.endsWith("/") ? u.pathname.slice(0, -1) : u.pathname;
+    } catch {
+      return "";
+    }
+  };
+
+  const UNIQUE_ENDPOINT = (() => {
+    const base = getAppBaseUrl();
+    // Keep it as a same-origin absolute path
+    return `${base}/includes/check-unique.php`;
+  })();
+
+  const checkUnique = async ({ type, value }) => {
+    const params = new URLSearchParams({ type, value });
+    const url = `${UNIQUE_ENDPOINT}?${params.toString()}`;
+
+    try {
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+      });
+      const data = await res.json();
+      return data?.ok ? !!data.available : true; // fail-open
+    } catch {
+      return true; // fail-open
+    }
+  };
+
+  const wireUnique = ({ input, type, message }) => {
+    if (!input) return;
+    if (input.dataset.uniqueBound === "1") return;
+    input.dataset.uniqueBound = "1";
+
+    const run = debounce(async () => {
+      const v = (input.value || "").trim();
+      if (!v) return;
+
+      // Only hit server if the field is already valid format-wise.
+      // (Your existing validators + native constraints handle format.)
+      if (!input.checkValidity()) return;
+
+      const available = await checkUnique({ type, value: v });
+      if (!available) {
+        showError(input);
+        input.setCustomValidity(message);
+      } else {
+        if (input.validationMessage === message) input.setCustomValidity("");
+        clearError(input);
+      }
+    }, 450);
+
+    // Blur is a good UX balance (no spam while typing)
+    input.addEventListener("blur", run);
+
+    // If they start typing again, clear our message
+    input.addEventListener("input", () => {
+      if (input.validationMessage === message) input.setCustomValidity("");
+    });
+  };
+
   /**
    * Prevent popup spam while typing:
    * - input: UI only (red ring), no customValidity message
@@ -307,12 +385,39 @@ const syncConfirmPassword = (confirmInput) => {
       wireInput({ input, validate: validateEmail });
     });
 
+    // Email uniqueness (only when explicitly marked)
+    document.querySelectorAll('[data-unique="accounts_email"]').forEach((input) => {
+      wireUnique({
+        input,
+        type: "email",
+        message: "Email is already in use.",
+      });
+    });
+
     // Phone (PH)
     document.querySelectorAll('[data-validate="phone-ph"]').forEach((input) => {
       wireInput({
         input,
         validate: validatePHMobile,
         filter: (el) => (el.value = el.value.replace(/\D/g, "").slice(0, 10)),
+      });
+    });
+
+    // Phone uniqueness (accounts.phone)
+    document.querySelectorAll('[data-unique="accounts_phone"]').forEach((input) => {
+      wireUnique({
+        input,
+        type: "phone",
+        message: "Phone number is already in use.",
+      });
+    });
+
+    // Clinic contact uniqueness (clinics.contact)
+    document.querySelectorAll('[data-unique="clinic_contact"]').forEach((input) => {
+      wireUnique({
+        input,
+        type: "clinic_contact",
+        message: "Contact number is already in use.",
       });
     });
 

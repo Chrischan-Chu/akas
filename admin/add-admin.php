@@ -79,6 +79,7 @@ include __DIR__ . '/../includes/partials/head.php';
           name="email"
           required
           data-validate="email"
+          data-unique="accounts_email"
           placeholder="name@gmail.com"
           class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
         />

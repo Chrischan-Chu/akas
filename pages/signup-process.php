@@ -91,11 +91,11 @@ if ($existingId > 0) {
   // ✅ Google clinic-admin flow: allow if this is the same logged-in account
   if ($googleLocked && auth_is_logged_in() && auth_role() === 'clinic_admin') {
     if ($existingId !== (int)auth_user_id()) {
-      flash_set('error', 'Email is already registered. Please use your own Google account.');
+      flash_set('error', 'Email is already in use. Please use your own Google account.');
       backToSignup($baseUrl, $role);
     }
   } else {
-    flash_set('error', 'Email is already registered. Please login.');
+    flash_set('error', 'Email is already in use. Please log in.');
     redirect($baseUrl . '/pages/login.php');
   }
 }
@@ -148,6 +148,16 @@ if ($role === 'user') {
       redirect($baseUrl . '/pages/signup-user.php');
     }
     $phoneVal = $digits;
+  }
+
+  // ✅ Unique phone check (only when provided)
+  if ($phoneVal !== null) {
+    $stmt = $pdo->prepare('SELECT id FROM accounts WHERE phone = ? LIMIT 1');
+    $stmt->execute([$phoneVal]);
+    if ((int)($stmt->fetchColumn() ?? 0) > 0) {
+      flash_set('error', 'Phone number is already in use.');
+      redirect($baseUrl . '/pages/signup-user.php');
+    }
   }
 
   $birthdateVal = null;
@@ -271,6 +281,14 @@ if (!preg_match('/^\d{10}$/', $businessIdDigits)) {
 $contactDigits = preg_replace('/\D+/', '', $contactNumber) ?? '';
 if (!preg_match('/^9\d{9}$/', $contactDigits)) {
   flash_set('error', 'Enter a valid PH mobile number (ex: 9123456789).');
+  backToSignup($baseUrl, 'clinic_admin');
+}
+
+// ✅ Unique clinic contact number check
+$stmt = $pdo->prepare('SELECT id FROM clinics WHERE contact = ? LIMIT 1');
+$stmt->execute([$contactDigits]);
+if ($stmt->fetch()) {
+  flash_set('error', 'Phone number is already in use.');
   backToSignup($baseUrl, 'clinic_admin');
 }
 

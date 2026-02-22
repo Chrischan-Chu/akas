@@ -138,6 +138,7 @@ include "../includes/partials/head.php";
                 name="email"
                 placeholder="Email"
                 data-validate="email"
+                data-unique="accounts_email"
                 required
                 class="w-full rounded-xl bg-white px-12 py-2.5 text-slate-700 placeholder:text-slate-400
                        focus:outline-none focus:ring-2 focus:ring-white/60"
@@ -209,6 +210,7 @@ include "../includes/partials/head.php";
                 minlength="10"
                 required
                 data-validate="phone-ph"
+                data-unique="accounts_phone"
                 class="flex-1 h-11 rounded-xl bg-white px-4
                           text-slate-700 placeholder:text-slate-400
                           focus:outline-none focus:ring-2 focus:ring-white/60"

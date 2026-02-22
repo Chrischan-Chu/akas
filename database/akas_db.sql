@@ -34,7 +34,8 @@ CREATE TABLE `clinics` (
   `close_time` time DEFAULT NULL,
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_business_id` (`business_id`)
+  UNIQUE KEY `uniq_business_id` (`business_id`),
+  UNIQUE KEY `uniq_clinic_contact` (`contact`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 /* =====================
@@ -66,6 +67,7 @@ CREATE TABLE `accounts` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_email` (`email`),
+  UNIQUE KEY `uniq_phone` (`phone`),
   KEY `idx_clinic_id` (`clinic_id`),
   KEY `idx_google_sub` (`google_sub`),
   KEY `idx_email_verified` (`email_verified_at`),

@@ -58,7 +58,7 @@ if ($password !== $confirm) {
 $stmt = $pdo->prepare('SELECT id FROM accounts WHERE email = ? LIMIT 1');
 $stmt->execute([$email]);
 if ($stmt->fetch()) {
-  flash_set('error', 'Email is already registered.');
+  flash_set('error', 'Email is already in use.');
   header('Location: ' . $baseUrl . '/admin/add-admin.php');
   exit;
 }

@@ -175,6 +175,7 @@ include "../includes/partials/head.php";
                   placeholder="Admin Email"
                   required
                   data-validate="email"
+                  data-unique="accounts_email"
                   class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
               </div>
@@ -356,6 +357,7 @@ include "../includes/partials/head.php";
                     inputmode="numeric"
                     required
                     data-validate="phone-ph"
+                    data-unique="clinic_contact"
                     class="flex-1 h-11 rounded-xl bg-white px-4
                           text-slate-700 placeholder:text-slate-400
                           focus:outline-none focus:ring-2 focus:ring-white/60"
