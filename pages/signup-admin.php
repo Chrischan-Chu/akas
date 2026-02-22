@@ -702,6 +702,8 @@ include "../includes/partials/head.php";
 
 })();
 </script>
+<?php $v = filemtime(__DIR__ . '/../assets/js/form-validators.js'); ?>
+<script src="/assets/js/form-validators.js?v=<?= $v ?>"></script>
 
 <script src="<?php echo $baseUrl; ?>/assets/js/signup-admin-doctors.js"></script>
 

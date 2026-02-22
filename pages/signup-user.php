@@ -258,7 +258,8 @@ include "../includes/partials/head.php";
   </section>
 
 </main>
-<script src="<?php echo $baseUrl; ?>/assets/js/form-validators.js"></script>
+<?php $v = filemtime(__DIR__ . '/../assets/js/form-validators.js'); ?>
+<script src="/assets/js/form-validators.js?v=<?= $v ?>"></script>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </body>
