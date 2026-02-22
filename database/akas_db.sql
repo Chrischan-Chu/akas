@@ -32,7 +32,7 @@ CREATE TABLE `clinics` (
   `is_open` tinyint(1) NOT NULL DEFAULT 1,
   `open_time` time DEFAULT NULL,
   `close_time` time DEFAULT NULL,
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_business_id` (`business_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -63,7 +63,7 @@ CREATE TABLE `accounts` (
   `email_verify_token_hash` varchar(64) DEFAULT NULL,
   `email_verify_expires_at` datetime DEFAULT NULL,
 
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_email` (`email`),
   KEY `idx_clinic_id` (`clinic_id`),
@@ -97,8 +97,8 @@ CREATE TABLE `clinic_doctors` (
   `declined_reason` varchar(255) DEFAULT NULL,
   `created_via` enum('CMS','REGISTRATION') NOT NULL DEFAULT 'CMS',
 
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_clinic_id` (`clinic_id`),
   KEY `idx_doc_status` (`approval_status`),
