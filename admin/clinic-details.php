@@ -68,11 +68,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
  // --- Clinic basic fields ---
 $clinicName = trim((string)($_POST['clinic_name'] ?? ''));
+$clinicName = preg_replace('/\s+/', ' ', $clinicName);
 $specialty  = trim((string)($_POST['specialty'] ?? ''));
 $specialtyOther = trim((string)($_POST['specialty_other'] ?? ''));
 
 if ($clinicName === '' || $specialty === '') {
   flash_set('error', 'Clinic Name and Type of Clinic are required.');
+  header('Location: ' . $baseUrl . '/admin/clinic-details.php');
+  exit;
+}
+
+// ✅ Clinic name: letters + spaces only, max 50
+if (mb_strlen($clinicName) > 50 || !preg_match('/^[A-Za-z]+(?:\s[A-Za-z]+)*$/', $clinicName)) {
+  flash_set('error', 'You can only use letters and spacing (Maximum of 50 characters).');
   header('Location: ' . $baseUrl . '/admin/clinic-details.php');
   exit;
 }
@@ -225,6 +233,10 @@ include __DIR__ . '/../includes/partials/head.php';
           <input
             type="text"
             name="clinic_name"
+            maxlength="50"
+            pattern="^[A-Za-z ]{1,50}$"
+            title="You can only use letters and spacing (Maximum of 50 characters)."
+            data-validate="full-name"
             required
             value="<?php echo h($row['clinic_name'] ?? ''); ?>"
             class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"

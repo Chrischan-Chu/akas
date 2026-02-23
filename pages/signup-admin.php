@@ -141,6 +141,9 @@ include "../includes/partials/head.php";
   type="text"
   name="admin_name"
   placeholder="Admin Full Name"
+  maxlength="50"
+  pattern="^[A-Za-z ]{1,50}$"
+  title="You can only use letters and spacing (Maximum of 50 characters)."
   required
   data-validate="full-name"
  class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400
@@ -261,6 +264,10 @@ include "../includes/partials/head.php";
                   type="text"
                   name="clinic_name"
                   placeholder="Clinic Name"
+                  maxlength="50"
+                  pattern="^[A-Za-z ]{1,50}$"
+                  title="You can only use letters and spacing (Maximum of 50 characters)."
+                  data-validate="full-name"
                   required
                   class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
                 />

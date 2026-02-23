@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
 
     // Collect inputs
     $clinic_name     = trim((string)($_POST['clinic_name'] ?? ''));
+    $clinic_name     = preg_replace('/\s+/', ' ', $clinic_name);
     $specialty       = trim((string)($_POST['specialty'] ?? ''));
     $specialty_other = trim((string)($_POST['specialty_other'] ?? ''));
     $contact_number  = preg_replace('/\D+/', '', (string)($_POST['contact_number'] ?? '')); // digits only
@@ -50,6 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
     // Basic validation
     if ($clinic_name === '' || $specialty === '' || $business_id === '' || $contact_number === '') {
       $reapplyError = "Please fill in required fields.";
+    } elseif (mb_strlen($clinic_name) > 50 || !preg_match('/^[A-Za-z]+(?:\s[A-Za-z]+)*$/', $clinic_name)) {
+      $reapplyError = "You can only use letters and spacing (Maximum of 50 characters).";
     } elseif ($specialty === 'Other' && $specialty_other === '') {
       $reapplyError = "Please specify your clinic type (Other).";
     } elseif (!preg_match('/^9\d{9}$/', $contact_number)) {

@@ -21,12 +21,20 @@ if ($clinicId <= 0) {
 }
 
 $adminName = trim((string)($_POST['admin_name'] ?? ''));
+$adminName = preg_replace('/\s+/', ' ', $adminName);
 $email     = strtolower(trim((string)($_POST['email'] ?? '')));
 $password  = (string)($_POST['password'] ?? '');
 $confirm   = (string)($_POST['confirm_password'] ?? '');
 
 if ($adminName === '') {
   flash_set('error', 'Please enter the admin name.');
+  header('Location: ' . $baseUrl . '/admin/add-admin.php');
+  exit;
+}
+
+// ✅ Admin full name: letters + spaces only, max 50
+if (mb_strlen($adminName) > 50 || !preg_match('/^[A-Za-z]+(?:\s[A-Za-z]+)*$/', $adminName)) {
+  flash_set('error', 'You can only use letters and spacing (Maximum of 50 characters).');
   header('Location: ' . $baseUrl . '/admin/add-admin.php');
   exit;
 }

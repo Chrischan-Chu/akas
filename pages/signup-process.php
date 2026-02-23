@@ -125,12 +125,12 @@ if ($role === 'user') {
   }
 
   if (mb_strlen($name) > 50) {
-    flash_set('error', 'Full name must be 50 characters or less.');
+    flash_set('error', 'You can only use letters and spacing (Maximum of 50 characters).');
     redirect($baseUrl . '/pages/signup-user.php');
   }
 
   if (!preg_match('/^[A-Za-z]+(?:\s[A-Za-z]+)*$/', $name)) {
-    flash_set('error', 'Full name must contain letters and spaces only.');
+    flash_set('error', 'You can only use letters and spacing (Maximum of 50 characters).');
     redirect($baseUrl . '/pages/signup-user.php');
   }
 
@@ -220,7 +220,9 @@ if ($role === 'user') {
  */
 
 $adminName      = trim((string)($_POST['admin_name'] ?? ''));
+$adminName      = preg_replace('/\s+/', ' ', $adminName);
 $clinicName     = trim((string)($_POST['clinic_name'] ?? ''));
+$clinicName     = preg_replace('/\s+/', ' ', $clinicName);
 $specialty      = trim((string)($_POST['specialty'] ?? ''));
 $specialtyOther = trim((string)($_POST['specialty_other'] ?? ''));
 $contactNumber  = trim((string)($_POST['contact_number'] ?? ''));
@@ -262,8 +264,20 @@ if ($adminName === '') {
   backToSignup($baseUrl, 'clinic_admin');
 }
 
+// ✅ Admin full name: letters + spaces only, max 50
+if (mb_strlen($adminName) > 50 || !preg_match('/^[A-Za-z]+(?:\s[A-Za-z]+)*$/', $adminName)) {
+  flash_set('error', 'You can only use letters and spacing (Maximum of 50 characters).');
+  backToSignup($baseUrl, 'clinic_admin');
+}
+
 if ($clinicName === '' || $specialty === '' || $businessId === '' || $contactNumber === '') {
   flash_set('error', 'Please complete all required fields.');
+  backToSignup($baseUrl, 'clinic_admin');
+}
+
+// ✅ Clinic name: letters + spaces only, max 50
+if (mb_strlen($clinicName) > 50 || !preg_match('/^[A-Za-z]+(?:\s[A-Za-z]+)*$/', $clinicName)) {
+  flash_set('error', 'You can only use letters and spacing (Maximum of 50 characters).');
   backToSignup($baseUrl, 'clinic_admin');
 }
 

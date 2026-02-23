@@ -50,6 +50,10 @@ include __DIR__ . '/../includes/partials/head.php';
         <input
           type="text"
           name="admin_name"
+          maxlength="50"
+          pattern="^[A-Za-z ]{1,50}$"
+          title="You can only use letters and spacing (Maximum of 50 characters)."
+          data-validate="full-name"
           required
           placeholder="Full Name"
           class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
