@@ -6,6 +6,22 @@ require_once __DIR__ . '/../includes/google_config.php';
 include "../includes/partials/head.php";
 ?>
 
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+   
+    document.querySelectorAll("form").forEach(function(form) {
+        form.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
+
+});
+</script>
+
 <body class="bg-white">
 
 <style>

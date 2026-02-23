@@ -33,6 +33,21 @@ $locked = (($_GET['locked'] ?? '') === '1');
 
 include "../includes/partials/head.php";
 ?>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    // Disable Enter key on all forms
+    document.querySelectorAll("form").forEach(function(form) {
+        form.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
+
+});
+</script>
 
 <body class="bg-white">
 
