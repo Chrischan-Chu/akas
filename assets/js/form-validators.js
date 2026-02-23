@@ -487,7 +487,26 @@
       });
     });
 
-    // Business ID
+    
+    // Clinic email uniqueness (optional)
+    document.querySelectorAll('[data-unique="clinic_email"]').forEach((input) => {
+      wireUnique({
+        input,
+        type: "clinic_email",
+        message: "Clinic email is already in use.",
+      });
+    });
+
+    // Business ID uniqueness
+    document.querySelectorAll('[data-unique="clinic_business_id"]').forEach((input) => {
+      wireUnique({
+        input,
+        type: "clinic_business_id",
+        message: "Business ID is already registered.",
+      });
+    });
+
+// Business ID
     document.querySelectorAll('[data-validate="business-id-10"]').forEach((input) => {
       wireInput({
         input,

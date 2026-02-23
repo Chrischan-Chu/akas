@@ -309,6 +309,18 @@ if ($stmt->fetch()) {
 if ($clinicEmail !== '' && !filter_var($clinicEmail, FILTER_VALIDATE_EMAIL)) {
   flash_set('error', 'Please enter a valid clinic email address.');
   backToSignup($baseUrl, 'clinic_admin');
+
+
+// ✅ Unique clinic email (optional but must be unique when provided)
+if ($clinicEmail !== '') {
+  $stmt = $pdo->prepare('SELECT id FROM clinics WHERE email = ? LIMIT 1');
+  $stmt->execute([$clinicEmail]);
+  if ($stmt->fetch()) {
+    flash_set('error', 'Clinic email is already in use.');
+    backToSignup($baseUrl, 'clinic_admin');
+  }
+}
+
 }
 
 // unique business id

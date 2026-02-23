@@ -35,7 +35,8 @@ CREATE TABLE `clinics` (
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_business_id` (`business_id`),
-  UNIQUE KEY `uniq_clinic_contact` (`contact`)
+  UNIQUE KEY `uniq_clinic_contact` (`contact`),
+  UNIQUE KEY `uniq_clinic_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 /* =====================

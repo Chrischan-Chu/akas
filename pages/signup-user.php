@@ -111,8 +111,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 name="name"
                 placeholder="Full Name"
                 maxlength="50"
-                pattern="^[A-Za-z ]{1,50}$"
-                title="You can only use letters and spacing (Maximum of 50 characters)."
                 data-validate="full-name"
                 required
                 class="w-full rounded-xl bg-white px-12 py-2.5 text-slate-700 placeholder:text-slate-400
