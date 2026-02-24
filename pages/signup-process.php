@@ -298,8 +298,19 @@ if (!preg_match('/^9\d{9}$/', $contactDigits)) {
   backToSignup($baseUrl, 'clinic_admin');
 }
 
-// ✅ Unique clinic contact number check
-$stmt = $pdo->prepare('SELECT id FROM clinics WHERE contact = ? LIMIT 1');
+// ✅ Unique clinic contact number check (across users + clinics + doctors)
+$stmt = $pdo->prepare('
+  SELECT 1
+  FROM (
+    SELECT phone AS num FROM accounts
+    UNION ALL
+    SELECT contact AS num FROM clinics
+    UNION ALL
+    SELECT contact_number AS num FROM clinic_doctors
+  ) t
+  WHERE t.num = ?
+  LIMIT 1
+');
 $stmt->execute([$contactDigits]);
 if ($stmt->fetch()) {
   flash_set('error', 'Phone number is already in use.');
@@ -321,6 +332,17 @@ if ($clinicEmail !== '') {
   }
 }
 
+}
+
+
+// ✅ Unique clinic email (optional)
+if ($clinicEmail !== '') {
+  $stmt = $pdo->prepare('SELECT 1 FROM clinics WHERE email = ? LIMIT 1');
+  $stmt->execute([$clinicEmail]);
+  if ($stmt->fetch()) {
+    flash_set('error', 'Clinic email is already in use.');
+    backToSignup($baseUrl, 'clinic_admin');
+  }
 }
 
 // unique business id
