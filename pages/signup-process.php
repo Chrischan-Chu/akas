@@ -188,7 +188,7 @@ if ($role === 'user') {
 
   $ins = $pdo->prepare('
     INSERT INTO accounts (role, name, gender, email, password_hash, phone, birthdate)
-    VALUES (?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?(?,?,?,?,?,?,?,?,?,?,?)
   ');
   $ins->execute(['user', $name, $gender, $email, $hash, $phoneVal, $birthdateVal]);
   $newId = (int)$pdo->lastInsertId();
@@ -309,7 +309,7 @@ if ($stmt->fetch()) {
 if ($clinicEmail !== '' && !filter_var($clinicEmail, FILTER_VALIDATE_EMAIL)) {
   flash_set('error', 'Please enter a valid clinic email address.');
   backToSignup($baseUrl, 'clinic_admin');
-
+}
 
 // ✅ Unique clinic email (optional but must be unique when provided)
 if ($clinicEmail !== '') {
@@ -319,8 +319,6 @@ if ($clinicEmail !== '') {
     flash_set('error', 'Clinic email is already in use.');
     backToSignup($baseUrl, 'clinic_admin');
   }
-}
-
 }
 
 // unique business id
@@ -402,6 +400,12 @@ foreach ($doctors as $i => $d) {
     backToSignup($baseUrl, 'clinic_admin');
   }
 
+  // Preserve availability JSON when provided (used for calendar slots)
+  $availabilityJson = '';
+  if (isset($d['availability']) && is_string($d['availability'])) {
+    $availabilityJson = trim($d['availability']);
+  }
+
   // ✅ normalize
   $doctors[$i] = [
     'full_name' => $fullName,
@@ -409,6 +413,7 @@ foreach ($doctors as $i => $d) {
     'specialization' => $spec,
     'prc' => $prc,
     'schedule' => $sched,
+    'availability' => ($availabilityJson !== '' ? $availabilityJson : null),
     'email' => $dEmail,
     'contact_number' => $phoneDigits,
   ];
@@ -516,12 +521,11 @@ auth_set($acctId, 'clinic_admin', $adminName, $email, $clinicId);
   if (!empty($doctors)) {
     $insDoc = $pdo->prepare('
       INSERT INTO clinic_doctors
-        (clinic_id, name, birthdate, specialization, prc_no, schedule, email, contact_number, approval_status, created_via)
+        (clinic_id, name, birthdate, specialization, prc_no, schedule, availability, email, contact_number, approval_status, created_via)
       VALUES
         (?,?,?,?,?,?,?,?,?,?,?)
     ');
-
-    // Helper: convert availability JSON to a readable schedule string (for the schedule column)
+// Helper: convert availability JSON to a readable schedule string (for the schedule column)
     $fmtSchedule = function (?string $availabilityJson): ?string {
       if (!$availabilityJson) return null;
       $a = json_decode($availabilityJson, true);

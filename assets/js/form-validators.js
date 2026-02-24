@@ -125,7 +125,11 @@
     const form = input.closest("form");
     if (!form) return;
 
-    // ✅ Block ALL submit paths (click, Enter, etc.)
+    // Register this field's uniqueness check on the form so submit can validate ALL unique fields.
+    if (!form.__uniqueChecks) form.__uniqueChecks = [];
+    form.__uniqueChecks.push({ input, runCheckNow });
+
+    // ✅ Block ALL submit paths (click, Enter, etc.) - once per form
     if (form.dataset.uniqueSubmitBound === "1") return;
     form.dataset.uniqueSubmitBound = "1";
 
@@ -138,13 +142,15 @@
         // pause submit until uniqueness is confirmed
         e.preventDefault();
 
-        const ok = await runCheckNow();
-
-        // if taken -> stay on email and stop
-        if (!ok) {
-          input.focus();
-          input.reportValidity();
-          return;
+        const checks = Array.isArray(form.__uniqueChecks) ? form.__uniqueChecks : [];
+        // run all registered uniqueness checks
+        for (const c of checks) {
+          const ok = await c.runCheckNow();
+          if (!ok) {
+            c.input.focus();
+            c.input.reportValidity();
+            return;
+          }
         }
 
         // if other fields invalid, let browser show them

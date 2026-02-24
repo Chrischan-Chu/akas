@@ -583,10 +583,10 @@ document.addEventListener("DOMContentLoaded", function () {
 </div>
 
 <?php $v1 = @filemtime(__DIR__ . '/../assets/js/form-validators.js') ?: time(); ?>
-<script src="/assets/js/form-validators.js?v=<?= (int)$v1 ?>"></script>
+<script src="<?= $baseUrl ?>/assets/js/form-validators.js?v=<?= (int)$v1 ?>"></script>
 
 <?php $v2 = @filemtime(__DIR__ . '/../assets/js/signup-admin.js') ?: time(); ?>
-<script src="/assets/js/signup-admin.js?v=<?= (int)$v2 ?>"></script>
+<script src="<?= $baseUrl ?>/assets/js/signup-admin.js?v=<?= (int)$v2 ?>"></script>
 
 <script src="<?php echo $baseUrl; ?>/assets/js/signup-admin-doctors.js"></script>
 </body>

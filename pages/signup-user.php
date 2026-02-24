@@ -275,7 +275,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 </main>
 <?php $v = filemtime(__DIR__ . '/../assets/js/form-validators.js'); ?>
-<script src="/assets/js/form-validators.js?v=<?= $v ?>"></script>
+<script src="<?= $baseUrl ?>/assets/js/form-validators.js?v=<?= $v ?>"></script>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </body>

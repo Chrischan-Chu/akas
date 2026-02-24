@@ -158,13 +158,14 @@
 
     const start = (iStart?.value || "").trim();
     const end = (iEnd?.value || "").trim();
-    const allowed = [15, 20, 30];
+    const slotMins = parseInt(iSlotMins?.value || "30", 10);
+    const allowed = [15, 30, 60];
     const days = getSelectedDays();
 
     clearValidity();
 
     if (!allowed.includes(slotMins)) {
-      return setError(iSlotMins, "Slot length must be 15, 20, or 30 minutes."), null;
+      return setError(iSlotMins, "Slot length must be 15, 30, or 60 minutes."), null;
     }
 
     // --- basic fields ---
