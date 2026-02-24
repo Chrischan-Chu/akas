@@ -33,6 +33,21 @@ $locked = (($_GET['locked'] ?? '') === '1');
 
 include "../includes/partials/head.php";
 ?>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    // Disable Enter key on all forms
+    document.querySelectorAll("form").forEach(function(form) {
+        form.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
+
+});
+</script>
 
 <body class="bg-white">
 
@@ -141,6 +156,7 @@ include "../includes/partials/head.php";
   type="text"
   name="admin_name"
   placeholder="Admin Full Name"
+  maxlength="50"
   required
   data-validate="full-name"
  class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400
@@ -261,6 +277,8 @@ include "../includes/partials/head.php";
                   type="text"
                   name="clinic_name"
                   placeholder="Clinic Name"
+                  maxlength="50"
+                  data-validate="full-name"
                   required
                   class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
@@ -376,8 +394,10 @@ include "../includes/partials/head.php";
                   </svg>
                 </span>
                 <input
-                  type="text"
-                  \1
+                  type="email"
+                  name="clinic_email"
+                  placeholder="Clinic Email (Optional)"
+                  data-validate="email"
                   data-unique="clinic_email"
                   class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
@@ -407,7 +427,14 @@ include "../includes/partials/head.php";
 
                 <input
                   type="text"
-                  \1
+                  name="business_id"
+                  inputmode="numeric"
+                  maxlength="10"
+                  minlength="10"
+                  pattern="\d{10}"
+                  placeholder="10-Digit Business ID"
+                  required
+                  data-validate="business-id-10"
                   data-unique="clinic_business_id"
                   class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
                 />

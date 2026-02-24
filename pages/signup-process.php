@@ -82,10 +82,25 @@ if (!$googleLocked) {
 
 $pdo = db();
 
-// ✅ Unique email check
+// ✅ Unique email check (across accounts + clinics + clinic_doctors)
 $stmt = $pdo->prepare('SELECT id FROM accounts WHERE email = ? LIMIT 1');
 $stmt->execute([$email]);
 $existingId = (int)($stmt->fetchColumn() ?? 0);
+
+// Also block if the email is already used as a clinic email or doctor email
+$stmt = $pdo->prepare('
+  SELECT 1 FROM clinics WHERE email = ? LIMIT 1
+  UNION ALL
+  SELECT 1 FROM clinic_doctors WHERE email = ? LIMIT 1
+  LIMIT 1
+');
+$stmt->execute([$email, $email]);
+$emailTakenElsewhere = (bool)$stmt->fetchColumn();
+
+if ($emailTakenElsewhere) {
+  flash_set('error', 'Email is already in use. Please use a different email.');
+  backToSignup($baseUrl, $role);
+}
 
 if ($existingId > 0) {
   // ✅ Google clinic-admin flow: allow if this is the same logged-in account
@@ -150,11 +165,18 @@ if ($role === 'user') {
     $phoneVal = $digits;
   }
 
-  // ✅ Unique phone check (only when provided)
+  // ✅ Unique phone check (only when provided) across accounts + clinics + clinic_doctors
   if ($phoneVal !== null) {
-    $stmt = $pdo->prepare('SELECT id FROM accounts WHERE phone = ? LIMIT 1');
-    $stmt->execute([$phoneVal]);
-    if ((int)($stmt->fetchColumn() ?? 0) > 0) {
+    $stmt = $pdo->prepare('
+      SELECT 1 FROM accounts WHERE phone = ? LIMIT 1
+      UNION ALL
+      SELECT 1 FROM clinics WHERE contact = ? LIMIT 1
+      UNION ALL
+      SELECT 1 FROM clinic_doctors WHERE contact_number = ? LIMIT 1
+      LIMIT 1
+    ');
+    $stmt->execute([$phoneVal, $phoneVal, $phoneVal]);
+    if ((bool)$stmt->fetchColumn()) {
       flash_set('error', 'Phone number is already in use.');
       redirect($baseUrl . '/pages/signup-user.php');
     }
@@ -188,7 +210,7 @@ if ($role === 'user') {
 
   $ins = $pdo->prepare('
     INSERT INTO accounts (role, name, gender, email, password_hash, phone, birthdate)
-    VALUES (?,?,?,?,?,?(?,?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?)
   ');
   $ins->execute(['user', $name, $gender, $email, $hash, $phoneVal, $birthdateVal]);
   $newId = (int)$pdo->lastInsertId();
@@ -298,21 +320,17 @@ if (!preg_match('/^9\d{9}$/', $contactDigits)) {
   backToSignup($baseUrl, 'clinic_admin');
 }
 
-// ✅ Unique clinic contact number check (across users + clinics + doctors)
+// ✅ Unique clinic contact number check (across accounts + clinics + clinic_doctors)
 $stmt = $pdo->prepare('
-  SELECT 1
-  FROM (
-    SELECT phone AS num FROM accounts
-    UNION ALL
-    SELECT contact AS num FROM clinics
-    UNION ALL
-    SELECT contact_number AS num FROM clinic_doctors
-  ) t
-  WHERE t.num = ?
+  SELECT 1 FROM accounts WHERE phone = ? LIMIT 1
+  UNION ALL
+  SELECT 1 FROM clinics WHERE contact = ? LIMIT 1
+  UNION ALL
+  SELECT 1 FROM clinic_doctors WHERE contact_number = ? LIMIT 1
   LIMIT 1
 ');
-$stmt->execute([$contactDigits]);
-if ($stmt->fetch()) {
+$stmt->execute([$contactDigits, $contactDigits, $contactDigits]);
+if ((bool)$stmt->fetchColumn()) {
   flash_set('error', 'Phone number is already in use.');
   backToSignup($baseUrl, 'clinic_admin');
 }
@@ -322,16 +340,21 @@ if ($clinicEmail !== '' && !filter_var($clinicEmail, FILTER_VALIDATE_EMAIL)) {
   backToSignup($baseUrl, 'clinic_admin');
 }
 
-// ✅ Unique clinic email (optional but must be unique when provided)
+// ✅ Unique clinic email (optional but must be unique when provided) across accounts + clinics + clinic_doctors
 if ($clinicEmail !== '') {
-  $stmt = $pdo->prepare('SELECT id FROM clinics WHERE email = ? LIMIT 1');
-  $stmt->execute([$clinicEmail]);
-  if ($stmt->fetch()) {
+  $stmt = $pdo->prepare('
+    SELECT 1 FROM accounts WHERE email = ? LIMIT 1
+    UNION ALL
+    SELECT 1 FROM clinics WHERE email = ? LIMIT 1
+    UNION ALL
+    SELECT 1 FROM clinic_doctors WHERE email = ? LIMIT 1
+    LIMIT 1
+  ');
+  $stmt->execute([$clinicEmail, $clinicEmail, $clinicEmail]);
+  if ((bool)$stmt->fetchColumn()) {
     flash_set('error', 'Clinic email is already in use.');
     backToSignup($baseUrl, 'clinic_admin');
   }
-}
-
 }
 
 // unique business id

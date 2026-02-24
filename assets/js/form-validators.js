@@ -298,12 +298,18 @@
 
   /* ================= validators ================= */
 
+  // Letters + spaces only, max 50 chars
+  // Used for: User Full Name, Admin Full Name, Clinic Name
   const validateFullName = (val) => {
-    const v = (val || "").trim();
+    const v = (val || "").trim().replace(/\s+/g, " ");
     if (!v) return { ok: true, message: "" };
 
+    if (v.length > 50) {
+      return { ok: false, message: "You can only use letters and spacing (Maximum of 50 characters)." };
+    }
+
     if (!/^[A-Za-z]+(?:\s[A-Za-z]+)*$/.test(v)) {
-      return { ok: false, message: "Full Name must contain letters and spaces only." };
+      return { ok: false, message: "You can only use letters and spacing (Maximum of 50 characters)." };
     }
 
     return { ok: true, message: "" };
@@ -497,7 +503,7 @@
       });
     });
 
-    // Clinic business ID uniqueness
+    // Business ID uniqueness
     document.querySelectorAll('[data-unique="clinic_business_id"]').forEach((input) => {
       wireUnique({
         input,
