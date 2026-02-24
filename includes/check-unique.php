@@ -53,11 +53,11 @@ try {
     $email = strtolower(trim($value));
 
     $sql = "
-      SELECT 1 FROM accounts WHERE email = ? LIMIT 1
+      SELECT 1 FROM accounts WHERE email = ?
       UNION ALL
-      SELECT 1 FROM clinics WHERE email = ? LIMIT 1
+      SELECT 1 FROM clinics WHERE email = ?
       UNION ALL
-      SELECT 1 FROM clinic_doctors WHERE email = ? LIMIT 1
+      SELECT 1 FROM clinic_doctors WHERE email = ?
       LIMIT 1
     ";
     $stmt = $pdo->prepare($sql);
@@ -67,11 +67,11 @@ try {
     $num = $digitsOnly($value);
 
     $sql = "
-      SELECT 1 FROM accounts WHERE phone = ? LIMIT 1
+      SELECT 1 FROM accounts WHERE phone = ?
       UNION ALL
-      SELECT 1 FROM clinics WHERE contact = ? LIMIT 1
+      SELECT 1 FROM clinics WHERE contact = ?
       UNION ALL
-      SELECT 1 FROM clinic_doctors WHERE contact_number = ? LIMIT 1
+      SELECT 1 FROM clinic_doctors WHERE contact_number = ?
       LIMIT 1
     ";
     $stmt = $pdo->prepare($sql);

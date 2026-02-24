@@ -430,8 +430,6 @@ document.addEventListener("DOMContentLoaded", function () {
                   name="business_id"
                   inputmode="numeric"
                   maxlength="10"
-                  minlength="10"
-                  pattern="\d{10}"
                   placeholder="10-Digit Business ID"
                   required
                   data-validate="business-id-10"
