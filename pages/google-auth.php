@@ -51,7 +51,18 @@ $stmt->execute([$email]);
 $acc = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if ($acc) {
-  // Update Google fields
+  // ✅ If user is trying to SIGN UP with Google but email already exists,
+  // do NOT log them in. Show an error like regular signup.
+  if ($mode === 'signup') {
+    // Make sure an existing session doesn't make it look like they got signed in.
+    unset($_SESSION['auth']);
+
+    flash_set('error', 'Account has already been registered. Please log in instead.');
+    // Send them to the login page WITHOUT pre-filling email (keep URL clean).
+    redirect_to($baseUrl . '/pages/login.php');
+  }
+
+  // Google LOGIN: existing account -> update Google fields then sign in
   $upd = $pdo->prepare("UPDATE accounts SET auth_provider='google', google_sub=?, google_picture=?, name=?, email_verified_at = COALESCE(email_verified_at, NOW()), email_verify_token_hash = NULL, email_verify_expires_at = NULL WHERE id=?");
   $upd->execute([$sub, ($pic !== '' ? $pic : null), $name, (int)$acc['id']]);
 

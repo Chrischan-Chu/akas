@@ -3,12 +3,33 @@ $appTitle = "AKAS | User Sign Up";
 $baseUrl  = "";
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/google_config.php';
+
+// ✅ flash messages
+$errMsg = flash_get('error');
+$okMsg  = flash_get('success');
 include "../includes/partials/head.php";
 ?>
 
 <body class="min-h-screen">
  
 <main class="min-h-screen w-full">
+  <!-- ✅ Flash Messages -->
+  <?php if ($errMsg): ?>
+    <div class="w-full px-4 pt-4">
+      <div class="mx-auto max-w-md rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <?= htmlspecialchars($errMsg, ENT_QUOTES, 'UTF-8'); ?>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($okMsg): ?>
+    <div class="w-full px-4 pt-4">
+      <div class="mx-auto max-w-md rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <?= htmlspecialchars($okMsg, ENT_QUOTES, 'UTF-8'); ?>
+      </div>
+    </div>
+  <?php endif; ?>
+
   <div class="min-h-screen grid grid-cols-1 lg:grid-cols-2">
 <style>
   .akas-logo {

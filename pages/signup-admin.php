@@ -169,7 +169,7 @@ document.addEventListener("DOMContentLoaded", function () {
               </div>
             </div>
 
-            <p class="mt-1 text-[10px] text-white/80 text-center">
+            <p class="mt-1 text-sm text-white/80 text-center">
               (Skips Step 1 when using Google.)
             </p>
 

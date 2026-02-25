@@ -1,187 +1,135 @@
 <?php
-declare(strict_types=1);
-
-$appTitle = "AKAS | Sign Up";
+$appTitle = "AKAS | Choose Account Type";
 $baseUrl  = "";
-
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/google_config.php';
-
-if (auth_is_logged_in()) {
-  header('Location: ' . ($baseUrl . (auth_role() === 'clinic_admin' ? '/admin/dashboard.php' : '/index.php#top')));
-  exit;
-}
 ?>
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title><?php echo htmlspecialchars($appTitle, ENT_QUOTES, 'UTF-8'); ?></title>
-
-  <link rel="stylesheet"
-      href="<?php echo $baseUrl; ?>/assets/css/output.css?v=<?php echo filemtime(__DIR__ . '/../assets/css/output.css'); ?>">
-
-
-  <style>
-    :root{
-      --primary:#40B7FF;
-      --secondary:#0b3869;
-      --accent:#FFA154;
-    }
-    .btnCard{
-      border: 1px solid rgba(255,255,255,.35);
-      box-shadow: 0 14px 40px rgba(0,0,0,.08);
-    }
-    .btnPrimary{ background: var(--primary); }
-    .btnAccent{ background: var(--accent); }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title><?= $appTitle ?></title>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-[var(--secondary)]/40 px-6">
+<body class="min-h-screen bg-slate-100 flex items-center justify-center p-4">
 
-<main class="w-full max-w-5xl">
-  <div class="text-center mb-10">
-    <h1 class="text-5xl font-bold text-[var(--primary)]">Welcome to AKAS</h1>
-    <p class="mt-3 text-lg text-[var(--secondary)]/80">Choose how you want to sign up</p>
-  </div>
+<div class="w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden">
+  <div class="flex flex-col lg:flex-row">
 
-  <!-- Google signup POST (used by both buttons) -->
-  <form id="googleSignupForm" action="<?php echo $baseUrl; ?>/pages/google-auth.php" method="POST" class="hidden">
-    <input type="hidden" name="mode" value="signup">
-    <input type="hidden" name="role" id="googleRole" value="user">
-    <input type="hidden" name="credential" id="googleCredential" value="">
-  </form>
+    <!-- LEFT PANEL -->
+    <div class="lg:w-1/2 w-full text-white flex flex-col"
+         style="background-color:#40b7ff;">
 
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Back to home INSIDE LEFT ONLY -->
+      <div class="px-8 sm:px-12 pt-6">
+        <a href="../index.php"
+           class="text-white font-medium hover:underline transition">
+          ← Back to home
+        </a>
+      </div>
 
-    <!-- USER CARD -->
-    <section class="btnCard rounded-3xl p-8 bg-white/80 backdrop-blur">
-      <h2 class="text-2xl font-bold text-[var(--secondary)]">User</h2>
-      <p class="text-sm text-slate-600 mt-1">Book appointments & browse clinics</p>
+      <div class="p-8 sm:p-12 lg:p-16 flex flex-col flex-grow">
+        <div>
+          <h1 class="text-4xl sm:text-5xl font-bold leading-tight">
+            Create your AKAS account
+          </h1>
 
-      <div class="mt-6 space-y-3">
+          <p class="mt-4 text-white/95 text-base sm:text-lg">
+            Choose what type of account you want to create.
+          </p>
+        </div>
+
+        <!-- Bottom Sign In -->
+        <div class="mt-10 lg:mt-auto pt-10">
+          <div class="flex items-center gap-4 opacity-90 mb-4">
+            <div class="h-px bg-white/60 flex-1"></div>
+            <span class="text-sm sm:text-base font-medium whitespace-nowrap">
+              Already have an account?
+            </span>
+            <div class="h-px bg-white/60 flex-1"></div>
+          </div>
+
+          <a href="login.php"
+             class="flex items-center justify-center gap-3 font-semibold text-lg sm:text-xl hover:underline transition">
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M10 17l5-5-5-5" />
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M15 12H3" />
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M21 3v18a2 2 0 01-2 2h-6" />
+            </svg>
+            <span>Sign in to your account</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL (FULL WHITE, INCLUDING TOP) -->
+    <div class="lg:w-1/2 w-full bg-white p-8 sm:p-12 lg:p-16 flex flex-col justify-center gap-10 sm:gap-14">
+
+      <!-- USER -->
+      <div>
+        <div class="flex items-center gap-3 mb-3">
+          <svg class="w-7 h-7" style="color:#40b7ff;"
+               fill="none" stroke="currentColor" stroke-width="2"
+               viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M5.121 17.804A9 9 0 1118.879 17.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <h2 class="text-2xl sm:text-3xl font-bold text-slate-800">
+            User Account
+          </h2>
+        </div>
+
+        <p class="text-slate-600 text-base sm:text-lg mb-6">
+          Book appointments, browse clinics, and manage your schedule.
+        </p>
+
         <a href="signup-user.php"
-           class="btnAccent w-full text-white rounded-2xl py-4 px-6 text-lg font-bold
-                  shadow hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5
-                  flex items-center justify-center">
+           class="block w-full text-center bg-orange-500 hover:bg-orange-600
+                  text-white font-semibold text-xl py-4 sm:py-5
+                  rounded-full shadow-lg transition duration-200">
           Continue as User
         </a>
-
-        <button type="button"
-                onclick="beginGoogleSignup('user')"
-                class="w-full rounded-2xl py-4 px-6 text-lg font-bold
-                       border border-slate-200 bg-white
-                       shadow hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5
-                       flex items-center justify-center gap-2">
-          <span>Continue with Google</span>
-        </button>
       </div>
-    </section>
 
-    <!-- ADMIN CARD -->
-    <section class="btnCard rounded-3xl p-8 bg-white/80 backdrop-blur">
-      <h2 class="text-2xl font-bold text-[var(--secondary)]">Clinic Admin</h2>
-      <p class="text-sm text-slate-600 mt-1">Register a clinic & manage schedules</p>
+      <!-- CLINIC ADMIN -->
+      <div>
+        <div class="flex items-center gap-3 mb-3">
+          <svg class="w-7 h-7" style="color:#40b7ff;"
+               fill="none" stroke="currentColor" stroke-width="2"
+               viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M3 21h18M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16M9 8h6M9 12h6M9 16h6" />
+          </svg>
+          <h2 class="text-2xl sm:text-3xl font-bold text-slate-800">
+            Clinic Admin Account
+          </h2>
+        </div>
 
-      <div class="mt-6 space-y-3">
+        <p class="text-slate-600 text-base sm:text-lg mb-6">
+          Register a clinic, manage doctors, and handle appointments.
+        </p>
+
         <a href="signup-admin.php"
-           class="btnPrimary w-full text-white rounded-2xl py-4 px-6 text-lg font-bold
-                  shadow hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5
-                  flex items-center justify-center">
+           class="block w-full text-center text-white font-semibold text-xl
+                  py-4 sm:py-5 rounded-full shadow-lg transition duration-200"
+           style="background-color:#40b7ff;"
+           onmouseover="this.style.backgroundColor='#2fa5e6'"
+           onmouseout="this.style.backgroundColor='#40b7ff'">
           Continue as Admin
         </a>
 
-        <button type="button"
-                onclick="beginGoogleSignup('clinic_admin')"
-                class="w-full rounded-2xl py-4 px-6 text-lg font-bold
-                       border border-slate-200 bg-white
-                       shadow hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5
-                       flex items-center justify-center gap-2">
-          <span>Continue with Google</span>
-        </button>
-
-        <p class="text-xs text-slate-500 mt-2">
-          Google Admin signup will skip Step 1 and take you directly to Step 2.
+        <p class="text-sm text-slate-500 mt-4">
+          Admin sign up has multiple steps. Make sure the clinic details are accurate.
         </p>
       </div>
-    </section>
 
+    </div>
   </div>
-
-  <div class="mt-10 text-center">
-    <a href="/index.php#home" class="text-sm text-[var(--primary)] hover:underline">← Go to home</a>
-  </div>
-</main>
-
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-
-<!-- hidden official Google buttons (we click them programmatically) -->
-<div id="googleBtnUser" style="display:none"></div>
-<div id="googleBtnAdmin" style="display:none"></div>
-
-<script>
-  let _googleReady = false;
-
-  function initGoogleButtons() {
-    if (_googleReady) return true;
-    if (!window.google || !google.accounts || !google.accounts.id) return false;
-
-    // USER button
-    google.accounts.id.initialize({
-      client_id: "<?php echo htmlspecialchars(GOOGLE_CLIENT_ID, ENT_QUOTES, 'UTF-8'); ?>",
-      callback: function (resp) {
-        if (!resp || !resp.credential) return;
-        document.getElementById('googleRole').value = window.__googleRole || 'user';
-        document.getElementById('googleCredential').value = resp.credential;
-        document.getElementById('googleSignupForm').submit();
-      }
-    });
-
-    google.accounts.id.renderButton(
-      document.getElementById("googleBtnUser"),
-      { theme: "outline", size: "large", text: "continue_with", shape: "pill" }
-    );
-
-    google.accounts.id.renderButton(
-      document.getElementById("googleBtnAdmin"),
-      { theme: "outline", size: "large", text: "continue_with", shape: "pill" }
-    );
-
-    _googleReady = true;
-    return true;
-  }
-
-  function beginGoogleSignup(role) {
-    window.__googleRole = (role === 'clinic_admin') ? 'clinic_admin' : 'user';
-
-    if (!initGoogleButtons()) {
-      alert("Google is still loading. Refresh the page and try again.");
-      return;
-    }
-
-    // Click the hidden official Google button (reliable sign-in popup)
-    const btn = (window.__googleRole === 'clinic_admin')
-      ? document.querySelector('#googleBtnAdmin div[role="button"]')
-      : document.querySelector('#googleBtnUser div[role="button"]');
-
-    if (!btn) {
-      alert("Google button not ready. Refresh the page and try again.");
-      return;
-    }
-
-    btn.click();
-  }
-
-  // Wait until GIS loads then initialize
-  window.addEventListener('load', () => {
-    const t = setInterval(() => {
-      if (initGoogleButtons()) clearInterval(t);
-    }, 80);
-    setTimeout(() => clearInterval(t), 5000);
-  });
-</script>
-
+</div>
 
 </body>
 </html>
