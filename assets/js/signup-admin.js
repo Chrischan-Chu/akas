@@ -16,13 +16,14 @@
 
   const debounce = (fn, ms = 200) => {
     let t;
-    return (...args) => {
+    const wrapped = (...args) => {
       clearTimeout(t);
       t = setTimeout(() => fn(...args), ms);
     };
+    wrapped.cancel = () => clearTimeout(t);
+    return wrapped;
   };
 
-  // Resolve app base URL from THIS script tag so it works at / or /akas etc.
   const getAppBaseUrl = () => {
     const script = document.querySelector('script[src*="/assets/js/signup-admin.js"]');
     if (!script?.src) return "";
@@ -66,15 +67,69 @@
     const step2 = document.getElementById("step2");
 
     const nextBtn = document.getElementById("nextBtn");
-    const backBtn = document.getElementById("backBtn");
+    const backBtn = document.getElementById("backBtn"); // hidden in step2 but kept for JS
+    const googleStep1Block = document.getElementById("googleStep1Block");
+    const topBackLink = document.getElementById("topBackLink");
 
     const specialtySelect = document.getElementById("specialtySelect");
     const otherWrap = document.getElementById("otherSpecialtyWrap");
     const otherInput = otherWrap?.querySelector('input[name="specialty_other"]');
 
+    // Step indicator elements
+    const stepPill1 = document.getElementById("stepPill1");
+    const stepPill2 = document.getElementById("stepPill2");
+    const stepDot1 = document.getElementById("stepDot1");
+    const stepDot2 = document.getElementById("stepDot2");
+    const stepLine = document.getElementById("stepLine");
+
+    const ORANGE = "#ffa154";
+
+const setStepIndicator = (n) => {
+  if (!stepPill1 || !stepPill2 || !stepDot1 || !stepDot2) return;
+
+  const setActive = (pill, dot) => {
+    pill.classList.remove("opacity-70", "bg-white/5", "border-white/15");
+    pill.classList.add("bg-white/15", "border-white/25", "opacity-100");
+
+    dot.classList.remove("bg-white/30");
+    dot.style.background = ORANGE;
+  };
+
+  const setInactive = (pill, dot) => {
+    pill.classList.add("opacity-70");
+    pill.classList.remove("bg-white/15", "border-white/25", "opacity-100");
+    pill.classList.add("bg-white/5", "border-white/15");
+
+    dot.style.background = "";
+    dot.classList.add("bg-white/30");
+  };
+
+  const setCompletedDotOnly = (pill, dot) => {
+    // ✅ pill stays like inactive (NOT highlighted)
+    pill.classList.add("opacity-70");
+    pill.classList.remove("bg-white/15", "border-white/25", "opacity-100");
+    pill.classList.add("bg-white/5", "border-white/15");
+
+    // ✅ but dot becomes orange
+    dot.classList.remove("bg-white/30");
+    dot.style.background = ORANGE;
+  };
+
+  if (n === 1) {
+    setActive(stepPill1, stepDot1);
+    setInactive(stepPill2, stepDot2);
+    if (stepLine) stepLine.className = "w-10 h-[3px] rounded-full bg-white/30";
+  } else {
+    // ✅ Step 1 completed (dot only), Step 2 active (highlighted)
+    setCompletedDotOnly(stepPill1, stepDot1);
+    setActive(stepPill2, stepDot2);
+    if (stepLine) stepLine.className = "w-10 h-[3px] rounded-full bg-white/60";
+  }
+};
+
     if (!wizard || !step1 || !step2 || !nextBtn) return;
 
-    // Remember which were originally required, so toggling steps doesn't permanently break it
+    // remember originally required
     wizard.querySelectorAll("[required]").forEach((el) => {
       el.dataset.wasRequired = "1";
     });
@@ -91,6 +146,14 @@
         step2.classList.remove("active");
         toggleStepRequired(step1, true);
         toggleStepRequired(step2, false);
+
+        if (googleStep1Block) googleStep1Block.style.display = "";
+        setStepIndicator(1);
+
+        document.getElementById("titleStep2Wrap")?.classList.add("hidden");
+        document.getElementById("titleStep1Wrap")?.classList.remove("hidden");
+
+        if (topBackLink) topBackLink.textContent = "← Back to selection";
         return;
       }
 
@@ -98,6 +161,14 @@
       step2.classList.add("active");
       toggleStepRequired(step1, false);
       toggleStepRequired(step2, true);
+
+      if (googleStep1Block) googleStep1Block.style.display = "none";
+      setStepIndicator(2);
+
+      document.getElementById("titleStep1Wrap")?.classList.add("hidden");
+      document.getElementById("titleStep2Wrap")?.classList.remove("hidden");
+
+      if (topBackLink) topBackLink.textContent = "← Back";
     };
 
     const toggleOtherSpecialty = () => {
@@ -122,8 +193,6 @@
     /* ---------- Step 1: soft-gating on Next click ---------- */
 
     const emailInput = step1.querySelector('input[name="email"][data-unique="accounts_email"]');
-
-    // uniqueness check state (prevents race conditions)
     let controller = null;
     const UNIQUE_MSG = "Email is already in use.";
 
@@ -131,14 +200,10 @@
       if (!emailInput) return true;
 
       const v = (emailInput.value || "").trim();
-
-      // empty/invalid format: let normal HTML + form-validators handle it
       if (!v) return false;
       if (!emailInput.checkValidity()) return false;
 
-      try {
-        controller?.abort();
-      } catch {}
+      try { controller?.abort(); } catch {}
       controller = new AbortController();
 
       const available = await checkUnique({
@@ -153,31 +218,26 @@
         return false;
       }
 
-      // clear ONLY our uniqueness message
       if (emailInput.validationMessage === UNIQUE_MSG) emailInput.setCustomValidity("");
       clearError(emailInput);
       return true;
     };
 
-    // Faster email uniqueness: check on blur + after user pauses typing
     const debouncedUnique = debounce(async () => {
       await runEmailUnique();
     }, 250);
 
     emailInput?.addEventListener("input", () => {
-      // as they type, remove uniqueness error and re-check after pause
       if (emailInput.validationMessage === UNIQUE_MSG) emailInput.setCustomValidity("");
       clearError(emailInput);
       debouncedUnique();
     });
 
     emailInput?.addEventListener("blur", () => {
-      // check immediately on blur (no ring on empty; handled by validators)
       debouncedUnique.cancel?.();
       runEmailUnique();
     });
 
-    // Paint invalid fields red ONLY when Next is clicked
     const paintStep1Invalids = () => {
       const controls = step1.querySelectorAll("input, select, textarea");
       let firstInvalid = null;
@@ -185,13 +245,12 @@
       for (const el of controls) {
         if (el.closest(".hidden")) continue;
         if (el.disabled) continue;
-        if (el.type === "file") continue; // Work ID optional
+        if (el.type === "file") continue;
 
         if (!el.checkValidity()) {
           showError(el);
           if (!firstInvalid) firstInvalid = el;
         } else {
-          // Don't clear if email has uniqueness error
           if (!(el === emailInput && el.validationMessage === UNIQUE_MSG)) {
             clearError(el);
           }
@@ -202,7 +261,6 @@
     };
 
     nextBtn.addEventListener("click", async () => {
-      // 1) show required/format errors
       const firstInvalid = paintStep1Invalids();
       if (firstInvalid) {
         firstInvalid.focus();
@@ -210,7 +268,6 @@
         return;
       }
 
-      // 2) ensure email uniqueness before proceeding
       const uniqueOk = await runEmailUnique();
       if (!uniqueOk) {
         emailInput?.focus();
@@ -218,40 +275,33 @@
         return;
       }
 
-      // ✅ proceed to step 2
       showStep(2);
-
-      document.getElementById("titleStep1Wrap")?.classList.add("hidden");
-      document.getElementById("titleStep2Wrap")?.classList.remove("hidden");
-
-      const bar = document.getElementById("progressBar");
-      if (bar) bar.style.width = "100%";
-
-      document.getElementById("labelStep1")?.classList.add("opacity-60");
-      document.getElementById("labelStep2")?.classList.remove("opacity-60");
-
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
 
+    // top back behavior (step2 -> step1)
+    topBackLink?.addEventListener("click", (e) => {
+      const qs = new URLSearchParams(window.location.search);
+      const locked = qs.get("locked") === "1";
+
+      if (locked) return; // google-locked stays as normal link
+
+      if (step2.classList.contains("active")) {
+        e.preventDefault();
+        showStep(1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+
+    // hidden back button if you ever call it
     backBtn?.addEventListener("click", () => {
       showStep(1);
-
-      document.getElementById("titleStep2Wrap")?.classList.add("hidden");
-      document.getElementById("titleStep1Wrap")?.classList.remove("hidden");
-
-      const bar = document.getElementById("progressBar");
-      if (bar) bar.style.width = "50%";
-
-      document.getElementById("labelStep2")?.classList.add("opacity-60");
-      document.getElementById("labelStep1")?.classList.remove("opacity-60");
-
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
 
-    /* ---------- Handle ?step=2 and Google-locked Step 2 ---------- */
+    /* ---------- Handle Google locked Step 2 ---------- */
 
     const qs = new URLSearchParams(window.location.search);
-    const urlStep = qs.get("step");
     const locked = qs.get("locked") === "1";
 
     if (locked) {
@@ -262,27 +312,10 @@
       step1.style.display = "none";
       step1.querySelectorAll("input, select, textarea").forEach((el) => (el.disabled = true));
 
-      if (backBtn) backBtn.style.display = "none";
+      if (googleStep1Block) googleStep1Block.style.display = "none";
 
-      document.getElementById("titleStep1Wrap")?.classList.add("hidden");
-      document.getElementById("titleStep2Wrap")?.classList.remove("hidden");
-
-      const bar = document.getElementById("progressBar");
-      if (bar) bar.style.width = "100%";
-
-      document.getElementById("labelStep1")?.classList.add("opacity-60");
-      document.getElementById("labelStep2")?.classList.remove("opacity-60");
-    } else if (urlStep === "2") {
-      showStep(2);
-
-      document.getElementById("titleStep1Wrap")?.classList.add("hidden");
-      document.getElementById("titleStep2Wrap")?.classList.remove("hidden");
-
-      const bar = document.getElementById("progressBar");
-      if (bar) bar.style.width = "100%";
-
-      document.getElementById("labelStep1")?.classList.add("opacity-60");
-      document.getElementById("labelStep2")?.classList.remove("opacity-60");
+      // keep top link as selection for locked mode
+      if (topBackLink) topBackLink.textContent = "← Back to selection";
     } else {
       showStep(1);
     }

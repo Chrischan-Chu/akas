@@ -6,80 +6,111 @@ require_once __DIR__ . '/../includes/google_config.php';
 include "../includes/partials/head.php";
 ?>
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-
-   
-    document.querySelectorAll("form").forEach(function(form) {
-        form.addEventListener("keydown", function(e) {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                return false;
-            }
-        });
-    });
-
-});
-</script>
-
-<body class="bg-white">
-
+<body class="min-h-screen">
+ 
+<main class="min-h-screen w-full">
+  <div class="min-h-screen grid grid-cols-1 lg:grid-cols-2">
 <style>
-  .auth-title {
-    font-family: ui-monospace, "Courier New", monospace;
-    letter-spacing: .14em;
+  .akas-logo {
+    width: 260px;
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  @media (min-width: 640px) {
+    .akas-logo { width: 320px; }
+  }
+  @media (min-width: 768px) {
+    .akas-logo { width: 360px; }
+  }
+  @media (min-width: 1024px) {
+    .akas-logo { width: 500px; }
+  }
+
+  /* ✅ MANUAL DESKTOP POSITION CONTROL (ONLY DESKTOP) */
+  @media (min-width: 1024px) {
+    .logo-wrap {
+      margin-top: 120px;    
+      padding-bottom: 80px;  
+    }
   }
 </style>
 
-<main class="min-h-screen flex items-center justify-center">
+<!-- LEFT: WHITE BRANDING -->
+<section class="bg-white px-6 py-10 sm:px-10 lg:px-12 lg:py-14 lg:min-h-screen">
+  <div class="w-full max-w-md mx-auto flex flex-col lg:min-h-screen">
 
-  <section
-    class="w-full max-w-6xl
-           mx-4 sm:mx-8 lg:mx-10 xl:mx-auto
-           rounded-2xl sm:rounded-3xl lg:rounded-[40px]
-           overflow-hidden shadow-xl border border-slate-100">
+    <!-- TOP TEXT -->
+    <div class="text-left">
+      <h1 class="text-slate-900 font-bold text-4xl sm:text-5xl leading-tight">
+        Create your user account
+      </h1>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 min-h-[480px]">
-      <div class="bg-[#FFFDF6] relative flex items-center justify-center p-6 sm:p-10">
-        <img
-          src="<?php echo $baseUrl; ?>/assets/img/akas-logo.png"
-          alt="AKAS Logo"
-          class="w-44 sm:w-56 md:w-64 lg:w-72 xl:w-80 max-w-full"
-        />
-      </div>
+      <p class="mt-4 text-slate-600 text-base sm:text-lg leading-relaxed">
+        Discover available clinics and book your preferred appointments with ease.
+      </p>
+    </div>
 
-      <div class="relative flex items-center justify-center p-4 sm:p-6 lg:p-10" style="background: var(--primary);">
+    <!-- LOGO -->
+    <div class="logo-wrap mt-10 sm:mt-12 md:mt-14 flex justify-center pb-2 sm:pb-12 md:pb-14">
+      <img
+        src="<?= $baseUrl ?>/assets/img/akas-logo.png"
+        alt="AKAS Logo"
+        class="akas-logo select-none"
+      />
+    </div>
 
-        <div class="w-full max-w-sm px-3 sm:px-4 lg:px-0">
-          <h1 class="auth-title text-3xl sm:text-4xl font-semibold text-white text-center">
-            USER SIGN UP
-          </h1>
-          <p class="text-center text-white text-sm mb-5">
-            Create your user account to book appointments.
-          </p>
+  </div>
+</section>
+    <!-- RIGHT: BLUE FORM -->
+    <section class="relative min-h-screen -mt-6 lg:-mt-15 p-0" style="background:#38B6FF;">
 
-          
-          <div class="mt-4 mb-4">
-            <form id="googleUserSignupForm" action="<?php echo $baseUrl; ?>/pages/google-auth.php" method="POST">
+      <!-- BACK BUTTON -->
+      <a
+        href="<?= $baseUrl; ?>/pages/signup.php"
+        class="absolute text-white font-semibold hover:underline z-50"
+        style="top:8px; left:13px;"
+      >
+        ← Back to selection
+      </a>
+
+      <div class="min-h-screen px-6 sm:px-10 py-12 flex items-center justify-center">
+        <div class="w-full max-w-sm">
+
+          <h2 class="mt-10 text-white text-2xl sm:text-3xl font-semibold">
+            Sign up for User
+          </h2>
+
+          <!-- Google Signup -->
+          <div class="mt-6">
+            <form id="googleUserSignupForm" action="<?= $baseUrl; ?>/pages/google-auth.php" method="POST">
               <input type="hidden" name="mode" value="signup">
               <input type="hidden" name="role" value="user">
               <input type="hidden" name="credential" id="googleCredentialUserSignup">
             </form>
 
-            <div id="g_id_onload"
-                 data-client_id="<?php echo htmlspecialchars(GOOGLE_CLIENT_ID); ?>"
-                 data-callback="onGoogleUserSignup"
-                 data-auto_prompt="false">
+            <div
+              id="g_id_onload"
+              data-client_id="<?= htmlspecialchars(GOOGLE_CLIENT_ID); ?>"
+              data-callback="onGoogleUserSignup"
+              data-auto_prompt="false">
             </div>
 
-            <div class="flex justify-center">
-              <div class="g_id_signin"
-                   data-type="standard"
-                   data-size="large"
-                   data-theme="outline"
-                   data-text="signup_with"
-                   data-shape="pill"
-                   data-logo_alignment="left">
+            <!-- Force Google button to match input width (max-w-sm ≈ 384px) -->
+            <div class="w-full overflow-hidden">
+              <div style="width:100%; max-width:100%;">
+                <div
+                  class="g_id_signin"
+                  data-type="standard"
+                  data-size="large"
+                  data-theme="outline"
+                  data-text="signup_with"
+                  data-shape="rectangular"
+                  data-logo_alignment="left"
+                  data-width="384">
+                </div>
               </div>
             </div>
 
@@ -90,22 +121,29 @@ document.addEventListener("DOMContentLoaded", function () {
               }
             </script>
 
-            <div class="flex items-center gap-3 mt-4">
+            <!-- OR -->
+            <div class="flex items-center gap-3 mt-6">
               <div class="h-px flex-1 bg-white/40"></div>
               <div class="text-xs text-white/90 font-semibold">OR</div>
               <div class="h-px flex-1 bg-white/40"></div>
             </div>
           </div>
 
-          <form action="signup-process.php" method="POST" class="space-y-3">
+          <!-- USER FORM -->
+          <form
+            action="signup-process.php"
+            method="POST"
+            class="mt-2 space-y-3"
+            novalidate
+            data-inline-errors="1"
+          >
             <input type="hidden" name="role" value="user" />
-            <div class="relative">
-              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/80">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M5.121 17.804A9 9 0 1118.88 17.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </span>
+
+            <!-- Full Name -->
+            <div>
+              <label class="block text-md text-white mb-1 ml-1">
+                Full Name <span class="text-red-600 font-semibold ml-1">*</span>
+              </label>
               <input
                 type="text"
                 name="name"
@@ -113,20 +151,26 @@ document.addEventListener("DOMContentLoaded", function () {
                 maxlength="50"
                 data-validate="full-name"
                 required
-                class="w-full rounded-xl bg-white px-12 py-2.5 text-slate-700 placeholder:text-slate-400
+                class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                       text-slate-700 placeholder:text-slate-400
                        focus:outline-none focus:ring-2 focus:ring-white/60"
               />
+              <p data-err-for="name" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
             </div>
-<div>
+
+           <div>
+  <label class="block text-md text-white mb-1 ml-1">
+    Gender <span class="text-red-600 font-semibold ml-1">*</span>
+  </label>
+
   <div class="relative">
     <select
-      id="gender"
       name="gender"
       required
       data-required-msg="Please select a Gender."
-      class="appearance-none w-full rounded-xl bg-white px-4 pr-12 py-2.5
-             text-slate-700 outline-none border border-slate-200
-             focus:ring-2 focus:ring-white/60"
+      class="w-full appearance-none rounded-xl bg-white pl-4 pr-10 py-2.5
+             border border-white/80 text-slate-700
+             focus:outline-none focus:ring-2 focus:ring-white/60"
     >
       <option value="" disabled selected hidden>Select a Gender</option>
       <option value="Male">Male</option>
@@ -134,21 +178,25 @@ document.addEventListener("DOMContentLoaded", function () {
       <option value="Prefer not to say">Prefer not to say</option>
     </select>
 
-    <div class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 flex items-center text-slate-500">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path d="M6 9l6 6 6-6"/>
-      </svg>
-    </div>
+    <!-- custom arrow -->
+    <svg
+      class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-600"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/>
+    </svg>
   </div>
+
+  <p data-err-for="gender" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
 </div>
 
-            <div class="relative">
-              <span class="absolute inset-y-0 left-4 flex items-center text-black/80">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M3 8l9 6 9-6m-18 0v10a2 2 0 002 2h14a2 2 0 002-2V8" />
-                </svg>
-              </span>
+            <!-- Email -->
+            <div>
+              <label class="block text-md text-white mb-1 ml-1">
+                Email <span class="text-red-600 font-semibold ml-1">*</span>
+              </label>
               <input
                 type="text"
                 name="email"
@@ -156,127 +204,140 @@ document.addEventListener("DOMContentLoaded", function () {
                 data-validate="email"
                 data-unique="accounts_email"
                 required
-                class="w-full rounded-xl bg-white px-12 py-2.5 text-slate-700 placeholder:text-slate-400
+                class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                       text-slate-700 placeholder:text-slate-400
                        focus:outline-none focus:ring-2 focus:ring-white/60"
               />
+              <p data-err-for="email" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/80">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 11V7a4 4 0 00-8 0v4m8 0h6a2 2 0 012 2v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7a2 2 0 012-2h6z" />
-                  </svg>
-                </span>
 
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  placeholder="Password"
-                  data-validate="password"
-                  required
-                  class="w-full rounded-xl border border-slate-200 pl-12 pr-12 py-3 outline-none focus:ring-2 focus:ring-slate-200"
-                />
-
-                <button
-                  type="button"
-                  class="toggle-pass absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
-                  data-target="password">
-                </button>
-              </div>
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/80">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 11V7a4 4 0 00-8 0v4m8 0h6a2 2 0 012 2v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7a2 2 0 012-2h6z" />
-                  </svg>
-                </span>
-
-                <input
-                  type="password"
-                  id="confirm_password"
-                  name="confirm_password"
-                  placeholder="Confirm Password"
-                  data-validate="password-confirm"
-                  data-match="password"
-                  required
-                  class="w-full rounded-xl border border-slate-200 pl-12 pr-12 py-3 outline-none focus:ring-2 focus:ring-slate-200"
-                />
-
-                <button
-                  type="button"
-                  class="toggle-pass absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
-                  data-target="confirm_password">
-                </button>
-              </div>
-
+            <!-- Password -->
+            <div>
+              <label class="block text-md text-white mb-1 ml-1">
+                Password <span class="text-red-600 font-semibold ml-1">*</span>
+              </label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                placeholder="Password"
+                data-validate="password"
+                required
+                class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                       text-slate-700 placeholder:text-slate-400
+                       focus:outline-none focus:ring-2 focus:ring-white/60"
+              />
+              <p data-err-for="password" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
             </div>
-            <div class="space-y-1">
+
+            <!-- Confirm Password -->
+            <div>
+              <label class="block text-md text-white mb-1 ml-1">
+                Confirm Password <span class="text-red-600 font-semibold ml-1">*</span>
+              </label>
+              <input
+                type="password"
+                id="confirm_password"
+                name="confirm_password"
+                placeholder="Confirm Password"
+                data-validate="password-confirm"
+                data-match="password"
+                required
+                class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                       text-slate-700 placeholder:text-slate-400
+                       focus:outline-none focus:ring-2 focus:ring-white/60"
+              />
+              <p data-err-for="confirm_password" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
+            </div>
+
+            <!-- Contact -->
+            <div>
+              <label class="block text-md text-white mb-1 ml-1">
+                Contact Number <span class="text-red-600 font-semibold ml-1">*</span>
+              </label>
               <div class="flex items-center gap-2">
-                <div class="bg-white rounded-xl px-2 sm:px-2 py-2 sm:py-2.5 text-slate-700 font-semibold border border-white/40">
+                <div class="bg-white rounded-xl px-3 py-2.5 text-slate-700 font-semibold border border-white/80">
                   +63
                 </div>
                 <input
-                type="tel"
-                id="contactNumber"
-                name="contact_number"
-                placeholder="9123456789"
-                inputmode="numeric"
-                minlength="10"
-                required
-                data-validate="phone-ph"
-                data-unique="accounts_phone"
-                class="flex-1 h-11 rounded-xl bg-white px-4
-                          text-slate-700 placeholder:text-slate-400
-                          focus:outline-none focus:ring-2 focus:ring-white/60"
-              />
+                  type="tel"
+                  name="contact_number"
+                  placeholder="9123456789"
+                  inputmode="numeric"
+                  required
+                  data-validate="phone-ph"
+                  data-unique="accounts_phone"
+                  class="flex-1 rounded-xl bg-white px-4 py-2.5 border border-white/80
+                         text-slate-700 placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-white/60"
+                />
+              </div>
+              <p data-err-for="contact_number" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
+            </div>
+
+            <!-- Birthdate -->
+            <div>
+              <div class="bg-white/95 rounded-xl px-4 py-2.5 border border-white/80">
+                <label class="block text-md text-black mb-1 ml-1">
+                  Birthdate <span class="text-red-600 font-semibold ml-1">*</span>
+                </label>
+                <input
+                  type="date"
+                  name="birthdate"
+                  required
+                  data-validate="age-18"
+                  data-required-msg="Please select your Birthdate."
+                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-slate-200
+                         text-slate-700 focus:outline-none focus:ring-2 focus:ring-white/60"
+                />
+              </div>
+              <p data-err-for="birthdate" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
+            </div>
+
+        <button
+  type="submit"
+  class="w-full py-3 rounded-xl font-semibold text-white text-base
+         transition-colors duration-300"
+  style="background-color:#ffa154;"
+  onmouseover="this.style.backgroundColor='#f97316'"
+  onmouseout="this.style.backgroundColor='#ffa154'"
+>
+  Create Account
+</button>
+            <!-- Bottom block -->
+            <div class="pt-6">
+              <div class="flex items-center gap-3">
+                <div class="h-px flex-1 bg-white/40"></div>
+                <div class="text-sm text-white/90 font-semibold">Already have an account?</div>
+                <div class="h-px flex-1 bg-white/40"></div>
               </div>
 
-            </div>
-            <div class="bg-white/90 rounded-xl px-4 py-2.5 border border-white/40">
-              <label class="block text-xs font-semibold text-slate-700 mb-2">
-                Birthdate
-              </label>
-              <input
-                type="date"
-                name="birthdate"
-                data-validate="age-18"
-                class="w-full rounded-xl bg-white px-4 py-2.5 text-slate-700 outline-none border border-slate-200
-                       focus:ring-2 focus:ring-white/60"
-                required
-              />
-            </div>
-            <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <a
-                href="<?php echo $baseUrl; ?>/pages/signup.php"
-                class="w-full text-center py-2.5 text-sm sm:text-base rounded-lg font-semibold
-                      border border-slate-300 text-slate-600 bg-white
-                      hover:bg-slate-100 transition">
-                ← Back to Selection
-              </a>
-              <button
-                type="submit"
-                class="w-full py-2.5 text-sm sm:text-base rounded-lg font-semibold
-                      text-black  shadow-md hover:shadow-lg transition-all"
-                style="background-color: var(--secondary);">
-                Create Account
-              </button>
-
+              <div class="mt-3 flex items-center justify-center gap-2">
+                <a
+                  href="<?= $baseUrl; ?>/pages/login.php"
+                  class="text-white font-semibold hover:underline inline-flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5m0 0l-5-5m5 5H3" />
+                  </svg>
+                  Sign in to your account
+                </a>
+              </div>
             </div>
 
           </form>
 
         </div>
       </div>
+    </section>
 
-    </div>
-  </section>
-
+  </div>
 </main>
+
 <?php $v = filemtime(__DIR__ . '/../assets/js/form-validators.js'); ?>
 <script src="<?= $baseUrl ?>/assets/js/form-validators.js?v=<?= $v ?>"></script>
-
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+
 </body>
 </html>

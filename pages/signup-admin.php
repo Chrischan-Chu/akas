@@ -5,7 +5,7 @@ $baseUrl  = "";
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/google_config.php';
 
-// ✅ flash messages (so you can see why "Create Clinic" bounces back)
+// ✅ flash messages
 $errMsg = flash_get('error');
 $okMsg  = flash_get('success');
 
@@ -26,168 +26,277 @@ try {
     }
   }
 } catch (Throwable $e) {
-  $declinedDoctorCount = 0; // fail silently
+  $declinedDoctorCount = 0;
 }
 
 $locked = (($_GET['locked'] ?? '') === '1');
 
 include "../includes/partials/head.php";
 ?>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-
-    // Disable Enter key on all forms
-    document.querySelectorAll("form").forEach(function(form) {
-        form.addEventListener("keydown", function(e) {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                return false;
-            }
-        });
+  // Disable Enter key on all forms
+  document.querySelectorAll("form").forEach(function(form) {
+    form.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        return false;
+      }
     });
-
+  });
 });
 </script>
 
-<body class="bg-white">
+<body class="min-h-screen">
 
 <style>
-  .auth-title {
-    font-family: ui-monospace, "Courier New", monospace;
-    letter-spacing: .14em;
-  }
-
   .step { display: none; }
   .step.active { display: block; }
 
   /* Modal */
   .modal-backdrop{ display:none; }
   .modal-backdrop.show{ display:flex; }
+
+  /* ✅ SAME LOGO STYLE AS signup-user */
+  .akas-logo {
+    width: 260px;
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  @media (min-width: 640px) { .akas-logo { width: 320px; } }
+  @media (min-width: 768px) { .akas-logo { width: 360px; } }
+  @media (min-width: 1024px) { .akas-logo { width: 500px; } }
+
+  /* ✅ SAME MANUAL DESKTOP POSITION CONTROL (ONLY DESKTOP) */
+  @media (min-width: 1024px) {
+    .logo-wrap {
+      margin-top: 120px;
+      padding-bottom: 80px;
+    }
+  }
 </style>
 
-<main class="min-h-screen flex items-center justify-center px-4">
+<main class="min-h-screen w-full">
+  <div class="min-h-screen grid grid-cols-1 lg:grid-cols-2">
 
-  <section
-    class="w-full max-w-6xl
-           mx-4 sm:mx-8 lg:mx-10 xl:mx-auto
-           rounded-2xl sm:rounded-3xl lg:rounded-[40px]
-           overflow-hidden shadow-xl border border-slate-100">
+    <!-- LEFT: WHITE BRANDING -->
+    <section class="bg-white px-6 py-10 sm:px-10 lg:px-12 lg:py-14 lg:min-h-screen">
+      <div class="w-full max-w-md mx-auto flex flex-col lg:min-h-screen">
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 min-h-[520px]">
+        <div class="text-left">
+          <h1 class="text-slate-900 font-bold text-4xl sm:text-5xl leading-tight">
+            Create your admin account
+          </h1>
+          <p class="mt-4 text-slate-600 text-base sm:text-lg leading-relaxed">
+            Manage your clinic, doctors, and appointments with ease.
+          </p>
+        </div>
 
-      <div class="bg-[#FFFDF6] relative flex items-center justify-center p-6">
-        <img
-          src="<?php echo $baseUrl; ?>/assets/img/akas-logo.png"
-          alt="AKAS Logo"
-          class="w-44 sm:w-56 md:w-64 lg:w-72 xl:w-80 max-w-full"
-        />
+        <div class="logo-wrap mt-10 sm:mt-12 md:mt-14 flex justify-center pb-2 sm:pb-12 md:pb-14">
+          <img
+            src="<?= $baseUrl ?>/assets/img/akas-logo.png"
+            alt="AKAS Logo"
+            class="akas-logo select-none"
+          />
+        </div>
+
       </div>
+    </section>
 
-      <div class="relative flex items-center justify-center p-4 sm:p-6 lg:p-8"
-           style="background: var(--primary);">
+    <!-- RIGHT: BLUE FORM -->
+    <section class="relative min-h-screen -mt-6 lg:-mt-15 p-0" style="background:#38B6FF;">
 
-        <div class="w-full max-w-sm px-2 sm:px-4 lg:px-0">
+      <!-- TOP LEFT BACK (changes to Back on step 2 via JS) -->
+      <a
+        id="topBackLink"
+        href="<?= $baseUrl; ?>/pages/signup.php"
+        class="absolute text-white font-semibold hover:underline z-50"
+        style="top:8px; left:13px;"
+      >
+        ← Back to selection
+      </a>
 
+      <div class="min-h-screen px-6 sm:px-10 py-12 flex items-center justify-center">
+        <div class="w-full max-w-sm">
+
+          <!-- TITLES -->
           <div id="titleStep1Wrap">
-            <h1 class="auth-title text-3xl sm:text-4xl font-semibold text-white text-center">
-              ADMIN SIGN UP
-            </h1>
-            <p class="text-center text-white text-sm mb-6">
-              Create your admin account for managing the clinic.
-            </p>
+            <h2 class="mt-10 text-white text-2xl sm:text-3xl font-semibold">
+              Admin Sign Up
+            </h2>
           </div>
 
           <div id="titleStep2Wrap" class="hidden">
-            <h1 class="auth-title text-3xl sm:text-4xl font-semibold text-white text-center">
-              CLINIC SIGN UP
-            </h1>
-            <p class="text-center text-white text-sm mb-6">
+            <h2 class="mt-10 text-white text-2xl sm:text-3xl font-semibold">
+              Clinic Sign Up
+            </h2>
+            <p class="text-white/90 text-sm mt-2">
               Add your clinic details to start accepting appointments.
             </p>
           </div>
 
-          <div class="mb-6">
-            <div class="flex items-center justify-between text-xs font-semibold text-white/90">
-              <span id="labelStep1" class="opacity-100">Admin Account</span>
-              <span id="labelStep2" class="opacity-60">Clinic Details</span>
+          <!-- ✅ GOOGLE + OR (STEP 1 ONLY) -->
+          <div id="googleStep1Block" class="mt-6">
+            <form id="googleAdminSignupForm" action="<?= $baseUrl; ?>/pages/google-auth.php" method="POST">
+              <input type="hidden" name="mode" value="signup">
+              <input type="hidden" name="role" value="clinic_admin">
+              <input type="hidden" name="credential" id="googleCredentialAdminSignup">
+            </form>
+
+            <div
+              id="g_id_onload"
+              data-client_id="<?= htmlspecialchars(GOOGLE_CLIENT_ID); ?>"
+              data-callback="onGoogleAdminSignup"
+              data-auto_prompt="false">
             </div>
-            <div class="mt-2 h-2 w-full rounded-full bg-white/20 overflow-hidden">
-              <div id="progressBar" class="h-full w-1/2 rounded-full" style="background: var(--secondary);"></div>
+
+            <div class="w-full overflow-hidden">
+              <div style="width:100%; max-width:100%;">
+                <div
+                  class="g_id_signin"
+                  data-type="standard"
+                  data-size="large"
+                  data-theme="outline"
+                  data-text="signup_with"
+                  data-shape="rectangular"
+                  data-logo_alignment="left"
+                  data-width="384">
+                </div>
+              </div>
+            </div>
+
+            <p class="mt-1 text-[10px] text-white/80 text-center">
+              (Skips Step 1 when using Google.)
+            </p>
+
+            <script>
+              function onGoogleAdminSignup(response) {
+                document.getElementById('googleCredentialAdminSignup').value = response.credential;
+                document.getElementById('googleAdminSignupForm').submit();
+              }
+            </script>
+
+            <div class="flex items-center gap-3 mt-6">
+              <div class="h-px flex-1 bg-white/40"></div>
+              <div class="text-xs text-white/90 font-semibold">OR</div>
+              <div class="h-px flex-1 bg-white/40"></div>
             </div>
           </div>
 
-          <!-- ✅ SHOW FLASH MESSAGES HERE -->
+          <!-- ✅ STEP INDICATOR (ALWAYS VISIBLE) -->
+          <div class="mt-6 mb-4 flex items-center justify-center">
+            <div class="w-full max-w-sm">
+              <div class="flex items-center gap-3">
+
+                <!-- Step 1 -->
+                <div id="stepPill1" class="flex-1 rounded-xl px-3 py-2 border border-white/15 bg-white/5 opacity-70">
+                  <div class="flex items-center gap-2">
+                    <span id="stepDot1"
+                          class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-extrabold text-white bg-white/30">
+                      1
+                    </span>
+                    <div class="leading-tight">
+                      <div class="text-white font-semibold text-[13px]">Admin</div>
+                      <div class="text-white/70 text-[11px] -mt-0.5">Account</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="stepLine" class="w-10 h-[3px] rounded-full bg-white/30"></div>
+
+                <!-- Step 2 -->
+                <div id="stepPill2" class="flex-1 rounded-xl px-3 py-2 border border-white/15 bg-white/5 opacity-70">
+                  <div class="flex items-center gap-2">
+                    <span id="stepDot2"
+                          class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-extrabold text-white bg-white/30">
+                      2
+                    </span>
+                    <div class="leading-tight">
+                      <div class="text-white font-semibold text-[13px]">Clinic</div>
+                      <div class="text-white/70 text-[11px] -mt-0.5">Details</div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- FLASH -->
           <?php if (!empty($errMsg)): ?>
-            <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
-              <?php echo htmlspecialchars((string)$errMsg, ENT_QUOTES, 'UTF-8'); ?>
+            <div class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
+              <?= htmlspecialchars((string)$errMsg, ENT_QUOTES, 'UTF-8'); ?>
             </div>
           <?php endif; ?>
 
           <?php if (!empty($okMsg)): ?>
-            <div class="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-700 text-sm">
-              <?php echo htmlspecialchars((string)$okMsg, ENT_QUOTES, 'UTF-8'); ?>
+            <div class="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-700 text-sm">
+              <?= htmlspecialchars((string)$okMsg, ENT_QUOTES, 'UTF-8'); ?>
             </div>
           <?php endif; ?>
 
+          <!-- FORM -->
           <form id="signupWizard"
-                action="<?php echo $baseUrl; ?>/pages/signup-process.php"
+                action="<?= $baseUrl; ?>/pages/signup-process.php"
                 method="POST"
                 enctype="multipart/form-data"
-                class="space-y-4">
+                class="mt-4 space-y-3"
+                novalidate
+                data-inline-errors="1">
 
             <input type="hidden" name="role" value="clinic_admin" />
+            <input type="hidden" name="google_locked" value="<?= $locked ? '1' : '0'; ?>" />
 
-            <input type="hidden" name="google_locked" value="<?php echo $locked ? '1' : '0'; ?>" />
             <?php if ($locked && auth_is_logged_in() && auth_role() === 'clinic_admin'): ?>
-              <input type="hidden" name="admin_name" value="<?php echo htmlspecialchars(auth_name() ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
-              <input type="hidden" name="email" value="<?php echo htmlspecialchars(auth_email() ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
+              <input type="hidden" name="admin_name" value="<?= htmlspecialchars(auth_name() ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
+              <input type="hidden" name="email" value="<?= htmlspecialchars(auth_email() ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
             <?php endif; ?>
 
             <!-- STEP 1 -->
             <div id="step1" class="step active space-y-3">
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  </svg>
-                </span>
-<input
-  type="text"
-  name="admin_name"
-  placeholder="Admin Full Name"
-  maxlength="50"
-  required
-  data-validate="full-name"
- class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400
-       border border-slate-200
-       focus:outline-none focus:ring-2 focus:ring-white/60
-       ring-offset-0"
-/>
-              </div>
 
-              <div class="bg-white/90 rounded-xl px-4 py-3 border border-white/40">
-                <label class="block text-xs font-semibold text-slate-700 mb-2">
-                  Work ID (Optional)
+              <div>
+                <label class="block text-md text-white mb-1 ml-1">
+                  Admin Full Name <span class="text-red-600 font-semibold ml-1">*</span>
                 </label>
-
                 <input
-                  type="file"
-                  name="admin_work_id"
-                  accept="image/png,image/jpeg,image/webp"
-                  class="block w-full text-sm text-slate-700
-                        file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0
-                        file:text-sm file:font-semibold file:bg-white file:text-slate-800 hover:file:opacity-90"
+                  type="text"
+                  name="admin_name"
+                  placeholder="Admin Full Name"
+                  maxlength="50"
+                  required
+                  data-validate="full-name"
+                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                         text-slate-700 placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
+                <p data-err-for="admin_name" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M3 8l9 6 9-6m-18 0v10a2 2 0 002 2h14a2 2 0 002-2V8" />
-                  </svg>
-                </span>
+              <div>
+                <div class="bg-white/95 rounded-xl px-4 py-3 border border-white/80">
+                  <label class="block text-md text-black mb-2 ml-1">
+                    Work ID (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    name="admin_work_id"
+                    accept="image/png,image/jpeg,image/webp"
+                    class="block w-full text-sm text-slate-700
+                           file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0
+                           file:text-sm file:font-semibold file:bg-white file:text-slate-800 hover:file:opacity-90"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-md text-white mb-1 ml-1">
+                  Admin Email <span class="text-red-600 font-semibold ml-1">*</span>
+                </label>
                 <input
                   type="text"
                   name="email"
@@ -195,18 +304,17 @@ document.addEventListener("DOMContentLoaded", function () {
                   required
                   data-validate="email"
                   data-unique="accounts_email"
-                  class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                         text-slate-700 placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
+                <p data-err-for="email" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 11V7a4 4 0 00-8 0v4m8 0h6a2 2 0 012 2v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7a2 2 0 012-2h6z" />
-                  </svg>
-                </span>
-
+              <div>
+                <label class="block text-md text-white mb-1 ml-1">
+                  Admin Password <span class="text-red-600 font-semibold ml-1">*</span>
+                </label>
                 <input
                   type="password"
                   id="password"
@@ -214,22 +322,17 @@ document.addEventListener("DOMContentLoaded", function () {
                   placeholder="Admin Password"
                   data-validate="password"
                   required
-                  class="w-full h-11 rounded-xl bg-white pl-12 pr-12 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                         text-slate-700 placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
-
-                <button type="button"
-                        class="toggle-pass absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
-                        data-target="password"></button>
+                <p data-err-for="password" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 11V7a4 4 0 00-8 0v4m8 0h6a2 2 0 012 2v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7a2 2 0 012-2h6z" />
-                  </svg>
-                </span>
-
+              <div>
+                <label class="block text-md text-white mb-1 ml-1">
+                  Confirm Admin Password <span class="text-red-600 font-semibold ml-1">*</span>
+                </label>
                 <input
                   type="password"
                   id="confirm_password"
@@ -238,41 +341,57 @@ document.addEventListener("DOMContentLoaded", function () {
                   data-validate="password-confirm"
                   data-match="password"
                   required
-                  class="w-full h-11 rounded-xl bg-white pl-12 pr-12 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                         text-slate-700 placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
-
-                <button type="button"
-                        class="toggle-pass absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
-                        data-target="confirm_password"></button>
+                <p data-err-for="confirm_password" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
-              <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <a
-                  href="<?php echo $baseUrl; ?>/pages/signup.php"
-                  class="w-full text-center py-2.5 rounded-xl font-semibold
-                         border border-white/50 text-white hover:bg-white/10 transition">
-                  ← Back to Selection
-                </a>
+              <button
+                type="button"
+                id="nextBtn"
+                class="w-full py-3 rounded-xl font-semibold text-white text-base transition-colors duration-300"
+                style="background-color:#ffa154;"
+                onmouseover="this.style.backgroundColor='#f97316'"
+                onmouseout="this.style.backgroundColor='#ffa154'"
+              >
+                Next →
+              </button>
 
-                <button
-                  type="button"
-                  id="nextBtn"
-                  class="w-full py-2.5 rounded-xl font-bold text-black shadow-md hover:shadow-lg transition-all"
-                  style="background: var(--secondary);">
-                  Next →
-                </button>
+              <!-- ✅ Already have account (STEP 1) -->
+              <div class="pt-6">
+                <div class="flex items-center gap-3">
+                  <div class="h-px flex-1 bg-white/40"></div>
+                  <div class="text-sm text-white/90 font-semibold">Already have an account?</div>
+                  <div class="h-px flex-1 bg-white/40"></div>
+                </div>
+
+                <div class="mt-3 flex items-center justify-center gap-2">
+                  <a
+                    href="<?= $baseUrl; ?>/pages/login.php"
+                    class="text-white font-semibold hover:underline inline-flex items-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5m0 0l-5-5m5 5H3" />
+                    </svg>
+                    Sign in to your account
+                  </a>
+                </div>
               </div>
             </div>
 
             <!-- STEP 2 -->
             <div id="step2" class="step space-y-3">
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M3 21h18M6 21V7a2 2 0 012-2h8a2 2 0 012 2v14M9 21V9m6 12V9" />
-                  </svg>
-                </span>
+
+              <!-- hidden backBtn (used by JS), not visible -->
+              <button type="button" id="backBtn" class="hidden"></button>
+
+              <div>
+                <label class="block text-md text-white mb-1 ml-1">
+                  Clinic Name <span class="text-red-600 font-semibold ml-1">*</span>
+                </label>
                 <input
                   type="text"
                   name="clinic_name"
@@ -280,11 +399,14 @@ document.addEventListener("DOMContentLoaded", function () {
                   maxlength="50"
                   data-validate="full-name"
                   required
-                  class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                         text-slate-700 placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
+                <p data-err-for="clinic_name" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
-              <!-- DOCTORS (Optional) -->
+              <!-- DOCTORS -->
               <div class="bg-white/90 rounded-xl px-4 py-4 border border-white/40">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -361,13 +483,21 @@ document.addEventListener("DOMContentLoaded", function () {
                   type="text"
                   name="specialty_other"
                   placeholder="Please specify (required if Other)"
-                  class="w-full h-11 rounded-xl bg-white px-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                         text-slate-700 placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
+                <p data-err-for="specialty_other" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
-              <div class="space-y-1">
-                <div class="flex gap-2">
-                  <div class="w-20 h-11 flex items-center justify-center rounded-xl bg-white text-slate-700 font-semibold">
+              <!-- Contact -->
+              <div>
+                <label class="block text-md text-white mb-1 ml-1">
+                  Contact Number <span class="text-red-600 font-semibold ml-1">*</span>
+                </label>
+
+                <div class="flex items-center gap-2">
+                  <div class="bg-white rounded-xl px-3 py-2.5 text-slate-700 font-semibold border border-white/80">
                     +63
                   </div>
                   <input
@@ -379,30 +509,33 @@ document.addEventListener("DOMContentLoaded", function () {
                     required
                     data-validate="phone-ph"
                     data-unique="clinic_contact"
-                    class="flex-1 h-11 rounded-xl bg-white px-4
-                          text-slate-700 placeholder:text-slate-400
-                          focus:outline-none focus:ring-2 focus:ring-white/60"
+                    class="flex-1 rounded-xl bg-white px-4 py-2.5 border border-white/80
+                           text-slate-700 placeholder:text-slate-400
+                           focus:outline-none focus:ring-2 focus:ring-white/60"
                   />
                 </div>
+                <p data-err-for="contact_number" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M3 8l9 6 9-6m-18 0v10a2 2 0 002 2h14a2 2 0 002-2V8" />
-                  </svg>
-                </span>
+              <!-- Clinic Email -->
+              <div>
+                <label class="block text-md text-white mb-1 ml-1">
+                  Clinic Email (Optional)
+                </label>
                 <input
                   type="email"
                   name="clinic_email"
                   placeholder="Clinic Email (Optional)"
                   data-validate="email"
                   data-unique="clinic_email"
-                  class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                         text-slate-700 placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
+                <p data-err-for="clinic_email" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
+              <!-- Clinic Logo -->
               <div class="bg-white/90 rounded-xl px-4 py-3 border border-white/40">
                 <label class="block text-xs font-semibold text-slate-700 mb-2">
                   Clinic Logo (Optional)
@@ -417,14 +550,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 />
               </div>
 
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-black/70">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M7 7h10M7 11h6M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/>
-                  </svg>
-                </span>
-
+              <!-- Business ID -->
+              <div>
+                <label class="block text-md text-white mb-1 ml-1">
+                  10-Digit Business ID <span class="text-red-600 font-semibold ml-1">*</span>
+                </label>
                 <input
                   type="text"
                   name="business_id"
@@ -434,38 +564,56 @@ document.addEventListener("DOMContentLoaded", function () {
                   required
                   data-validate="business-id-10"
                   data-unique="clinic_business_id"
-                  class="w-full h-11 rounded-xl bg-white pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                         text-slate-700 placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-white/60"
                 />
+                <p data-err-for="business_id" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
-              <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  id="backBtn"
-                  class="w-full py-2.5 rounded-xl font-semibold border border-white/50 text-white hover:bg-white/10 transition">
-                  ← Back
-                </button>
+              <!-- ✅ Create Clinic FULL WIDTH -->
+              <button
+                type="submit"
+                class="w-full py-3 rounded-xl font-semibold text-white text-base transition-colors duration-300"
+                style="background-color:#ffa154;"
+                onmouseover="this.style.backgroundColor='#f97316'"
+                onmouseout="this.style.backgroundColor='#ffa154'"
+              >
+                Create Clinic
+              </button>
 
-                <button
-                  type="submit"
-                  class="w-full py-2.5 rounded-xl font-bold text-black shadow-md hover:shadow-lg transition-all"
-                  style="background: var(--secondary);">
-                  Create Clinic
-                </button>
+              <!-- ✅ Already have account (STEP 2) -->
+              <div class="pt-6">
+                <div class="flex items-center gap-3">
+                  <div class="h-px flex-1 bg-white/40"></div>
+                  <div class="text-sm text-white/90 font-semibold">Already have an account?</div>
+                  <div class="h-px flex-1 bg-white/40"></div>
+                </div>
+
+                <div class="mt-3 flex items-center justify-center gap-2">
+                  <a
+                    href="<?= $baseUrl; ?>/pages/login.php"
+                    class="text-white font-semibold hover:underline inline-flex items-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5m0 0l-5-5m5 5H3" />
+                    </svg>
+                    Sign in to your account
+                  </a>
+                </div>
               </div>
+
             </div>
-
           </form>
 
         </div>
       </div>
-
-    </div>
-  </section>
-
+    </section>
+  </div>
 </main>
 
-<!-- ADD DOCTOR MODAL -->
+<!-- ADD DOCTOR MODAL (unchanged) -->
 <div id="doctorModal" class="modal-backdrop fixed inset-0 z-50 items-center justify-center p-4" style="background: rgba(0,0,0,.55);">
   <div class="w-full max-w-xl rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden">
     <div class="px-5 py-4 flex items-center justify-between" style="background: var(--primary);">
@@ -477,7 +625,6 @@ document.addEventListener("DOMContentLoaded", function () {
     </div>
 
     <div class="p-5">
-      <!-- modal body unchanged -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
@@ -588,6 +735,8 @@ document.addEventListener("DOMContentLoaded", function () {
 <?php $v2 = @filemtime(__DIR__ . '/../assets/js/signup-admin.js') ?: time(); ?>
 <script src="<?= $baseUrl ?>/assets/js/signup-admin.js?v=<?= (int)$v2 ?>"></script>
 
-<script src="<?php echo $baseUrl; ?>/assets/js/signup-admin-doctors.js"></script>
+<script src="<?= $baseUrl; ?>/assets/js/signup-admin-doctors.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
 </body>
 </html>

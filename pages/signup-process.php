@@ -87,11 +87,11 @@ $stmt = $pdo->prepare('SELECT id FROM accounts WHERE email = ? LIMIT 1');
 $stmt->execute([$email]);
 $existingId = (int)($stmt->fetchColumn() ?? 0);
 
-// Also block if the email is already used as a clinic email or doctor email
+// ✅ FIXED: Also block if email is already used as a clinic email or doctor email
 $stmt = $pdo->prepare('
-  SELECT 1 FROM clinics WHERE email = ? LIMIT 1
+  SELECT 1 FROM clinics WHERE email = ?
   UNION ALL
-  SELECT 1 FROM clinic_doctors WHERE email = ? LIMIT 1
+  SELECT 1 FROM clinic_doctors WHERE email = ?
   LIMIT 1
 ');
 $stmt->execute([$email, $email]);
@@ -124,7 +124,6 @@ $hash = $googleLocked
  * =========================
  * USER SIGNUP (NORMAL ONLY)
  * =========================
- * Requirement: normal signups must login after registering.
  */
 if ($role === 'user') {
   $name = trim((string)($_POST['name'] ?? ''));
@@ -165,14 +164,14 @@ if ($role === 'user') {
     $phoneVal = $digits;
   }
 
-  // ✅ Unique phone check (only when provided) across accounts + clinics + clinic_doctors
+  // ✅ FIXED: Unique phone check across accounts + clinics + clinic_doctors
   if ($phoneVal !== null) {
     $stmt = $pdo->prepare('
-      SELECT 1 FROM accounts WHERE phone = ? LIMIT 1
+      SELECT 1 FROM accounts WHERE phone = ?
       UNION ALL
-      SELECT 1 FROM clinics WHERE contact = ? LIMIT 1
+      SELECT 1 FROM clinics WHERE contact = ?
       UNION ALL
-      SELECT 1 FROM clinic_doctors WHERE contact_number = ? LIMIT 1
+      SELECT 1 FROM clinic_doctors WHERE contact_number = ?
       LIMIT 1
     ');
     $stmt->execute([$phoneVal, $phoneVal, $phoneVal]);
@@ -237,8 +236,6 @@ if ($role === 'user') {
  * =========================
  * CLINIC ADMIN SIGNUP
  * =========================
- * Normal: Step 1+2 then login later (not auto-login).
- * Google: Step 2 only (locked), then logout after submission and login later.
  */
 
 $adminName      = trim((string)($_POST['admin_name'] ?? ''));
@@ -320,13 +317,13 @@ if (!preg_match('/^9\d{9}$/', $contactDigits)) {
   backToSignup($baseUrl, 'clinic_admin');
 }
 
-// ✅ Unique clinic contact number check (across accounts + clinics + clinic_doctors)
+// ✅ FIXED: Unique clinic contact number check across accounts + clinics + clinic_doctors
 $stmt = $pdo->prepare('
-  SELECT 1 FROM accounts WHERE phone = ? LIMIT 1
+  SELECT 1 FROM accounts WHERE phone = ?
   UNION ALL
-  SELECT 1 FROM clinics WHERE contact = ? LIMIT 1
+  SELECT 1 FROM clinics WHERE contact = ?
   UNION ALL
-  SELECT 1 FROM clinic_doctors WHERE contact_number = ? LIMIT 1
+  SELECT 1 FROM clinic_doctors WHERE contact_number = ?
   LIMIT 1
 ');
 $stmt->execute([$contactDigits, $contactDigits, $contactDigits]);
@@ -340,14 +337,14 @@ if ($clinicEmail !== '' && !filter_var($clinicEmail, FILTER_VALIDATE_EMAIL)) {
   backToSignup($baseUrl, 'clinic_admin');
 }
 
-// ✅ Unique clinic email (optional but must be unique when provided) across accounts + clinics + clinic_doctors
+// ✅ FIXED: Unique clinic email across accounts + clinics + clinic_doctors
 if ($clinicEmail !== '') {
   $stmt = $pdo->prepare('
-    SELECT 1 FROM accounts WHERE email = ? LIMIT 1
+    SELECT 1 FROM accounts WHERE email = ?
     UNION ALL
-    SELECT 1 FROM clinics WHERE email = ? LIMIT 1
+    SELECT 1 FROM clinics WHERE email = ?
     UNION ALL
-    SELECT 1 FROM clinic_doctors WHERE email = ? LIMIT 1
+    SELECT 1 FROM clinic_doctors WHERE email = ?
     LIMIT 1
   ');
   $stmt->execute([$clinicEmail, $clinicEmail, $clinicEmail]);
@@ -393,7 +390,7 @@ foreach ($doctors as $i => $d) {
     $slot = trim((string)($d['slot_mins'] ?? $d['slotMins'] ?? ''));
     $start = trim((string)($d['start_time'] ?? $d['startTime'] ?? ''));
     $end = trim((string)($d['end_time'] ?? $d['endTime'] ?? ''));
-    $days = $d['days'] ?? null; // could be array like ["Mon","Tue"]
+    $days = $d['days'] ?? null;
 
     if ($start !== '' && $end !== '') {
       $daysText = '';
@@ -404,7 +401,6 @@ foreach ($doctors as $i => $d) {
     }
   }
 
-  // ✅ Required doctor fields (schedule required only if doctor exists)
   if ($fullName === '' || $birth === '' || $spec === '' || $prc === '' || $dEmail === '' || $phone === '' || $sched === '') {
     flash_set('error', 'Please complete all doctor fields (Doctor #' . ($i + 1) . ').');
     backToSignup($baseUrl, 'clinic_admin');
@@ -436,13 +432,11 @@ foreach ($doctors as $i => $d) {
     backToSignup($baseUrl, 'clinic_admin');
   }
 
-  // Preserve availability JSON when provided (used for calendar slots)
   $availabilityJson = '';
   if (isset($d['availability']) && is_string($d['availability'])) {
     $availabilityJson = trim($d['availability']);
   }
 
-  // ✅ normalize
   $doctors[$i] = [
     'full_name' => $fullName,
     'birthdate' => $birthObj->format('Y-m-d'),
@@ -493,7 +487,6 @@ $workIdPath = upload_image_optional(
 try {
   $pdo->beginTransaction();
 
-  // Insert clinic
   $insClinic = $pdo->prepare('
     INSERT INTO clinics
       (clinic_name, specialty, specialty_other, logo_path, business_id, contact, email,
@@ -523,7 +516,6 @@ try {
 
   $clinicId = (int)$pdo->lastInsertId();
 
-  // Insert / attach admin account linked to clinic
   if ($googleLocked) {
     if (!auth_is_logged_in() || auth_role() !== 'clinic_admin' || (int)(auth_clinic_id() ?? 0) > 0) {
       flash_set('error', 'Invalid clinic registration state. Please login again.');
@@ -539,9 +531,8 @@ try {
       LIMIT 1
     ");
     $updAdmin->execute([$clinicId, $adminName, $email, $acctId]);
-    // ✅ update session too, so pending.php sees clinic_id
-auth_set($acctId, 'clinic_admin', $adminName, $email, $clinicId);
 
+    auth_set($acctId, 'clinic_admin', $adminName, $email, $clinicId);
 
   } else {
     $adminAccountId = 0;
@@ -553,7 +544,6 @@ auth_set($acctId, 'clinic_admin', $adminName, $email, $clinicId);
     $adminAccountId = (int)$pdo->lastInsertId();
   }
 
-  // Insert doctors (optional)
   if (!empty($doctors)) {
     $insDoc = $pdo->prepare('
       INSERT INTO clinic_doctors
@@ -561,7 +551,7 @@ auth_set($acctId, 'clinic_admin', $adminName, $email, $clinicId);
       VALUES
         (?,?,?,?,?,?,?,?,?,?,?)
     ');
-// Helper: convert availability JSON to a readable schedule string (for the schedule column)
+
     $fmtSchedule = function (?string $availabilityJson): ?string {
       if (!$availabilityJson) return null;
       $a = json_decode($availabilityJson, true);
@@ -595,8 +585,6 @@ auth_set($acctId, 'clinic_admin', $adminName, $email, $clinicId);
     };
 
     foreach ($doctors as $d) {
-      // Coming from signup-admin-doctors.js:
-      // - $d['availability'] is a JSON string like {"days":[1,2,3,4,5],"start":"09:00","end":"17:00","slot_mins":30}
       $availabilityJson = (string)($d['availability'] ?? '');
 
       $insDoc->execute([
@@ -605,8 +593,8 @@ auth_set($acctId, 'clinic_admin', $adminName, $email, $clinicId);
         (string)($d['birthdate'] ?? null),
         (string)($d['specialization'] ?? null),
         (string)($d['prc'] ?? null),
-        $fmtSchedule($availabilityJson),         // schedule (readable)
-        ($availabilityJson !== '' ? $availabilityJson : null), // availability (JSON for calendar)
+        $fmtSchedule($availabilityJson),
+        ($availabilityJson !== '' ? $availabilityJson : null),
         (string)($d['email'] ?? null),
         (string)($d['contact_number'] ?? null),
         'PENDING',
@@ -623,21 +611,15 @@ auth_set($acctId, 'clinic_admin', $adminName, $email, $clinicId);
   backToSignup($baseUrl, 'clinic_admin');
 }
 
-  // ✅ Send email verification for MANUAL admin accounts
-  if (!$googleLocked && $adminAccountId > 0) {
-    $token = akas_create_email_verify_token($pdo, $adminAccountId, 30);
-    $sent  = akas_send_verification_email($baseUrl, $email, $adminName, $token);
+if (!$googleLocked && !empty($adminAccountId) && $adminAccountId > 0) {
+  $token = akas_create_email_verify_token($pdo, $adminAccountId, 30);
+  $sent  = akas_send_verification_email($baseUrl, $email, $adminName, $token);
 
-    flash_set('success', $sent
-      ? 'Registration submitted! Please verify your email (check inbox/spam). After verification, you can log in, but your clinic will still need superadmin approval.'
-      : 'Registration submitted, but we could not send the verification email. Please configure SMTP and resend verification.'
-    );
-  }
+  flash_set('success', $sent
+    ? 'Registration submitted! Please verify your email (check inbox/spam). After verification, you can log in, but your clinic will still need superadmin approval.'
+    : 'Registration submitted, but we could not send the verification email. Please configure SMTP and resend verification.'
+  );
+}
 
-// ✅ Always require login after admin registration
-// ✅ If Google admin finished Step 2, log them out (they must login later)
-
-
-// ✅ Redirect to pending page (NOT login)
+// ✅ Redirect to pending page
 redirect($baseUrl . '/admin/pending.php');
-
