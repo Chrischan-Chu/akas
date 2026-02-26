@@ -355,6 +355,15 @@ include "../includes/partials/head.php";
 
   </div>
 </main>
+<script>
+  if ("scrollRestoration" in history) {
+    history.scrollRestoration = "manual";
+  }
+
+  window.addEventListener("load", function () {
+    window.scrollTo(0, 0);
+  });
+</script>
 
 <?php $v = filemtime(__DIR__ . '/../assets/js/form-validators.js'); ?>
 <script src="<?= $baseUrl ?>/assets/js/form-validators.js?v=<?= $v ?>"></script>

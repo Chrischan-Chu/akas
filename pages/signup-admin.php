@@ -54,10 +54,6 @@ document.addEventListener("DOMContentLoaded", function () {
   .step { display: none; }
   .step.active { display: block; }
 
-  /* Modal */
-  .modal-backdrop{ display:none; }
-  .modal-backdrop.show{ display:flex; }
-
   /* ✅ SAME LOGO STYLE AS signup-user */
   .akas-logo {
     width: 260px;
@@ -182,7 +178,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             <div class="flex items-center gap-3 mt-6">
               <div class="h-px flex-1 bg-white/40"></div>
-              <div class="text-xs text-white/90 font-semibold">OR</div>
+              <div class="text-sm text-white/90 font-semibold">OR</div>
               <div class="h-px flex-1 bg-white/40"></div>
             </div>
           </div>
@@ -407,11 +403,11 @@ document.addEventListener("DOMContentLoaded", function () {
               </div>
 
               <!-- DOCTORS -->
-              <div class="bg-white/90 rounded-xl px-4 py-4 border border-white/40">
+              <div id="doctorsBlock" class="bg-white/90 rounded-xl px-4 py-4 border border-white/40">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <p class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                      Doctors
+                      Doctors <span class="text-red-600 font-extrabold">*</span>
                       <?php if ($declinedDoctorCount > 0): ?>
                         <span class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold
                                      bg-rose-50 text-rose-700 border border-rose-200">
@@ -425,8 +421,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         You have declined doctor(s). You can reapply later in <b>Admin Dashboard → Doctors</b>.
                       </p>
                     <?php else: ?>
-                      <p class="text-xs text-slate-600">
-                        Add doctors now, or you can add them later in the admin dashboard.
+                      <p class="text-sm text-slate-600">
+                        Please add at least one doctor. You can add more later in the Admin Dashboard.
                       </p>
                     <?php endif; ?>
                   </div>
@@ -442,12 +438,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 <input type="hidden" name="doctors_json" id="doctorsJson" value="[]" />
                 <div id="doctorsList" class="mt-3 space-y-2"></div>
+                <p data-err-for="doctors_json" class="min-h-[16px] mt-2 text-sm text-red-600 font-semibold"></p>
               </div>
 
               <!-- Clinic Type -->
               <div class="bg-white/90 rounded-xl px-4 py-3 border border-white/40">
-                <label class="block text-xs font-semibold text-slate-700 mb-2">
-                  Clinic Type / Category
+                <label class="block text-sm font-semibold text-slate-700 mb-2">
+                  Clinic Type / Category <span class="text-red-600 font-extrabold">*</span>
                 </label>
 
                 <div class="relative">
@@ -537,7 +534,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
               <!-- Clinic Logo -->
               <div class="bg-white/90 rounded-xl px-4 py-3 border border-white/40">
-                <label class="block text-xs font-semibold text-slate-700 mb-2">
+                <label class="block text-sm font-semibold text-slate-700 mb-2">
                   Clinic Logo (Optional)
                 </label>
                 <input
@@ -613,129 +610,201 @@ document.addEventListener("DOMContentLoaded", function () {
   </div>
 </main>
 
-<!-- ADD DOCTOR MODAL (unchanged) -->
-<div id="doctorModal" class="modal-backdrop fixed inset-0 z-50 items-center justify-center p-4" style="background: rgba(0,0,0,.55);">
-  <div class="w-full max-w-xl rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden">
-    <div class="px-5 py-4 flex items-center justify-between" style="background: var(--primary);">
+<!-- ✅ DOCTOR MODAL (Tailwind hidden; JS toggles hidden/flex) -->
+<div id="doctorModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70">
+ <div class="relative w-full max-w-md sm:max-w-lg
+            max-h-[90vh]
+            rounded-2xl
+            bg-white
+            outline outline-4 outline-black
+            shadow-2xl
+            flex flex-col">
+    <div class="px-5 py-4 flex items-center justify-between bg-white border-b border-slate-200">
       <div>
-        <p class="text-white font-bold">Add Doctor</p>
-        <p class="text-white/80 text-xs">Fill in the doctor details. All fields are required.</p>
+        <p class="text-slate-900 font-bold">Add Doctor</p>
+<p class="text-slate-500 text-xs">Fill in the doctor details. All fields are required.</p>
       </div>
-      <button type="button" id="closeDoctorModal" class="text-white/90 hover:text-white text-xl leading-none">&times;</button>
+      <button type="button" id="closeDoctorModal"
+        class="text-slate-400 hover:text-slate-700 text-xl leading-none">
+  &times;
+</button>
     </div>
 
-    <div class="p-5">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <!-- ✅ scrollable body -->
+   <div class="flex-1 overflow-y-auto p-5" style="background:#38B6FF;">
+  <div class="bg-white rounded-2xl border border-white/70 shadow-sm p-4 sm:p-5">
+    <!-- ✅ PUT ALL YOUR FORM FIELDS INSIDE THIS CARD -->
+      <form id="doctorModalForm" data-inline-errors="1" novalidate>
+<div class="grid grid-cols-1 gap-4">
+
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
-          <input id="docFullName" type="text" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700" placeholder="e.g., Juan Dela Cruz" />
+          <label class="block text-sm font-semibold text-black mb-1">Full Name <span class="text-red-600 font-semibold">*</span></label>
+          <input id="docFullName" type="text" required
+                 data-required-msg="Please fill out this field."
+                 class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                 placeholder="e.g., Juan Dela Cruz"
+                 data-validate="full-name"
+                 maxlength="50" />
+          <p data-err-for="docFullName" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Birthdate</label>
-          <input id="docBirthdate" type="date" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700" />
+          <label class="block text-sm font-semibold text-black mb-1">Birthdate <span class="text-red-600 font-semibold">*</span></label>
+          <input id="docBirthdate" type="date" required
+                 data-required-msg="Please pick a birthdate."
+                 class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 focus:outline-none focus:ring-2 focus:ring-white/60"
+                 data-validate="age-18" />
+          <p data-err-for="docBirthdate" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Specialization</label>
-          <input id="docSpecialization" type="text" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700" placeholder="e.g., Pediatrics" />
+          <label class="block text-sm font-semibold text-black mb-1">Specialization <span class="text-red-600 font-semibold">*</span></label>
+          <input id="docSpecialization" type="text" required
+                 data-required-msg="Please fill out this field."
+                 class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                 placeholder="e.g., Pediatrics"
+                 data-validate="full-name"
+                 maxlength="50" />
+          <p data-err-for="docSpecialization" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">PRC (License No.)</label>
-          <input id="docPrc" type="text" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700" placeholder="e.g., 1234567" />
+          <label class="block text-sm font-semibold text-black mb-1">PRC (License No.) <span class="text-red-600 font-semibold">*</span></label>
+          <input id="docPrc" type="text" required
+                 data-required-msg="Please fill out this field."
+                 class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                 placeholder="e.g., 1234567" />
+          <p data-err-for="docPrc" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
-          <input id="docEmail" type="text" data-validate="email" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700" placeholder="doctor@email.com" />
+          <label class="block text-sm font-semibold text-black mb-1">Email <span class="text-red-600 font-semibold">*</span></label>
+          <input id="docEmail" type="text" required
+                 data-required-msg="Please fill out this field."
+                 class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                 placeholder="doctor@email.com"
+                 data-validate="email" />
+          <p data-err-for="docEmail" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Contact Number</label>
+          <label class="block text-sm font-semibold text-black mb-1">Contact Number <span class="text-red-600 font-semibold">*</span></label>
           <div class="flex gap-2">
             <div class="w-20 h-11 flex items-center justify-center rounded-xl bg-slate-50 text-slate-700 font-semibold border border-slate-200">
               +63
             </div>
-            <input id="docPhone" type="text" maxlength="10" inputmode="numeric" data-validate="phone-ph" class="flex-1 h-11 rounded-xl border border-slate-200 px-4 text-slate-700" placeholder="9123456789" />
+            <input id="docPhone" type="text" maxlength="10" inputmode="numeric" required
+                   data-required-msg="Please fill out this field."
+                   class="flex-1 h-11 rounded-xl border border-slate-200 px-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+                   placeholder="9123456789"
+                 data-validate="phone-ph" />
           </div>
+          <p data-err-for="docPhone" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
         </div>
 
-        <label class="block text-xs font-semibold text-slate-700 mb-1">Availability</label>
+        <!-- ✅ Days Availability -->
+        <div>
+          <label class="block text-sm font-semibold text-black mb-2">Days Availability <span class="text-red-600 font-semibold">*</span></label>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div class="sm:col-span-1">
-            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Slot length</label>
-            <select id="docSlotMins" class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700">
-              <option value="30" selected>30 minutes</option>
-              <option value="15">15 minutes</option>
-              <option value="60">60 minutes</option>
-            </select>
-          </div>
+          <div class="grid grid-cols-1 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Slot length <span class="text-red-600 font-semibold">*</span></label>
+              <select id="docSlotMins" required
+                      data-required-msg="Please select an option."
+                      class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 focus:outline-none focus:ring-2 focus:ring-white/60">
+                <option value="30" selected>30 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="60">60 minutes</option>
+              </select>
+              <p data-err-for="docSlotMins" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
+            </div>
 
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Start time</label>
-            <input id="docStartTime" type="time" step="1800"
-                  class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700"
-                  value="09:00" />
-          </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Start time <span class="text-red-600 font-semibold">*</span></label>
+              <input id="docStartTime" type="time" required value="09:00"
+                     data-required-msg="Please fill out this field."
+                     class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 focus:outline-none focus:ring-2 focus:ring-white/60" />
+              <p data-err-for="docStartTime" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
+            </div>
 
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-600 mb-1">End time</label>
-            <input id="docEndTime" type="time" step="1800"
-                  class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700"
-                  value="17:00" />
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">End time <span class="text-red-600 font-semibold">*</span></label>
+              <input id="docEndTime" type="time" required value="17:00"
+                     data-required-msg="Please fill out this field."
+                     class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 focus:outline-none focus:ring-2 focus:ring-white/60" />
+              <p data-err-for="docEndTime" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
+            </div>
+
+            <div id="docDaysWrap" class="rounded-xl border border-slate-200 p-3">
+              <div class="flex flex-wrap gap-2">
+                <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+                  <input type="checkbox" class="mr-2" id="dMon" checked>Mon
+                </label>
+                <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+                  <input type="checkbox" class="mr-2" id="dTue" checked>Tue
+                </label>
+                <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+                  <input type="checkbox" class="mr-2" id="dWed" checked>Wed
+                </label>
+                <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+                  <input type="checkbox" class="mr-2" id="dThu" checked>Thu
+                </label>
+                <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+                  <input type="checkbox" class="mr-2" id="dFri" checked>Fri
+                </label>
+                <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+                  <input type="checkbox" class="mr-2" id="dSat">Sat
+                </label>
+                <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
+                  <input type="checkbox" class="mr-2" id="dSun">Sun
+                </label>
+              </div>
+            </div>
+
+            <p data-err-for="docDays" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
+
+            <p class="text-[11px] text-white/80">
+              Choose the doctor schedule used for appointment slots.
+            </p>
           </div>
         </div>
-
-        <div class="mt-3">
-          <label class="block text-[11px] font-semibold text-slate-600 mb-2">Days available</label>
-          <div class="flex flex-wrap gap-2">
-            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
-              <input type="checkbox" class="mr-2" id="dMon" checked>Mon
-            </label>
-            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
-              <input type="checkbox" class="mr-2" id="dTue" checked>Tue
-            </label>
-            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
-              <input type="checkbox" class="mr-2" id="dWed" checked>Wed
-            </label>
-            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
-              <input type="checkbox" class="mr-2" id="dThu" checked>Thu
-            </label>
-            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
-              <input type="checkbox" class="mr-2" id="dFri" checked>Fri
-            </label>
-            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
-              <input type="checkbox" class="mr-2" id="dSat">Sat
-            </label>
-            <label class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white">
-              <input type="checkbox" class="mr-2" id="dSun">Sun
-            </label>
-          </div>
-        </div>
-
-        <p class="mt-2 text-[11px] text-slate-500">
-          Start/End must be within clinic hours. Booking uses 30-min slots.
-        </p>
 
       </div>
 
       <div class="mt-5 flex items-center justify-end gap-2">
-        <button type="button" id="cancelDoctor" class="px-4 py-2 rounded-xl font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50">Cancel</button>
-        <button type="button" id="saveDoctor" class="px-4 py-2 rounded-xl font-bold text-black shadow-sm hover:shadow" style="background: var(--secondary);">Save Doctor</button>
+        <button type="button" id="cancelDoctor"
+                class="px-4 py-2 rounded-xl font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50">
+          Cancel
+        </button>
+        <button type="button" id="saveDoctor"
+                class="px-4 py-2 rounded-xl font-bold text-black shadow-sm hover:shadow"
+                style="background: var(--secondary);">
+          Add Doctor
+        </button>
       </div>
+</form>
     </div>
   </div>
 </div>
+<script>
+  if ("scrollRestoration" in history) {
+    history.scrollRestoration = "manual";
+  }
+
+  window.addEventListener("load", function () {
+    window.scrollTo(0, 0);
+  });
+</script>
 
 <?php $v1 = @filemtime(__DIR__ . '/../assets/js/form-validators.js') ?: time(); ?>
-<script src="<?= $baseUrl ?>/assets/js/form-validators.js?v=<?= (int)$v1 ?>"></script>
+<script defer src="<?= $baseUrl ?>/assets/js/form-validators.js?v=<?= (int)$v1 ?>"></script>
 
 <?php $v2 = @filemtime(__DIR__ . '/../assets/js/signup-admin.js') ?: time(); ?>
-<script src="<?= $baseUrl ?>/assets/js/signup-admin.js?v=<?= (int)$v2 ?>"></script>
+<script defer src="<?= $baseUrl ?>/assets/js/signup-admin.js?v=<?= (int)$v2 ?>"></script>
 
-<script src="<?= $baseUrl; ?>/assets/js/signup-admin-doctors.js"></script>
+<?php $v3 = @filemtime(__DIR__ . '/../assets/js/signup-admin-doctors.js') ?: time(); ?>
+<script defer src="<?= $baseUrl ?>/assets/js/signup-admin-doctors.js?v=<?= (int)$v3 ?>"></script>
+
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 
 </body>

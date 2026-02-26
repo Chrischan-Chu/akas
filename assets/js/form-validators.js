@@ -3,11 +3,13 @@
   /* ================= helpers ================= */
 
   const showError = (el) => {
+    if (!el) return;
     el.classList.add("ring-2", "ring-red-400", "ring-offset-0");
     el.classList.add("focus:ring-red-400");
   };
 
   const clearError = (el) => {
+    if (!el) return;
     el.classList.remove("ring-2", "ring-red-400", "ring-offset-0");
     el.classList.remove("focus:ring-red-400");
   };
@@ -22,12 +24,16 @@
 
   const inlineEnabled = (inputOrForm) => {
     const form =
-      inputOrForm?.tagName === "FORM" ? inputOrForm : inputOrForm?.closest?.("form");
+      inputOrForm?.tagName === "FORM"
+        ? inputOrForm
+        : inputOrForm?.closest?.("form");
     return form?.dataset?.inlineErrors === "1";
   };
 
   const getRequiredMsg = (el) => {
-    return (el?.dataset?.requiredMsg || "").trim() || "Please fill out this field.";
+    return (
+      (el?.dataset?.requiredMsg || "").trim() || "Please fill out this field."
+    );
   };
 
   const getFieldContainer = (input) => {
@@ -39,7 +45,7 @@
     const rel = input.closest(".relative");
     if (rel) return rel;
 
-    // ✅ your signup-user.php uses simple <div> wrappers
+    // fallback
     return input.parentElement;
   };
 
@@ -49,16 +55,16 @@
 
     const key = input.name || input.id || "field";
 
-    // ✅ if your HTML already has <p data-err-for="..."> use it
+    // if your HTML already has <p data-err-for="..."> use it
     let p = container.querySelector(`p[data-err-for="${CSS.escape(key)}"]`);
     if (p) return p;
 
-    // ✅ else create one (but mark it)
+    // else create one (but mark it)
     p = document.createElement("p");
     p.dataset.errFor = key;
     p.dataset.inlineGenerated = "1";
     p.className = "mt-1 text-sm font-semibold text-red-600 leading-snug";
-    p.style.color = "rgb(220 38 38)"; // fallback red
+    p.style.color = "rgb(220 38 38)";
     container.appendChild(p);
     return p;
   };
@@ -68,11 +74,9 @@
     const p = getErrorTextEl(input);
     if (!p) return;
 
-    // ✅ force red style even if something overrides it
     p.classList.remove("text-black", "text-slate-700", "text-white");
     p.classList.add("text-red-600", "font-semibold");
     p.style.color = "rgb(220 38 38)";
-
     p.textContent = message || "";
   };
 
@@ -86,18 +90,15 @@
     const p = container.querySelector(`p[data-err-for="${CSS.escape(key)}"]`);
     if (!p) return;
 
-    // ✅ IMPORTANT:
-    // If the <p> exists in your HTML template, DO NOT remove it (keeps layout stable).
-    // Only remove if we created it dynamically.
-    if (p.dataset.inlineGenerated === "1") {
-      p.remove();
-    } else {
-      p.textContent = "";
-    }
+    // If <p> exists in template, keep it
+    if (p.dataset.inlineGenerated === "1") p.remove();
+    else p.textContent = "";
   };
 
   const getAppBaseUrl = () => {
-    const script = document.querySelector('script[src*="/assets/js/form-validators.js"]');
+    const script = document.querySelector(
+      'script[src*="/assets/js/form-validators.js"]'
+    );
     if (!script?.src) return "";
 
     try {
@@ -117,6 +118,14 @@
     return `${base}/includes/check-unique.php`;
   })();
 
+  /**
+   * ✅ Returns:
+   *   - true  => available
+   *   - false => already used
+   *   - null  => unknown (aborted / network / server error)
+   *
+   * We will treat null as: BLOCK SUBMIT SILENTLY (no special message)
+   */
   const checkUnique = async ({ type, value, signal }) => {
     const params = new URLSearchParams({ type, value });
     const url = `${UNIQUE_ENDPOINT}?${params.toString()}`;
@@ -130,102 +139,217 @@
       const data = await res.json();
       return data?.ok ? !!data.available : true;
     } catch {
-      return true;
+      return null;
     }
+  };
+
+  /* ================= custom form checks ================= */
+
+  const parseJsonSafe = (s, fallback) => {
+    try {
+      return JSON.parse(s);
+    } catch {
+      return fallback;
+    }
+  };
+
+  /**
+   * ✅ signup-admin.php: Doctors is required (at least 1)
+   */
+  const validateDoctorsRequired = (form) => {
+    const doctorsJson = form?.querySelector?.("#doctorsJson");
+    if (!doctorsJson) return { ok: true };
+
+    // Only enforce when Step 2 is active (wizard form)
+    const step2 = document.getElementById("step2");
+    if (step2 && !step2.classList.contains("active")) return { ok: true };
+
+    const list = parseJsonSafe(doctorsJson.value || "[]", []);
+    const count = Array.isArray(list) ? list.length : 0;
+
+    const block = document.getElementById("doctorsBlock");
+    const btn = document.getElementById("openDoctorModal");
+    const visibleErr = document.getElementById("doctor-error"); // <p id="doctor-error">
+
+    const msg = "Please add at least one doctor.";
+
+    const setBadUI = () => {
+      doctorsJson.setCustomValidity(msg);
+      if (visibleErr) visibleErr.textContent = msg;
+
+      showError(block);
+      showError(btn);
+
+      showInlineError(doctorsJson, msg);
+    };
+
+    const clearBadUI = () => {
+      if (doctorsJson.validationMessage === msg) doctorsJson.setCustomValidity("");
+      if (visibleErr) visibleErr.textContent = "";
+
+      clearError(block);
+      clearError(btn);
+      clearInlineError(doctorsJson);
+    };
+
+    if (count < 1) {
+      setBadUI();
+      return { ok: false, focusEl: btn || block || doctorsJson };
+    }
+
+    clearBadUI();
+    return { ok: true };
+  };
+
+  const runCustomFormChecks = (form) => {
+    const r1 = validateDoctorsRequired(form);
+    if (!r1.ok) return r1;
+    return { ok: true };
   };
 
   /* ================= wiring ================= */
 
+  /**
+   * ✅ Uniqueness
+   * - Shows ONLY "already in use" messages
+   * - Blocks submit on unknown/aborted silently (no message)
+   * - Prevents double-click / speed submit by locking submit immediately
+   */
   const wireUnique = ({ input, type, message }) => {
-    if (!input) return;
-    if (input.dataset.uniqueBound === "1") return;
-    input.dataset.uniqueBound = "1";
+  if (!input) return;
+  if (input.dataset.uniqueBound === "1") return;
+  input.dataset.uniqueBound = "1";
 
-    input.dataset.uniqueMsg = message;
+  input.dataset.uniqueMsg = message;
 
-    let controller = null;
+  let controller = null;
 
-    const runCheckNow = async () => {
-      const v = (input.value || "").trim();
+  const runCheckNow = async (phase = "blur") => {
+    const v = (input.value || "").trim();
 
-      if (!v) return true;
-      if (!input.checkValidity()) return true;
+    if (!v) return true;
+    if (!input.checkValidity()) return true;
 
-      try { controller?.abort(); } catch {}
-      controller = new AbortController();
+    try {
+      controller?.abort();
+    } catch {}
+    controller = new AbortController();
 
-      const available = await checkUnique({
-        type,
-        value: v,
-        signal: controller.signal,
-      });
-
-      if (!available) {
-        showError(input);
-        input.setCustomValidity(message);
-        showInlineError(input, message);
-        return false;
-      }
-
-      if (input.validationMessage === message) input.setCustomValidity("");
-      clearError(input);
-      clearInlineError(input);
-      return true;
-    };
-
-    input.addEventListener("blur", debounce(runCheckNow, 120));
-
-    input.addEventListener("input", () => {
-      if (input.validationMessage === message) input.setCustomValidity("");
-      clearError(input);
-      clearInlineError(input);
+    const available = await checkUnique({
+      type,
+      value: v,
+      signal: controller.signal,
     });
 
-    const form = input.closest("form");
-    if (!form) return;
+    // unknown => block submit silently; on blur do nothing
+    if (available === null) {
+      return phase === "submit" ? false : true;
+    }
 
-    if (!form.__uniqueChecks) form.__uniqueChecks = [];
-    form.__uniqueChecks.push({ input, runCheckNow });
+    if (!available) {
+      showError(input);
+      input.setCustomValidity(message);
+      showInlineError(input, message);
+      return false;
+    }
 
-    if (form.dataset.uniqueSubmitBound === "1") return;
-    form.dataset.uniqueSubmitBound = "1";
-
-    form.addEventListener(
-      "submit",
-      async (e) => {
-        if (form.dataset.uniqueSubmitLock === "1") return;
-
-        e.preventDefault();
-
-        const checks = Array.isArray(form.__uniqueChecks) ? form.__uniqueChecks : [];
-        for (const c of checks) {
-          const ok = await c.runCheckNow();
-          if (!ok) {
-            c.input.focus();
-            return;
-          }
-        }
-
-        if (!form.checkValidity()) {
-          const invalids = Array.from(form.querySelectorAll(":invalid"));
-          invalids.forEach((el) => {
-            showError(el);
-            showInlineError(el, el.validationMessage || "Invalid value.");
-          });
-          invalids[0]?.focus();
-          return;
-        }
-
-        form.dataset.uniqueSubmitLock = "1";
-        try {
-          form.requestSubmit();
-        } finally {
-          setTimeout(() => delete form.dataset.uniqueSubmitLock, 0);
-        }
-      },
-      true
-    );
+    if (input.validationMessage === message) input.setCustomValidity("");
+    clearError(input);
+    clearInlineError(input);
+    return true;
   };
+
+  input.addEventListener("blur", debounce(() => runCheckNow("blur"), 120));
+
+  input.addEventListener("input", () => {
+    if (input.validationMessage === message) input.setCustomValidity("");
+    clearError(input);
+    clearInlineError(input);
+  });
+
+  const form = input.closest("form");
+  if (!form) return;
+
+  // ✅ IMPORTANT: always register this field to the form checks
+  if (!form.__uniqueChecks) form.__uniqueChecks = [];
+  form.__uniqueChecks.push({ input, runCheckNow });
+
+  // ✅ attach submit handler only once per form
+  if (form.dataset.uniqueSubmitBound === "1") return;
+  form.dataset.uniqueSubmitBound = "1";
+
+  form.addEventListener(
+  "submit",
+  async (e) => {
+    // lock immediately (prevents double-click racing)
+    if (form.dataset.uniqueSubmitLock === "1") {
+      e.preventDefault();
+      return;
+    }
+    form.dataset.uniqueSubmitLock = "1";
+    e.preventDefault();
+
+    const submitBtn =
+      form.querySelector('button[type="submit"], input[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
+    const unlock = () => {
+      if (submitBtn) submitBtn.disabled = false;
+      delete form.dataset.uniqueSubmitLock;
+    };
+
+    // 1) uniqueness checks
+    const checks = Array.isArray(form.__uniqueChecks) ? form.__uniqueChecks : [];
+    for (const c of checks) {
+      const ok = await c.runCheckNow("submit");
+      if (!ok) {
+        c.input.focus();
+        unlock();
+        return;
+      }
+    }
+
+    // 2) native validation
+    const nativeOk = form.checkValidity();
+    if (!nativeOk) {
+      const invalids = Array.from(form.querySelectorAll(":invalid"));
+
+      invalids.forEach((el) => {
+        showError(el);
+        showInlineError(el, el.validationMessage || "Invalid value.");
+      });
+
+      runCustomFormChecks(form);
+
+      invalids[0]?.focus();
+      invalids[0]?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+
+      unlock();
+      return;
+    }
+
+    // 3) custom checks
+    {
+      const r = runCustomFormChecks(form);
+      if (!r.ok) {
+        r.focusEl?.focus?.();
+        r.focusEl?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        unlock();
+        return;
+      }
+    }
+
+    delete form.dataset.uniqueSubmitLock;
+if (submitBtn) {
+  submitBtn.disabled = true;
+  submitBtn.innerText = "Creating Account...";
+}
+
+form.submit();
+  },
+  true
+);
+};
 
   const wireInput = ({ input, validate, filter }) => {
     if (!input) return;
@@ -294,7 +418,9 @@
 
     input.addEventListener("invalid", (e) => {
       showError(input);
-      if (inlineEnabled(input)) showInlineError(input, input.validationMessage || "Invalid value.");
+      if (inlineEnabled(input)) {
+        showInlineError(input, input.validationMessage || "Invalid value.");
+      }
       e.preventDefault?.();
     });
 
@@ -342,6 +468,71 @@
     select.addEventListener("blur", () => setState(isEmpty()));
     select.closest("form")?.addEventListener("submit", () => setState(isEmpty()));
   };
+  
+  const wireDatePickerValidate = ({ input, validate }) => {
+  if (!input) return;
+
+  const clearUI = () => {
+    clearError(input);
+    input.setCustomValidity("");
+    clearInlineError(input);
+  };
+
+  const applyValidate = () => {
+    const v = String(input.value || "").trim();
+
+    if (!v) {
+      if (input.required && inlineEnabled(input)) {
+        const msg =
+          (input.dataset.requiredMsg || "").trim() || "Please select your Birthdate.";
+        input.setCustomValidity(msg);
+        showInlineError(input, msg);
+        showError(input);
+        return false;
+      }
+      clearUI();
+      return true;
+    }
+
+    const { ok, message } = validate(v, input, "change");
+    input.setCustomValidity(ok ? "" : message);
+
+    if (!ok) {
+      showError(input);
+      showInlineError(input, message);
+      return false;
+    }
+
+    clearError(input);
+    clearInlineError(input);
+    return true;
+  };
+
+  // ✅ Clear old error when user starts interacting again (calendar open / picking)
+  input.addEventListener("pointerdown", clearUI);
+  input.addEventListener("focus", clearUI);
+
+  // ✅ Main validation when value changes (calendar pick)
+  input.addEventListener("change", applyValidate);
+
+  // ✅ Handles "same date clicked again" cases (some browsers don’t fire change)
+  input.addEventListener("blur", applyValidate);
+
+  // ✅ If user types date manually, validate while typing (but don't show required msg yet)
+  input.addEventListener("input", () => {
+    const v = String(input.value || "").trim();
+    if (!v) {
+      clearUI();
+      return;
+    }
+    applyValidate();
+  });
+
+  // ✅ Also validate on submit
+  input.closest("form")?.addEventListener("submit", () => {
+    applyValidate();
+  });
+};
 
   /* ================= validators ================= */
 
@@ -350,10 +541,16 @@
     if (!v) return { ok: true, message: "" };
 
     if (v.length > 50) {
-      return { ok: false, message: "You can only use letters and spacing (Maximum of 50 characters)." };
+      return {
+        ok: false,
+        message: "You can only use letters and spacing (Maximum of 50 characters).",
+      };
     }
     if (!/^[A-Za-z]+(?:\s[A-Za-z]+)*$/.test(v)) {
-      return { ok: false, message: "You can only use letters and spacing (Maximum of 50 characters)." };
+      return {
+        ok: false,
+        message: "You can only use letters and spacing (Maximum of 50 characters).",
+      };
     }
     return { ok: true, message: "" };
   };
@@ -430,32 +627,41 @@
   };
 
   const syncConfirmPassword = (confirmInput) => {
-  const targetName = (confirmInput.dataset.match || "").trim();
-  const passInput = document.querySelector(`[name="${targetName}"]`);
-  if (!passInput) return;
+    const targetName = (confirmInput.dataset.match || "").trim();
+    const passInput = document.querySelector(`[name="${targetName}"]`);
+    if (!passInput) return;
 
-  // mark confirm as "touched" only when user actually interacts with it
-  const markTouched = () => (confirmInput.dataset.touched = "1");
-  confirmInput.addEventListener("input", markTouched);
-  confirmInput.addEventListener("blur", markTouched);
+    const markTouched = () => (confirmInput.dataset.touched = "1");
+    confirmInput.addEventListener("input", markTouched);
+    confirmInput.addEventListener("blur", markTouched);
 
-  passInput.addEventListener("input", () => {
-    const confirmVal = (confirmInput.value || "").trim();
+    passInput.addEventListener("input", () => {
+      const confirmVal = (confirmInput.value || "").trim();
 
-    // ✅ If confirm is still empty and user hasn't touched it, do NOTHING (no red)
-    if (!confirmVal && confirmInput.dataset.touched !== "1") {
-      confirmInput.setCustomValidity("");
-      clearError(confirmInput);
-      clearInlineError(confirmInput);
-      return;
-    }
+      if (!confirmVal && confirmInput.dataset.touched !== "1") {
+        confirmInput.setCustomValidity("");
+        clearError(confirmInput);
+        clearInlineError(confirmInput);
+        return;
+      }
 
-    // ✅ If confirm has value OR was touched already, re-validate it
-    confirmInput.dispatchEvent(new Event("blur"));
-  });
-};
+      confirmInput.dispatchEvent(new Event("blur"));
+    });
+  };
 
   document.addEventListener("DOMContentLoaded", () => {
+    // keep Doctors required state in sync when its hidden JSON changes
+    document.querySelectorAll('form[data-inline-errors="1"]').forEach((form) => {
+      const dj = form.querySelector("#doctorsJson");
+      if (!dj) return;
+      if (dj.dataset.doctorsReqBound === "1") return;
+      dj.dataset.doctorsReqBound = "1";
+
+      const sync = () => runCustomFormChecks(form);
+      dj.addEventListener("change", sync);
+      dj.addEventListener("input", sync);
+    });
+
     document.querySelectorAll('[data-validate="full-name"]').forEach((input) => {
       wireInput({ input, validate: validateFullName });
     });
@@ -489,7 +695,11 @@
     });
 
     document.querySelectorAll('[data-unique="clinic_business_id"]').forEach((input) => {
-      wireUnique({ input, type: "clinic_business_id", message: "Business ID is already registered." });
+      wireUnique({
+        input,
+        type: "clinic_business_id",
+        message: "Business ID is already registered.",
+      });
     });
 
     document.querySelectorAll('[data-validate="business-id-10"]').forEach((input) => {
@@ -514,19 +724,18 @@
     });
 
     document.querySelectorAll('[data-validate="age-18"]').forEach((input) => {
-      wireInput({ input, validate: validateAge18 });
-    });
+  wireDatePickerValidate({ input, validate: validateAge18 });
+});
 
     document.querySelectorAll("select[required]").forEach((sel) => {
       wireRequiredSelect(sel);
     });
+
     // Disable Enter-to-submit (prevents accidental submits)
     document.querySelectorAll('form[data-inline-errors="1"]').forEach((form) => {
-    form.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-    }
-  });
-});
+      form.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") e.preventDefault();
+      });
+    });
   });
 })();
