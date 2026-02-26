@@ -11,7 +11,7 @@ include "../includes/partials/head.php";
 ?>
 
 <body class="min-h-screen">
- 
+
 <main class="min-h-screen w-full">
   <!-- ✅ Flash Messages -->
   <?php if ($errMsg): ?>
@@ -237,6 +237,7 @@ include "../includes/partials/head.php";
               <label class="block text-md text-white mb-1 ml-1">
                 Password <span class="text-red-600 font-semibold ml-1">*</span>
               </label>
+              <div class="relative">
               <input
                 type="password"
                 id="password"
@@ -244,10 +245,27 @@ include "../includes/partials/head.php";
                 placeholder="Password"
                 data-validate="password"
                 required
-                class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80 pr-12
                        text-slate-700 placeholder:text-slate-400
                        focus:outline-none focus:ring-2 focus:ring-white/60"
               />
+
+              <button
+                type="button"
+                class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center text-slate-500 hover:text-slate-700 focus:outline-none"
+                data-toggle-password="#password"
+                aria-label="Show password"
+                aria-pressed="false"
+              >
+                <svg class="pw-eye h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <svg class="pw-eye-off hidden h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.956 9.956 0 012.474-4.118m3.197-2.146A9.956 9.956 0 0112 5c4.478 0 8.268 2.943 9.542 7a9.96 9.96 0 01-4.043 5.307M15 12a3 3 0 00-3-3m0 0a2.99 2.99 0 00-2.225.99M12 9v.01M3 3l18 18"/>
+                </svg>
+              </button>
+              </div>
               <p data-err-for="password" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
             </div>
 
@@ -256,6 +274,7 @@ include "../includes/partials/head.php";
               <label class="block text-md text-white mb-1 ml-1">
                 Confirm Password <span class="text-red-600 font-semibold ml-1">*</span>
               </label>
+              <div class="relative">
               <input
                 type="password"
                 id="confirm_password"
@@ -264,10 +283,27 @@ include "../includes/partials/head.php";
                 data-validate="password-confirm"
                 data-match="password"
                 required
-                class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80 pr-12
                        text-slate-700 placeholder:text-slate-400
                        focus:outline-none focus:ring-2 focus:ring-white/60"
               />
+
+              <button
+                type="button"
+                class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center text-slate-500 hover:text-slate-700 focus:outline-none"
+                data-toggle-password="#confirm_password"
+                aria-label="Show password"
+                aria-pressed="false"
+              >
+                <svg class="pw-eye h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <svg class="pw-eye-off hidden h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.956 9.956 0 012.474-4.118m3.197-2.146A9.956 9.956 0 0112 5c4.478 0 8.268 2.943 9.542 7a9.96 9.96 0 01-4.043 5.307M15 12a3 3 0 00-3-3m0 0a2.99 2.99 0 00-2.225.99M12 9v.01M3 3l18 18"/>
+                </svg>
+              </button>
+              </div>
               <p data-err-for="confirm_password" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
             </div>
 

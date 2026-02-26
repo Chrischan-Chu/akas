@@ -442,7 +442,7 @@ include __DIR__ . '/../includes/partials/head.php';
       </div>
     </div>
 
-    <div class="mt-5 flex items-center justify-between">
+    <div class="mt-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
       <div class="flex items-center gap-2">
         <button id="adminPrevMonth" type="button"
                 class="h-10 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-bold">‹</button>
@@ -453,8 +453,24 @@ include __DIR__ . '/../includes/partials/head.php';
                 class="h-10 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-bold">›</button>
       </div>
 
-      <div class="text-sm text-slate-600">
-        Selected date: <span class="font-bold text-slate-900" id="adminSelectedDateText">None</span>
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+        <!-- View Toggle -->
+        <div class="flex items-center border border-slate-200 rounded-xl bg-white p-1">
+          <button id="adminViewMonth" type="button" 
+                  class="adminViewToggle px-4 py-2 rounded-lg font-bold text-sm transition bg-slate-900 text-white"
+                  data-view="month">
+            Month
+          </button>
+          <button id="adminViewDay" type="button"
+                  class="adminViewToggle px-4 py-2 rounded-lg font-bold text-sm transition bg-white text-slate-900"
+                  data-view="day">
+            Day
+          </button>
+        </div>
+
+        <div class="text-sm text-slate-600">
+          Selected date: <span class="font-bold text-slate-900" id="adminSelectedDateText">None</span>
+        </div>
       </div>
     </div>
 

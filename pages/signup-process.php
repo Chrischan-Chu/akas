@@ -273,7 +273,8 @@ $doctors = array_values(array_filter($doctors, function ($d) {
   $name = trim((string)($d['full_name'] ?? $d['name'] ?? $d['fullName'] ?? ''));
   $email = trim((string)($d['email'] ?? ''));
   $spec = trim((string)($d['specialization'] ?? ''));
-  $prc  = trim((string)($d['prc'] ?? $d['prc_no'] ?? $d['prcNo'] ?? ''));
+  // Accept multiple PRC key names (JS now sends "prc")
+  $prc  = trim((string)($d['prc'] ?? $d['prc_no'] ?? $d['prcNo'] ?? $d['prc_number'] ?? ''));
 
   return ($name !== '' || $email !== '' || $spec !== '' || $prc !== '');
 }));
@@ -378,7 +379,8 @@ foreach ($doctors as $i => $d) {
   $fullName = trim((string)($d['full_name'] ?? $d['name'] ?? $d['fullName'] ?? ''));
   $birth    = trim((string)($d['birthdate'] ?? $d['birth_date'] ?? ''));
   $spec     = trim((string)($d['specialization'] ?? $d['specialty'] ?? ''));
-  $prc      = trim((string)($d['prc'] ?? $d['prc_no'] ?? $d['prcNo'] ?? ''));
+  // Accept multiple PRC key names (JS now sends "prc")
+  $prc      = trim((string)($d['prc'] ?? $d['prc_no'] ?? $d['prcNo'] ?? $d['prc_number'] ?? ''));
   $dEmail   = strtolower(trim((string)($d['email'] ?? '')));
   $phone    = trim((string)($d['contact_number'] ?? $d['phone'] ?? $d['contact'] ?? ''));
 

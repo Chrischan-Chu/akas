@@ -776,6 +776,10 @@ section[id] {
   right: 0px;
 }
 
+.right-2 {
+  right: 0.5rem;
+}
+
 .right-3 {
   right: 0.75rem;
 }
@@ -822,6 +826,11 @@ section[id] {
 
 .z-\[9999\] {
   z-index: 9999;
+}
+
+.mx-2 {
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
 }
 
 .mx-4 {
@@ -977,10 +986,6 @@ section[id] {
 
 .grid {
   display: grid;
-}
-
-.contents {
-  display: contents;
 }
 
 .hidden {
@@ -2192,6 +2197,10 @@ section[id] {
   color: rgb(0 0 0 / var(--tw-text-opacity, 1));
 }
 
+.text-black\/40 {
+  color: rgb(0 0 0 / 0.4);
+}
+
 .text-black\/60 {
   color: rgb(0 0 0 / 0.6);
 }
@@ -2341,12 +2350,12 @@ section[id] {
   color: rgb(133 77 14 / var(--tw-text-opacity, 1));
 }
 
-.\!underline {
-  text-decoration-line: underline !important;
-}
-
 .underline {
   text-decoration-line: underline;
+}
+
+.\!underline {
+  text-decoration-line: underline !important;
 }
 
 .underline-offset-4 {
@@ -2467,10 +2476,6 @@ section[id] {
 .ring-slate-400 {
   --tw-ring-opacity: 1;
   --tw-ring-color: rgb(148 163 184 / var(--tw-ring-opacity, 1));
-}
-
-.ring-offset-0 {
-  --tw-ring-offset-width: 0px;
 }
 
 .blur {
@@ -2760,11 +2765,6 @@ section[id] {
 
 .focus\:ring-black\/10:focus {
   --tw-ring-color: rgb(0 0 0 / 0.1);
-}
-
-.focus\:ring-red-400:focus {
-  --tw-ring-opacity: 1;
-  --tw-ring-color: rgb(248 113 113 / var(--tw-ring-opacity, 1));
 }
 
 .focus\:ring-slate-200:focus {

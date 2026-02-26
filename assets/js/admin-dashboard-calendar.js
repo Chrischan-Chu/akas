@@ -10,6 +10,8 @@
   const selectedText = document.getElementById("adminSelectedDateText");
   const listWrap = document.getElementById("adminApptList");
   const doctorFilter = document.getElementById("adminDoctorFilter");
+  const viewMonthBtn = document.getElementById("adminViewMonth");
+  const viewDayBtn = document.getElementById("adminViewDay");
 
   // Modal refs
   const modal = document.getElementById("adminApptModal");
@@ -50,10 +52,12 @@
   // doctor overlay: {sun:true,mon:false,...}
   let doctorOverlay = {};
 
+  let currentView = "month"; // "month" or "day"
   let viewDate = new Date();
   let selectedDate = null;
   let monthCounts = {}; // ymd -> {total,pending,approved,cancelled,done}
   let selectedAppointment = null;
+  let dayAppointments = []; // appointments for day view
 
   function h(s) {
     return String(s ?? "").replace(/[&<>"']/g, (m) => ({
@@ -266,14 +270,24 @@
       btn.addEventListener("click", async () => {
         selectedDate = d;
         selectedText.textContent = ymd;
-        renderMonth();
-
-        listWrap.innerHTML = `<div class="text-sm text-slate-500">Loading appointments…</div>`;
-        try {
-          const appts = await apiDayList(ymd);
-          renderList(appts);
-        } catch (e) {
-          listWrap.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
+        
+        if (currentView === "month") {
+          renderMonth();
+          listWrap.innerHTML = `<div class="text-sm text-slate-500">Loading appointments…</div>`;
+          try {
+            const appts = await apiDayList(ymd);
+            renderList(appts);
+          } catch (e) {
+            listWrap.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
+          }
+        } else {
+          // Day view: load appointments and render
+          try {
+            dayAppointments = await apiDayList(ymd);
+            renderDay();
+          } catch (e) {
+            calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
+          }
         }
       });
 
@@ -326,43 +340,184 @@
     });
   }
 
+  function renderDay() {
+    if (!selectedDate) {
+      monthLabel.textContent = "Select a date";
+      calGrid.innerHTML = `<div class="col-span-7 text-center py-8 text-slate-600">Select a date to view day details</div>`;
+      listWrap.innerHTML = "";
+      return;
+    }
+
+    const ymd = toYMD(selectedDate);
+    const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][selectedDate.getDay()];
+    monthLabel.textContent = `${dayName}, ${selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+
+    // Render hourly slots (9 AM to 5 PM)
+    calGrid.innerHTML = "";
+    const startHour = 9;
+    const endHour = 17;
+
+    // Create a map of appointments by hour
+    const apptsByHour = {};
+    for (let h = startHour; h < endHour; h++) {
+      apptsByHour[h] = [];
+    }
+    
+    dayAppointments.forEach(appt => {
+      const time = appt.time?.substring(0, 5) || "00:00";
+      const parts = time.split(":");
+      const apptHour = parseInt(parts[0] || "0", 10);
+      
+      if (apptHour >= startHour && apptHour < endHour) {
+        apptsByHour[apptHour].push(appt);
+      }
+    });
+
+    // Show all hours
+    for (let hour = startHour; hour < endHour; hour++) {
+      const hourDisplay = to12(`${pad2(hour)}:00`);
+      const appts = apptsByHour[hour] || [];
+
+      const slot = document.createElement("div");
+      slot.className = "col-span-7 rounded-2xl border border-slate-200 p-4 bg-white hover:shadow-md transition";
+
+      const header = document.createElement("div");
+      header.className = "font-extrabold text-slate-900 mb-3 text-sm";
+      header.textContent = hourDisplay;
+      slot.appendChild(header);
+
+      if (appts.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "text-sm text-slate-400";
+        empty.textContent = "No appointments";
+        slot.appendChild(empty);
+      } else {
+        const grid = document.createElement("div");
+        grid.className = "grid gap-2";
+
+        appts.forEach(appt => {
+          const apptDiv = document.createElement("button");
+          apptDiv.type = "button";
+          apptDiv.className = "text-left rounded-xl border border-slate-200 p-3 bg-slate-50 hover:bg-slate-100 transition text-sm";
+
+          const pill = statusPillClass(appt.status);
+          const apptTime = to12(appt.time);
+
+          apptDiv.innerHTML = `
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="font-semibold text-slate-900">${h(apptTime)} - ${h(appt.patient_name || "—")}</div>
+                <div class="text-xs text-slate-600 mt-0.5">Dr. ${h(appt.doctor_name || "—")}</div>
+              </div>
+              <span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-extrabold border ${pill}">
+                ${h(String(appt.status || "").toUpperCase())}
+              </span>
+            </div>
+          `;
+
+          apptDiv.addEventListener("click", () => {
+            openModal(appt);
+          });
+
+          grid.appendChild(apptDiv);
+        });
+
+        slot.appendChild(grid);
+      }
+
+      calGrid.appendChild(slot);
+    }
+
+    listWrap.innerHTML = "";
+  }
+
+  function updateViewToggleButtons() {
+    if (currentView === "month") {
+      viewMonthBtn?.classList.add("bg-slate-900", "text-white");
+      viewMonthBtn?.classList.remove("bg-white", "text-slate-900");
+      viewDayBtn?.classList.remove("bg-slate-900", "text-white");
+      viewDayBtn?.classList.add("bg-white", "text-slate-900");
+    } else {
+      viewDayBtn?.classList.add("bg-slate-900", "text-white");
+      viewDayBtn?.classList.remove("bg-white", "text-slate-900");
+      viewMonthBtn?.classList.remove("bg-slate-900", "text-white");
+      viewMonthBtn?.classList.add("bg-white", "text-slate-900");
+    }
+  }
+
+  function render() {
+    if (currentView === "month") {
+      renderMonth();
+    } else {
+      renderDay();
+    }
+    updateViewToggleButtons();
+  }
+
   async function refreshAfterAction() {
     // Re-fetch month counts and the selected day list
     await apiMonthCounts(toYM(viewDate));
-    renderMonth();
-
+    
     if (selectedDate) {
       const ymd = toYMD(selectedDate);
-      const appts = await apiDayList(ymd);
-      renderList(appts);
+      dayAppointments = await apiDayList(ymd);
+      
+      if (currentView === "month") {
+        renderMonth();
+      } else {
+        renderDay();
+      }
     }
   }
 
   async function boot() {
-    selectedText.textContent = "None";
-    listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
-
+    selectedText.textContent = selectedDate ? toYMD(selectedDate) : "None";
+    
     try {
       await apiMonthCounts(toYM(viewDate));
-      renderMonth();
+      
+      if (selectedDate) {
+        const ymd = toYMD(selectedDate);
+        dayAppointments = await apiDayList(ymd);
+      } else {
+        dayAppointments = [];
+      }
+      
+      render();
     } catch (e) {
       calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
     }
   }
 
   prevBtn.addEventListener("click", async () => {
-    viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
-    selectedDate = null;
-    selectedText.textContent = "None";
-    listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
+    if (currentView === "month") {
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+      selectedDate = null;
+      selectedText.textContent = "None";
+      listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
+    } else {
+      // Day view: go to previous day
+      if (selectedDate) {
+        selectedDate = new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000);
+        selectedText.textContent = toYMD(selectedDate);
+      }
+    }
     await boot();
   });
 
   nextBtn.addEventListener("click", async () => {
-    viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
-    selectedDate = null;
-    selectedText.textContent = "None";
-    listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
+    if (currentView === "month") {
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+      selectedDate = null;
+      selectedText.textContent = "None";
+      listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
+    } else {
+      // Day view: go to next day
+      if (selectedDate) {
+        selectedDate = new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000);
+        selectedText.textContent = toYMD(selectedDate);
+      }
+    }
     await boot();
   });
 
@@ -371,6 +526,31 @@
     selectedText.textContent = "None";
     listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
     await boot();
+  });
+
+  // View toggle events
+  viewMonthBtn?.addEventListener("click", async () => {
+    currentView = "month";
+    selectedDate = null;
+    selectedText.textContent = "None";
+    listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
+    await boot();
+  });
+
+  viewDayBtn?.addEventListener("click", async () => {
+    currentView = "day";
+    if (!selectedDate) {
+      selectedDate = new Date();
+    }
+    selectedText.textContent = toYMD(selectedDate);
+    
+    try {
+      const ymd = toYMD(selectedDate);
+      dayAppointments = await apiDayList(ymd);
+      render();
+    } catch (e) {
+      calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
+    }
   });
 
   // Modal events

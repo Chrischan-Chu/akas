@@ -1,11 +1,9 @@
 // assets/js/signup-admin-doctors.js
+// Doctor modal logic + JSON payload for signup-process.php
 (() => {
   const onReady = (fn) => {
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", fn);
-    } else {
-      fn();
-    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn);
+    else fn();
   };
 
   onReady(() => {
@@ -15,7 +13,6 @@
     const cancelBtn = document.getElementById("cancelDoctor");
     const saveBtn = document.getElementById("saveDoctor");
 
-    // If these are missing, modal can’t open.
     if (!modal || !openBtn) {
       console.warn("[signup-admin-doctors] Missing modal or open button:", {
         modal: !!modal,
@@ -24,7 +21,7 @@
       return;
     }
 
-    // Existing IDs in your modal (from signup-admin.php)
+    // Inputs
     const iName = document.getElementById("docFullName");
     const iBirth = document.getElementById("docBirthdate");
     const iSpec = document.getElementById("docSpecialization");
@@ -42,17 +39,17 @@
     const chkFri = document.getElementById("dFri");
     const chkSat = document.getElementById("dSat");
     const chkSun = document.getElementById("dSun");
-
     const daysWrap = document.getElementById("docDaysWrap");
 
-    // List + hidden json (already used by your page)
+    // List + hidden json
     const listEl = document.getElementById("doctorsList");
     const jsonEl = document.getElementById("doctorsJson");
 
     let doctors = [];
     let editingIndex = -1;
 
-    /* ================= UI helpers (NO browser tooltip) ================= */
+    /* ================= UI helpers ================= */
+
     const showRing = (el) => {
       if (!el) return;
       el.classList.add("ring-2", "ring-red-400", "ring-offset-0");
@@ -82,37 +79,57 @@
     };
 
     const requiredMsg = (el) => (el?.dataset?.requiredMsg || "Please fill out this field.").trim();
-
     const normalizeSpaces = (v) => (v || "").trim().replace(/\s+/g, " ");
 
-    // Same as signup Full Name rule
+    /* ================= field rules ================= */
+
+    // User/Admin full-name rule (letters + spaces only)
     const lettersSpacing50 = (raw) => {
       const v = normalizeSpaces(raw);
       if (!v) return { ok: false, msg: "Please fill out this field." };
-      if (v.length > 50) return { ok: false, msg: "You can only use letters and spacing (Maximum of 50 characters)." };
-      if (!/^[A-Za-z]+(?:\s[A-Za-z]+)*$/.test(v)) {
+      if (v.length > 50)
         return { ok: false, msg: "You can only use letters and spacing (Maximum of 50 characters)." };
-      }
+      if (!/^[A-Za-z]+(?:\s[A-Za-z]+)*$/.test(v))
+        return { ok: false, msg: "You can only use letters and spacing (Maximum of 50 characters)." };
       return { ok: true, msg: "" };
     };
 
-    /* ================= live field validation (like user sign up) ================= */
-    const liveValidateNameLike = (key, el) => {
+    // Doctor name rule (allows dots)
+    // Examples allowed: "Dr. Juan Dela Cruz", "O'Neil", "Anne-Marie"
+    const doctorNameRule = (raw) => {
+      const v = normalizeSpaces(raw);
+      const msg =
+        "Only letters, spaces, dots (.), hyphens (-), and apostrophes (') are allowed. Maximum of 50 characters.";
+      if (!v) return { ok: false, msg: "Please fill out this field." };
+      if (v.length > 50) return { ok: false, msg };
+      if (!/^[A-Za-z]+(?:[A-Za-z.\-\'\s]*[A-Za-z])?$/.test(v)) return { ok: false, msg };
+      return { ok: true, msg: "" };
+    };
+
+    const prcRule = (raw) => {
+      const v = String(raw || "").trim();
+      if (!v) return { ok: false, msg: "Please fill out this field." };
+      if (!/^\d{5,8}$/.test(v)) return { ok: false, msg: "PRC should be 5–8 digits." };
+      return { ok: true, msg: "" };
+    };
+
+    /* ================= live validation ================= */
+
+    const liveValidateName = (key, el) => {
       if (!el) return;
-      const v = String(el.value || "");
-      // on input: just clear (prevents noisy typing), on blur: validate
+
       el.addEventListener("input", () => {
-        // keep numbers from being typed in phone only (elsewhere)
         clearErr(key, el);
         el.setCustomValidity("");
       });
+
       el.addEventListener("blur", () => {
         const vv = String(el.value || "").trim();
         if (vv === "") {
           if (el.required) setErr(key, el, requiredMsg(el));
           return;
         }
-        const r = lettersSpacing50(vv);
+        const r = key === "docFullName" ? doctorNameRule(vv) : lettersSpacing50(vv);
         if (!r.ok) setErr(key, el, r.msg);
         else clearErr(key, el);
       });
@@ -120,10 +137,12 @@
 
     const liveValidateEmail = (key, el) => {
       if (!el) return;
+
       el.addEventListener("input", () => {
         clearErr(key, el);
         el.setCustomValidity("");
       });
+
       el.addEventListener("blur", () => {
         const vv = String(el.value || "").trim();
         if (vv === "") {
@@ -138,12 +157,13 @@
 
     const liveValidatePhone = (key, el) => {
       if (!el) return;
+
       el.addEventListener("input", () => {
-        // numeric only + max 10 digits
         el.value = String(el.value || "").replace(/\D/g, "").slice(0, 10);
         clearErr(key, el);
         el.setCustomValidity("");
       });
+
       el.addEventListener("blur", () => {
         const vv = String(el.value || "").trim();
         if (vv === "") {
@@ -155,81 +175,96 @@
       });
     };
 
-   const liveValidateBirthdate = (key, el) => {
-  if (!el) return;
+    const liveValidateBirthdate = (key, el) => {
+      if (!el) return;
 
-  const validate = () => {
-    const vv = String(el.value || "").trim();
+      const validate = () => {
+        const vv = String(el.value || "").trim();
 
-    if (vv === "") {
-      if (el.required) setErr(key, el, "Please pick a birthdate.");
-      else clearErr(key, el);
-      return false;
-    }
+        if (vv === "") {
+          if (el.required) setErr(key, el, "Please pick a birthdate.");
+          else clearErr(key, el);
+          return false;
+        }
 
-    const birth = new Date(vv);
-    const today = new Date();
-    birth.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
+        const birth = new Date(vv);
+        const today = new Date();
+        birth.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
 
-    if (birth > today) {
-      setErr(key, el, "Birthdate cannot be in the future.");
-      return false;
-    }
+        if (birth > today) {
+          setErr(key, el, "Birthdate cannot be in the future.");
+          return false;
+        }
 
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
 
-    if (age < 18) {
-      setErr(key, el, "You must be at least 18 years old.");
-      return false;
-    }
+        if (age < 18) {
+          setErr(key, el, "You must be at least 18 years old.");
+          return false;
+        }
 
-    clearErr(key, el);
-    return true;
-  };
+        clearErr(key, el);
+        return true;
+      };
 
-  // ✅ Clear old error when user starts interacting again
-  const clearWhilePicking = () => {
-    const p = errP(key);
-    if (p) p.textContent = "";
-    el.setCustomValidity("");
-    clearRing(el);
-  };
+      const clearWhilePicking = () => {
+        const p = errP(key);
+        if (p) p.textContent = "";
+        el.setCustomValidity("");
+        clearRing(el);
+      };
 
-  // Works better for datepicker interactions
-  el.addEventListener("pointerdown", clearWhilePicking);
-  el.addEventListener("focus", clearWhilePicking);
+      el.addEventListener("pointerdown", clearWhilePicking);
+      el.addEventListener("focus", clearWhilePicking);
+      el.addEventListener("change", validate);
+      el.addEventListener("blur", validate);
+      el.addEventListener("input", () => {
+        const vv = String(el.value || "").trim();
+        if (!vv) {
+          const p = errP(key);
+          if (p) p.textContent = "";
+          el.setCustomValidity("");
+          clearRing(el);
+          return;
+        }
+        validate();
+      });
+    };
 
-  // ✅ Main validation when the value changes
-  el.addEventListener("change", validate);
+    const liveValidatePRC = (key, el) => {
+      if (!el) return;
 
-  // ✅ Handles "same date clicked again" cases:
-  // some browsers won't fire change, but blur will happen when you click outside
-  el.addEventListener("blur", validate);
+      el.addEventListener("input", () => {
+        // digits only + max 8
+        el.value = String(el.value || "").replace(/\D/g, "").slice(0, 8);
+        clearErr(key, el);
+        el.setCustomValidity("");
+      });
 
-  // ✅ If user types the date manually, validate as they type
-  el.addEventListener("input", () => {
-    // don't show "Please pick..." while typing
-    const vv = String(el.value || "").trim();
-    if (!vv) {
-      const p = errP(key);
-      if (p) p.textContent = "";
-      el.setCustomValidity("");
-      clearRing(el);
-      return;
-    }
-    validate();
-  });
-};
-    // ✅ live validations (attach AFTER helpers are defined)
-    liveValidateNameLike("docFullName", iName);
+      el.addEventListener("blur", () => {
+        const vv = String(el.value || "").trim();
+        if (vv === "") {
+          if (el.required) setErr(key, el, requiredMsg(el));
+          return;
+        }
+        const r = prcRule(vv);
+        if (!r.ok) setErr(key, el, r.msg);
+        else clearErr(key, el);
+      });
+    };
+
+    // Attach live validation
+    liveValidateName("docFullName", iName);
     liveValidateBirthdate("docBirthdate", iBirth);
-    liveValidateNameLike("docSpecialization", iSpec);
+    liveValidateName("docSpecialization", iSpec);
+    liveValidatePRC("docPrc", iPrc);
     liveValidateEmail("docEmail", iEmail);
     liveValidatePhone("docPhone", iPhone);
 
+    /* ================= days helpers ================= */
 
     const getSelectedDays = () => {
       const days = [];
@@ -295,18 +330,194 @@
       });
     });
 
-    // Input filters
-    iPhone?.addEventListener("input", () => {
-      iPhone.value = (iPhone.value || "").replace(/\D/g, "").slice(0, 10);
+    /* ================= render list ================= */
+
+    const daysLabel = (arr) => {
+      const map = { 0: "Sun", 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat" };
+      return (Array.isArray(arr) ? arr : []).map((d) => map[d]).join(", ");
+    };
+
+    const escapeHtml = (s) =>
+      String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+    const renderList = () => {
+      if (!listEl) return;
+
+      if (!Array.isArray(doctors) || doctors.length === 0) {
+        listEl.innerHTML = "";
+        return;
+      }
+
+      listEl.innerHTML = doctors
+        .map(
+          (d, idx) => `
+          <div class="rounded-xl bg-white/90 border border-white/50 px-3 py-2">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="font-semibold text-slate-800 truncate">${escapeHtml(d.full_name || "")}</div>
+                <div class="text-sm text-slate-600">${escapeHtml(d.specialization || "")}</div>
+                <div class="text-sm text-slate-600">${escapeHtml(d.prc || "")}</div>
+                <div class="text-xs text-slate-500 mt-1">${escapeHtml(d.start_time || "")}–${escapeHtml(
+            d.end_time || ""
+          )}</div>
+                <div class="text-xs text-slate-500">${escapeHtml(daysLabel(d.days))}</div>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+                <button type="button"
+                        data-edit-doc="${idx}"
+                        style="background:#40b7ff; color:#fff; border:none; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; min-width:90px;">
+                  Edit
+                </button>
+                <button type="button"
+                        data-del-doc="${idx}"
+                        style="background:#ef4444; color:#fff; border:none; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; min-width:90px;">
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        `
+        )
+        .join("");
+
+      listEl.querySelectorAll("[data-del-doc]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const i = parseInt(btn.getAttribute("data-del-doc"), 10);
+          if (Number.isNaN(i)) return;
+          doctors.splice(i, 1);
+          syncJson();
+          renderList();
+        });
+      });
+
+      listEl.querySelectorAll("[data-edit-doc]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const i = parseInt(btn.getAttribute("data-edit-doc"), 10);
+          if (Number.isNaN(i)) return;
+          startEdit(i);
+        });
+      });
+    };
+
+    const syncJson = () => {
+      if (jsonEl) jsonEl.value = JSON.stringify(doctors || []);
+      // trigger validators watching doctorsJson
+      jsonEl?.dispatchEvent?.(new Event("change", { bubbles: true }));
+    };
+
+    /* ================= modal show/hide ================= */
+
+    const lockScroll = (locked) => {
+      document.documentElement.style.overflow = locked ? "hidden" : "";
+      document.body.style.overflow = locked ? "hidden" : "";
+    };
+
+    const showModal = () => {
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      lockScroll(true);
+
+      clearAllErrors();
+      iName?.focus?.();
+
+      if (saveBtn) saveBtn.textContent = editingIndex >= 0 ? "Save Changes" : "Add Doctor";
+    };
+
+    const hideModal = () => {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      lockScroll(false);
+    };
+
+    openBtn.addEventListener("click", () => {
+      editingIndex = -1;
+      resetModalInputs();
+      showModal();
+    });
+    closeBtn?.addEventListener("click", hideModal);
+    cancelBtn?.addEventListener("click", hideModal);
+
+    // ESC to close
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !modal.classList.contains("hidden")) hideModal();
     });
 
-    iPrc?.addEventListener("input", () => {
-      iPrc.value = (iPrc.value || "").replace(/[^0-9-]/g, "").slice(0, 20);
-    });
+    /* ================= edit / reset ================= */
+
+    const resetModalInputs = () => {
+      if (iName) iName.value = "";
+      if (iBirth) iBirth.value = "";
+      if (iSpec) iSpec.value = "";
+      if (iPrc) iPrc.value = "";
+      if (iEmail) iEmail.value = "";
+      if (iPhone) iPhone.value = "";
+      if (iSlotMins) iSlotMins.value = "30";
+      if (iStart) iStart.value = "09:00";
+      if (iEnd) iEnd.value = "17:00";
+
+      if (chkMon) chkMon.checked = true;
+      if (chkTue) chkTue.checked = true;
+      if (chkWed) chkWed.checked = true;
+      if (chkThu) chkThu.checked = true;
+      if (chkFri) chkFri.checked = true;
+      if (chkSat) chkSat.checked = false;
+      if (chkSun) chkSun.checked = false;
+
+      clearAllErrors();
+    };
+
+    const startEdit = (idx) => {
+      const d = doctors[idx];
+      if (!d) return;
+
+      editingIndex = idx;
+
+      if (iName) iName.value = d.full_name || "";
+      if (iBirth) iBirth.value = d.birthdate || "";
+      if (iSpec) iSpec.value = d.specialization || "";
+      if (iPrc) iPrc.value = d.prc || "";
+      if (iEmail) iEmail.value = d.email || "";
+      if (iPhone) iPhone.value = d.contact_number || "";
+
+      // Prefer availability JSON (if present)
+      let a = null;
+      try {
+        if (typeof d.availability === "string" && d.availability.trim() !== "") {
+          a = JSON.parse(d.availability);
+        }
+      } catch {}
+
+      const slot = a?.slot_mins ?? d.slot_mins ?? 30;
+      const start = a?.start ?? d.start_time ?? "09:00";
+      const end = a?.end ?? d.end_time ?? "17:00";
+      const days = Array.isArray(a?.days) ? a.days : Array.isArray(d.days) ? d.days : [1, 2, 3, 4, 5];
+
+      if (iSlotMins) iSlotMins.value = String(slot);
+      if (iStart) iStart.value = String(start);
+      if (iEnd) iEnd.value = String(end);
+
+      const setDays = new Set(days.map((x) => parseInt(String(x), 10)).filter((n) => !Number.isNaN(n)));
+      if (chkMon) chkMon.checked = setDays.has(1);
+      if (chkTue) chkTue.checked = setDays.has(2);
+      if (chkWed) chkWed.checked = setDays.has(3);
+      if (chkThu) chkThu.checked = setDays.has(4);
+      if (chkFri) chkFri.checked = setDays.has(5);
+      if (chkSat) chkSat.checked = setDays.has(6);
+      if (chkSun) chkSun.checked = setDays.has(0);
+
+      showModal();
+    };
+
+    /* ================= validate all ================= */
 
     const validateAll = () => {
       clearAllErrors();
-
       let ok = true;
       let firstBad = null;
 
@@ -316,7 +527,6 @@
         if (!firstBad) firstBad = el;
       };
 
-      // REQUIRED (mark ALL)
       const requiredFields = [
         ["docFullName", iName],
         ["docBirthdate", iBirth],
@@ -331,24 +541,28 @@
 
       requiredFields.forEach(([key, el]) => {
         if (!el) return;
-        if (String(el.value ?? "").trim() === "") {
-          mark(key, el, requiredMsg(el));
-        }
+        if (String(el.value ?? "").trim() === "") mark(key, el, requiredMsg(el));
       });
 
-      // Full name rule
+      // Doctor name rule
       if (iName && String(iName.value || "").trim() !== "") {
-        const r = lettersSpacing50(iName.value);
+        const r = doctorNameRule(iName.value);
         if (!r.ok) mark("docFullName", iName, r.msg);
       }
 
-      // Specialization rule
+      // Specialization rule (keep strict)
       if (iSpec && String(iSpec.value || "").trim() !== "") {
         const r = lettersSpacing50(iSpec.value);
         if (!r.ok) mark("docSpecialization", iSpec, r.msg);
       }
 
-      // Birthdate (not future + at least 18)
+      // PRC rule 5–8 digits
+      if (iPrc && String(iPrc.value || "").trim() !== "") {
+        const r = prcRule(iPrc.value);
+        if (!r.ok) mark("docPrc", iPrc, r.msg);
+      }
+
+      // Birthdate 18+
       if (iBirth && String(iBirth.value || "").trim() !== "") {
         const v = String(iBirth.value || "").trim();
         const birth = new Date(v);
@@ -363,31 +577,24 @@
           let age = today.getFullYear() - birth.getFullYear();
           const m = today.getMonth() - birth.getMonth();
           if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-
           if (age < 18) mark("docBirthdate", iBirth, "You must be at least 18 years old.");
         }
       }
 
-      // Email format
+      // Email
       if (iEmail && String(iEmail.value || "").trim() !== "") {
         const v = String(iEmail.value || "").trim();
         const emailOk = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(v);
         if (!emailOk) mark("docEmail", iEmail, "Enter a valid email (ex: name@gmail.com).");
       }
 
-      // Phone format (PH)
+      // Phone
       if (iPhone && String(iPhone.value || "").trim() !== "") {
         const v = String(iPhone.value || "").trim();
         if (!/^9\d{9}$/.test(v)) mark("docPhone", iPhone, "Enter a valid PH mobile number (ex: 9123456789).");
       }
 
-      // PRC numbers/hyphen only
-      if (iPrc && String(iPrc.value || "").trim() !== "") {
-        const v = String(iPrc.value || "").trim();
-        if (!/^[0-9-]+$/.test(v)) mark("docPrc", iPrc, "PRC must be numbers only.");
-      }
-
-      // Start/End order
+      // Start < End
       if (iStart && iEnd && iStart.value && iEnd.value) {
         if (iStart.value >= iEnd.value) mark("docEndTime", iEnd, "End time must be later than start time.");
       }
@@ -405,37 +612,7 @@
       return { ok, firstBad };
     };
 
-    /* ================= Modal show/hide (WORKS ALWAYS) ================= */
-    const lockScroll = (locked) => {
-      document.documentElement.style.overflow = locked ? "hidden" : "";
-      document.body.style.overflow = locked ? "hidden" : "";
-    };
-
-    const showModal = () => {
-      modal.classList.remove("hidden");
-      modal.classList.add("flex");
-
-      lockScroll(true);
-      clearAllErrors();
-      iName?.focus?.();
-
-      if (saveBtn) saveBtn.textContent = editingIndex >= 0 ? "Save Changes" : "Add Doctor";
-    };
-
-    const hideModal = () => {
-      modal.classList.add("hidden");
-      modal.classList.remove("flex");
-      lockScroll(false);
-    };
-
-    openBtn.addEventListener("click", showModal);
-    closeBtn?.addEventListener("click", hideModal);
-    cancelBtn?.addEventListener("click", hideModal);
-
-    // ESC to close
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !modal.classList.contains("hidden")) hideModal();
-    });
+    /* ================= save (Add Doctor button) ================= */
 
     saveBtn?.addEventListener("click", () => {
       const r = validateAll();
@@ -444,14 +621,57 @@
         return;
       }
 
-      // keep your saving logic below (if you already have it elsewhere)
+      const days = getSelectedDays();
+      const slotMins = parseInt(String(iSlotMins?.value || "30"), 10) || 30;
+      const startTime = String(iStart?.value || "").trim();
+      const endTime = String(iEnd?.value || "").trim();
+
+      // IMPORTANT: signup-process.php expects prc under key "prc" (not prc_number)
+      // and it generates DB schedule from availability JSON.
+      const availabilityObj = {
+        days,
+        start: startTime,
+        end: endTime,
+        slot_mins: slotMins,
+      };
+
+      const doc = {
+        full_name: normalizeSpaces(iName?.value || ""),
+        birthdate: String(iBirth?.value || "").trim(),
+        specialization: normalizeSpaces(iSpec?.value || ""),
+        prc: String(iPrc?.value || "").trim(),
+        email: String(iEmail?.value || "").trim(),
+        contact_number: String(iPhone?.value || "").trim(),
+
+        // for UI + server fallback builder
+        slot_mins: slotMins,
+        start_time: startTime,
+        end_time: endTime,
+        days,
+
+        // used by signup-process.php to build schedule in DB
+        availability: JSON.stringify(availabilityObj),
+      };
+
+      if (editingIndex >= 0) doctors[editingIndex] = doc;
+      else doctors.push(doc);
+
+      editingIndex = -1;
+      syncJson();
+      renderList();
+      hideModal();
     });
 
-    /* ================= init doctors from hidden ================= */
+    /* ================= init doctors ================= */
+
     try {
       doctors = JSON.parse(jsonEl?.value || "[]") || [];
     } catch {
       doctors = [];
     }
+    if (!Array.isArray(doctors)) doctors = [];
+
+    renderList();
+    syncJson(); // keeps hidden value normalized
   });
 })();

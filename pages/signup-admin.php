@@ -311,17 +311,32 @@ document.addEventListener("DOMContentLoaded", function () {
                 <label class="block text-md text-white mb-1 ml-1">
                   Admin Password <span class="text-red-600 font-semibold ml-1">*</span>
                 </label>
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  placeholder="Admin Password"
-                  data-validate="password"
-                  required
-                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
-                         text-slate-700 placeholder:text-slate-400
-                         focus:outline-none focus:ring-2 focus:ring-white/60"
-                />
+                              <div class="relative">
+                              <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                placeholder="Admin Password"
+                                data-validate="password"
+                                required
+                                class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                                       text-slate-700 placeholder:text-slate-400
+                                       focus:outline-none focus:ring-2 focus:ring-white/60 pr-12"
+                              />
+                              <button type="button"
+                                      class="absolute inset-y-0 right-0 flex items-center px-4 text-slate-500 hover:text-slate-700 focus:outline-none"
+                                      data-toggle-password="#password"
+                                      aria-label="Show password"
+                                      aria-pressed="false">
+                                      <svg class="pw-eye h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                  </svg>
+                                      <svg class="pw-eye-off hidden h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.956 9.956 0 012.474-4.118m3.197-2.146A9.956 9.956 0 0112 5c4.478 0 8.268 2.943 9.542 7a9.96 9.96 0 01-4.043 5.307M15 12a3 3 0 00-3-3m0 0a2.99 2.99 0 00-2.225.99M12 9v.01M3 3l18 18"/>
+                                  </svg>
+                                    </button>
+                            </div>
                 <p data-err-for="password" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
@@ -329,18 +344,33 @@ document.addEventListener("DOMContentLoaded", function () {
                 <label class="block text-md text-white mb-1 ml-1">
                   Confirm Admin Password <span class="text-red-600 font-semibold ml-1">*</span>
                 </label>
-                <input
-                  type="password"
-                  id="confirm_password"
-                  name="confirm_password"
-                  placeholder="Confirm Admin Password"
-                  data-validate="password-confirm"
-                  data-match="password"
-                  required
-                  class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
-                         text-slate-700 placeholder:text-slate-400
-                         focus:outline-none focus:ring-2 focus:ring-white/60"
-                />
+                              <div class="relative">
+                              <input
+                                type="password"
+                                id="confirm_password"
+                                name="confirm_password"
+                                placeholder="Confirm Admin Password"
+                                data-validate="password-confirm"
+                                data-match="password"
+                                required
+                                class="w-full rounded-xl bg-white px-4 py-2.5 border border-white/80
+                                       text-slate-700 placeholder:text-slate-400
+                                       focus:outline-none focus:ring-2 focus:ring-white/60 pr-12"
+                              />
+                              <button type="button"
+                                      class="absolute inset-y-0 right-0 flex items-center px-4 text-slate-500 hover:text-slate-700 focus:outline-none"
+                                      data-toggle-password="#confirm_password"
+                                      aria-label="Show password"
+                                      aria-pressed="false">
+                                      <svg class="pw-eye h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                  </svg>
+                                      <svg class="pw-eye-off hidden h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.956 9.956 0 012.474-4.118m3.197-2.146A9.956 9.956 0 0112 5c4.478 0 8.268 2.943 9.542 7a9.96 9.96 0 01-4.043 5.307M15 12a3 3 0 00-3-3m0 0a2.99 2.99 0 00-2.225.99M12 9v.01M3 3l18 18"/>
+                                  </svg>
+                                    </button>
+                            </div>
                 <p data-err-for="confirm_password" class="min-h-[16px] mt-1 text-sm text-red-600"></p>
               </div>
 
@@ -616,9 +646,9 @@ document.addEventListener("DOMContentLoaded", function () {
             max-h-[90vh]
             rounded-2xl
             bg-white
-            outline outline-4 outline-black
+            outline outline-8 
             shadow-2xl
-            flex flex-col">
+            flex flex-col" style="outline-color:#ffa154;">
     <div class="px-5 py-4 flex items-center justify-between bg-white border-b border-slate-200">
       <div>
         <p class="text-slate-900 font-bold">Add Doctor</p>
@@ -643,7 +673,7 @@ document.addEventListener("DOMContentLoaded", function () {
                  data-required-msg="Please fill out this field."
                  class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
                  placeholder="e.g., Juan Dela Cruz"
-                 data-validate="full-name"
+                 data-validate="doctor-name"
                  maxlength="50" />
           <p data-err-for="docFullName" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
         </div>
@@ -670,11 +700,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
         <div>
           <label class="block text-sm font-semibold text-black mb-1">PRC (License No.) <span class="text-red-600 font-semibold">*</span></label>
-          <input id="docPrc" type="text" required
-                 data-required-msg="Please fill out this field."
-                 class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
-                 placeholder="e.g., 1234567" />
-          <p data-err-for="docPrc" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
+          <input
+  id="docPrc"
+  type="text"
+  required
+  inputmode="numeric"
+  maxlength="8"
+  data-validate="prc-5-8"
+  data-required-msg="Please fill out this field."
+  class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+  placeholder="e.g., 1234567"
+/>
+<p data-err-for="docPrc" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
         </div>
 
         <div>

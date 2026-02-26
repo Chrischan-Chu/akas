@@ -39,11 +39,23 @@
   const getFieldContainer = (input) => {
     if (!input) return null;
 
+    // Prefer an explicit field wrapper if present
     const field = input.closest(".field");
     if (field) return field;
 
+    // Many inputs are wrapped in Tailwind `.relative` for icons (eye, dropdown chevron, etc.).
+    // If the error <p data-err-for="..."></p> is placed OUTSIDE that `.relative` (Fix A),
+    // we must NOT treat `.relative` as the container, otherwise the validator will inject
+    // a new <p> inside it, changing its height and making icons "move".
+    const key = input.name || input.id || "field";
     const rel = input.closest(".relative");
-    if (rel) return rel;
+    if (rel) {
+      const parent = rel.parentElement;
+      if (parent && parent.querySelector(`p[data-err-for="${CSS.escape(key)}"]`)) {
+        return parent;
+      }
+      return rel;
+    }
 
     // fallback
     return input.parentElement;
@@ -554,6 +566,52 @@ form.submit();
     }
     return { ok: true, message: "" };
   };
+  
+  const validateDoctorName = (val) => {
+  const v = (val || "").trim().replace(/\s+/g, " ");
+  if (!v) return { ok: true, message: "" };
+
+  if (v.length > 50) {
+    return {
+      ok: false,
+      message: "Only letters, spaces, dots (.), hyphens (-), and apostrophes (') are allowed. Maximum of 50 characters.",
+    };
+  }
+
+  if (!/^[A-Za-z]+(?:[A-Za-z.\-'\s]*[A-Za-z])?$/.test(v)) {
+    return {
+      ok: false,
+      message: "Only letters, spaces, dots (.), hyphens (-), and apostrophes (') are allowed. Maximum of 50 characters.",
+    };
+  }
+
+  return { ok: true, message: "" };
+};
+  
+  const validatePRC = (val) => {
+  const v = (val || "").trim();
+
+  if (!v) return { ok: true, message: "" };
+
+  // Remove non-digits automatically
+  const digitsOnly = v.replace(/\D/g, "");
+
+  if (digitsOnly !== v) {
+    return {
+      ok: false,
+      message: "PRC should be 5–8 digits.",
+    };
+  }
+
+  if (!/^\d{5,8}$/.test(digitsOnly)) {
+    return {
+      ok: false,
+      message: "PRC should be 5–8 digits.",
+    };
+  }
+
+  return { ok: true, message: "" };
+};
 
   const validateEmail = (val) => {
     const v = (val || "").trim();
@@ -622,7 +680,7 @@ form.submit();
     const m = today.getMonth() - birth.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
 
-    if (age < 18) return { ok: false, message: "You must be at least 18 years old." };
+    if (age < 18) return { ok: false, message: "Must be at least 18 years old." };
     return { ok: true, message: "" };
   };
 
@@ -649,7 +707,38 @@ form.submit();
     });
   };
 
+
+  /* ================= password toggle ================= */
+
+  const initPasswordToggles = () => {
+    // Delegated click so it works for any page that includes this file
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-toggle-password]");
+      if (!btn) return;
+
+      const sel = btn.getAttribute("data-toggle-password") || "";
+      const input =
+        document.querySelector(sel) ||
+        document.getElementById(sel.replace(/^#/, ""));
+
+      if (!input) return;
+
+      const isHidden = input.type === "password";
+      input.type = isHidden ? "text" : "password";
+
+      btn.setAttribute("aria-pressed", isHidden ? "true" : "false");
+      btn.setAttribute("aria-label", isHidden ? "Hide password" : "Show password");
+
+      const eye = btn.querySelector(".pw-eye");
+      const eyeOff = btn.querySelector(".pw-eye-off");
+      if (eye && eyeOff) {
+        eye.classList.toggle("hidden", isHidden);
+        eyeOff.classList.toggle("hidden", !isHidden);
+      }
+    });
+  };
   document.addEventListener("DOMContentLoaded", () => {
+    initPasswordToggles();
     // keep Doctors required state in sync when its hidden JSON changes
     document.querySelectorAll('form[data-inline-errors="1"]').forEach((form) => {
       const dj = form.querySelector("#doctorsJson");
@@ -665,6 +754,20 @@ form.submit();
     document.querySelectorAll('[data-validate="full-name"]').forEach((input) => {
       wireInput({ input, validate: validateFullName });
     });
+    
+    // ✅ Doctor name (allows Dr. / dots)
+document.querySelectorAll('[data-validate="doctor-name"]').forEach((input) => {
+  wireInput({ input, validate: validateDoctorName });
+});
+
+// ✅ PRC 5–8 digits
+document.querySelectorAll('[data-validate="prc-5-8"]').forEach((input) => {
+  wireInput({
+    input,
+    validate: validatePRC,
+    filter: (el) => (el.value = el.value.replace(/\D/g, "").slice(0, 8)),
+  });
+});
 
     document.querySelectorAll('[data-validate="email"]').forEach((input) => {
       wireInput({ input, validate: validateEmail });
