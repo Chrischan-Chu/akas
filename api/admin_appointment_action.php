@@ -36,29 +36,116 @@ if (!in_array($action, ['CANCELLED','DONE'], true)) {
   json_out(['ok' => false, 'message' => 'Invalid action'], 422);
 }
 
-// Make sure appointment belongs to this clinic
-$chk = $pdo->prepare("
-  SELECT APT_Status
-  FROM appointments
-  WHERE APT_AppointmentID = :id AND APT_ClinicID = :cid
-  LIMIT 1
-");
-$chk->execute([':id' => $apptId, ':cid' => $clinicId]);
-$row = $chk->fetch(PDO::FETCH_ASSOC);
+$details = null;
+try {
+  $pdo->beginTransaction();
 
-if (!$row) json_out(['ok' => false, 'message' => 'Appointment not found'], 404);
+  $chk = $pdo->prepare("
+    SELECT
+      a.APT_AppointmentID,
+      a.APT_UserID,
+      a.APT_DoctorID,
+      a.APT_ClinicID,
+      a.APT_Status,
+      a.APT_Date,
+      a.APT_Time,
+      u.name AS user_name,
+      u.phone AS user_phone,
+      d.name AS doctor_name,
+      d.contact_number AS doctor_phone
+    FROM appointments a
+    JOIN accounts u ON u.id = a.APT_UserID
+    JOIN clinic_doctors d ON d.id = a.APT_DoctorID
+    WHERE a.APT_AppointmentID = :id AND a.APT_ClinicID = :cid
+    LIMIT 1
+    FOR UPDATE
+  ");
+  $chk->execute([':id' => $apptId, ':cid' => $clinicId]);
+  $details = $chk->fetch(PDO::FETCH_ASSOC) ?: null;
 
-$cur = strtoupper((string)($row['APT_Status'] ?? ''));
-if ($cur === 'DONE' || $cur === 'CANCELLED') {
-  json_out(['ok' => false, 'message' => 'This appointment is already closed.'], 409);
+  if (!$details) {
+    $pdo->rollBack();
+    json_out(['ok' => false, 'message' => 'Appointment not found'], 404);
+  }
+
+  $cur = strtoupper((string)($details['APT_Status'] ?? ''));
+  if ($cur === 'DONE' || $cur === 'CANCELLED') {
+    $pdo->rollBack();
+    json_out(['ok' => false, 'message' => 'This appointment is already closed.'], 409);
+  }
+
+  $upd = $pdo->prepare("
+    UPDATE appointments
+    SET APT_Status = :st
+    WHERE APT_AppointmentID = :id AND APT_ClinicID = :cid
+    LIMIT 1
+  ");
+  $upd->execute([':st' => $action, ':id' => $apptId, ':cid' => $clinicId]);
+
+  if ($upd->rowCount() < 1) {
+    $pdo->rollBack();
+    json_out(['ok' => false, 'message' => 'Update failed'], 500);
+  }
+
+  $pdo->commit();
+} catch (Throwable $e) {
+  if ($pdo->inTransaction()) $pdo->rollBack();
+  json_out(['ok' => false, 'message' => 'Server error'], 500);
 }
 
-$upd = $pdo->prepare("
-  UPDATE appointments
-  SET APT_Status = :st
-  WHERE APT_AppointmentID = :id AND APT_ClinicID = :cid
-  LIMIT 1
-");
-$upd->execute([':st' => $action, ':id' => $apptId, ':cid' => $clinicId]);
+if ($action === 'CANCELLED') {
+  try {
+    require_once __DIR__ . '/../includes/sms_logger.php';
+    require_once __DIR__ . '/../includes/sms_templates.php';
+
+    if (defined('IPROGSMS_API_TOKEN') && (string)IPROGSMS_API_TOKEN !== '' && is_array($details)) {
+
+      $patientName = (string)($details['user_name'] ?? '');
+      $doctorName  = (string)($details['doctor_name'] ?? '');
+
+      $whenDate = !empty($details['APT_Date'])
+        ? date('M d, Y', strtotime((string)$details['APT_Date']))
+        : '';
+
+      $whenTimeRaw = (string)($details['APT_Time'] ?? '');
+
+      $userPhone = (string)($details['user_phone'] ?? '');
+      if (trim($userPhone) !== '') {
+        $userMsg = sms_template('cancel_by_admin_user', [
+          'patient_name' => $patientName,
+          'doctor_name'  => $doctorName,
+          'date'         => $whenDate,
+          'time'         => $whenTimeRaw,
+        ]);
+        sms_send_and_log($pdo, [
+          'appointment_id' => (int)($details['APT_AppointmentID'] ?? 0),
+          'clinic_id'      => (int)($details['APT_ClinicID'] ?? 0),
+          'user_id'        => (int)($details['APT_UserID'] ?? 0),
+          'doctor_id'      => (int)($details['APT_DoctorID'] ?? 0),
+          'event_type'     => 'cancel_by_admin',
+        ], 'user', $userPhone, $userMsg);
+      }
+
+      $docPhone = (string)($details['doctor_phone'] ?? '');
+      if (trim($docPhone) !== '') {
+        $docMsg = sms_template('cancel_by_admin_doctor', [
+          'patient_name' => $patientName,
+          'doctor_name'  => $doctorName,
+          'date'         => $whenDate,
+          'time'         => $whenTimeRaw,
+        ]);
+        sms_send_and_log($pdo, [
+          'appointment_id' => (int)($details['APT_AppointmentID'] ?? 0),
+          'clinic_id'      => (int)($details['APT_ClinicID'] ?? 0),
+          'user_id'        => (int)($details['APT_UserID'] ?? 0),
+          'doctor_id'      => (int)($details['APT_DoctorID'] ?? 0),
+          'event_type'     => 'cancel_by_admin',
+        ], 'doctor', $docPhone, $docMsg);
+      }
+    }
+  } catch (Throwable $smsErr) {
+    // ignore SMS errors
+  }
+}
 
 json_out(['ok' => true, 'status' => $action]);

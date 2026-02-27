@@ -5,6 +5,7 @@ SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+08:00";
 
+DROP TABLE IF EXISTS `sms_logs`;
 DROP TABLE IF EXISTS `appointments`;
 DROP TABLE IF EXISTS `clinic_doctors`;
 DROP TABLE IF EXISTS `accounts`;
@@ -131,5 +132,32 @@ CREATE TABLE `appointments` (
   CONSTRAINT `fk_appt_clinic` FOREIGN KEY (`APT_ClinicID`) REFERENCES `clinics` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_appt_doctor` FOREIGN KEY (`APT_DoctorID`) REFERENCES `clinic_doctors` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `sms_logs` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `appointment_id` int(10) unsigned DEFAULT NULL,
+  `clinic_id` int(10) unsigned DEFAULT NULL,
+  `user_id` int(10) unsigned DEFAULT NULL,
+  `doctor_id` int(10) unsigned DEFAULT NULL,
+  `event_type` varchar(50) NOT NULL,
+  `recipient_type` enum('user','doctor') NOT NULL,
+  `phone_number` varchar(24) NOT NULL,
+  `message` text NOT NULL,
+  `is_ok` tinyint(1) NOT NULL DEFAULT 0,
+  `http_status` int(11) NOT NULL DEFAULT 0,
+  `raw_response` longtext DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_sms_appt` (`appointment_id`),
+  KEY `idx_sms_clinic` (`clinic_id`),
+  KEY `idx_sms_user` (`user_id`),
+  KEY `idx_sms_doctor` (`doctor_id`),
+  KEY `idx_sms_created` (`created_at`),
+  CONSTRAINT `fk_sms_appt` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`APT_AppointmentID`) ON DELETE SET NULL,
+  CONSTRAINT `fk_sms_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_sms_user` FOREIGN KEY (`user_id`) REFERENCES `accounts` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_sms_doctor` FOREIGN KEY (`doctor_id`) REFERENCES `clinic_doctors` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 COMMIT;

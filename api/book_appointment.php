@@ -4,6 +4,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../includes/auth.php';
 
+require_once __DIR__ . '/../includes/sms_templates.php';
 date_default_timezone_set('Asia/Manila');
 
 function json_out(array $data, int $status = 200): void {
@@ -277,6 +278,8 @@ try {
   ");
   $stmt->execute([$userId, $doctorId, $clinicId, $date, $timeSql, $notes]);
 
+  $apptId = (int)$pdo->lastInsertId();
+
   $pdo->commit();
 
   // realtime signal after commit (don’t block booking if realtime fails)
@@ -287,6 +290,83 @@ try {
     }
   } catch (Throwable $rt) {
     // ignore realtime errors
+  }
+
+  // ✅ SMS notification (non-blocking)
+  try {
+    require_once __DIR__ . '/../includes/sms_logger.php';
+    require_once __DIR__ . '/../includes/sms_templates.php';
+
+    if (defined('IPROGSMS_API_TOKEN') && (string)IPROGSMS_API_TOKEN !== '' && $apptId > 0) {
+      $q = $pdo->prepare("
+        SELECT
+          a.APT_UserID,
+          a.APT_DoctorID,
+          a.APT_ClinicID,
+          u.name AS user_name,
+          u.phone AS user_phone,
+          d.name AS doctor_name,
+          d.contact_number AS doctor_phone,
+          a.APT_Date,
+          a.APT_Time
+        FROM appointments a
+        JOIN accounts u ON u.id = a.APT_UserID
+        JOIN clinic_doctors d ON d.id = a.APT_DoctorID
+        WHERE a.APT_AppointmentID = :id
+        LIMIT 1
+      ");
+      $q->execute([':id' => $apptId]);
+      $row = $q->fetch(PDO::FETCH_ASSOC) ?: null;
+
+      if (is_array($row)) {
+        $patientName = (string)($row['user_name'] ?? '');
+        $doctorName  = (string)($row['doctor_name'] ?? '');
+
+        $whenDate = !empty($row['APT_Date'])
+          ? date('M d, Y', strtotime((string)$row['APT_Date']))
+          : (string)$date;
+
+        $whenTimeRaw = (string)($row['APT_Time'] ?? '');
+
+        // Notify user
+        $userPhone = (string)($row['user_phone'] ?? '');
+        if (trim($userPhone) !== '') {
+          $userMsg = sms_template('booking_user', [
+            'patient_name' => $patientName,
+            'doctor_name'  => $doctorName,
+            'date'         => $whenDate,
+            'time'         => $whenTimeRaw,
+          ]);
+          sms_send_and_log($pdo, [
+            'appointment_id' => $apptId,
+            'clinic_id'      => (int)($row['APT_ClinicID'] ?? 0),
+            'user_id'        => (int)($row['APT_UserID'] ?? 0),
+            'doctor_id'      => (int)($row['APT_DoctorID'] ?? 0),
+            'event_type'     => 'booking',
+          ], 'user', $userPhone, $userMsg);
+        }
+
+        // Notify doctor
+        $docPhone = (string)($row['doctor_phone'] ?? '');
+        if (trim($docPhone) !== '') {
+          $docMsg = sms_template('booking_doctor', [
+            'patient_name' => $patientName,
+            'doctor_name'  => $doctorName,
+            'date'         => $whenDate,
+            'time'         => $whenTimeRaw,
+          ]);
+          sms_send_and_log($pdo, [
+            'appointment_id' => $apptId,
+            'clinic_id'      => (int)($row['APT_ClinicID'] ?? 0),
+            'user_id'        => (int)($row['APT_UserID'] ?? 0),
+            'doctor_id'      => (int)($row['APT_DoctorID'] ?? 0),
+            'event_type'     => 'booking',
+          ], 'doctor', $docPhone, $docMsg);
+        }
+      }
+    }
+  } catch (Throwable $smsErr) {
+    // ignore SMS errors (do not block booking)
   }
 
   json_out(['ok' => true, 'message' => 'Approved, please check notification for your checkup appointment.']);

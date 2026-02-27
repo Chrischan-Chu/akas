@@ -30,3 +30,17 @@ if ($isLocal && file_exists($localFile)) {
   if (!defined('DB_USER'))  define('DB_USER', '');
   if (!defined('DB_PASS'))  define('DB_PASS', '');
 }
+
+/**
+ * Optional: IPROG SMS
+ * Put these in config.local.php / config.production.php (recommended)
+ *
+ *   define('IPROGSMS_API_TOKEN', 'YOUR_TOKEN');
+ *   define('IPROGSMS_SMS_PROVIDER', 0); // 0, 1, or 2 (optional)
+ */
+if (!defined('IPROGSMS_API_TOKEN')) {
+  // You can also set an environment variable instead of committing secrets
+  $envToken = getenv('IPROGSMS_API_TOKEN');
+  define('IPROGSMS_API_TOKEN', is_string($envToken) ? $envToken : '');
+}
+if (!defined('IPROGSMS_SMS_PROVIDER')) define('IPROGSMS_SMS_PROVIDER', 0);
