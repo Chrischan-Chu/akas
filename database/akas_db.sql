@@ -5,6 +5,7 @@ SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+08:00";
 
+DROP TABLE IF EXISTS `contact_messages`;
 DROP TABLE IF EXISTS `sms_logs`;
 DROP TABLE IF EXISTS `appointments`;
 DROP TABLE IF EXISTS `clinic_doctors`;
@@ -75,6 +76,50 @@ CREATE TABLE `accounts` (
   KEY `idx_email_verified` (`email_verified_at`),
   CONSTRAINT `fk_accounts_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* =====================
+   ✅ NEW Table: contact_messages
+   Stores messages sent from Contact page to a clinic.
+   - sender_account_id is NULL for guests
+   - email_sent tracks if SMTP succeeded
+   ===================== */
+CREATE TABLE `contact_messages` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+
+  `clinic_id` int(10) unsigned NOT NULL,
+  `sender_account_id` int(10) unsigned DEFAULT NULL,
+
+  `sender_role` enum('guest','user','clinic_admin','super_admin') NOT NULL DEFAULT 'guest',
+  `sender_name` varchar(190) NOT NULL,
+  `sender_email` varchar(190) NOT NULL,
+
+  `message` text NOT NULL,
+
+  -- snapshot at time of sending
+  `clinic_name_snapshot` varchar(190) DEFAULT NULL,
+  `clinic_email_snapshot` varchar(190) DEFAULT NULL,
+
+  -- delivery tracking
+  `email_sent` tinyint(1) NOT NULL DEFAULT 0,
+  `provider` varchar(40) NOT NULL DEFAULT 'brevo',
+  `provider_message_id` varchar(128) DEFAULT NULL,
+
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`id`),
+  KEY `idx_cm_clinic` (`clinic_id`),
+  KEY `idx_cm_sender_account` (`sender_account_id`),
+  KEY `idx_cm_created` (`created_at`),
+
+  CONSTRAINT `fk_cm_clinic`
+    FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`)
+    ON DELETE CASCADE,
+
+  CONSTRAINT `fk_cm_sender_account`
+    FOREIGN KEY (`sender_account_id`) REFERENCES `accounts` (`id`)
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 /* =====================
    Table: clinic_doctors

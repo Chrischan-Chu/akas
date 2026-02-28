@@ -8,12 +8,21 @@ require_once __DIR__ . '/PHPMailer/SMTP.php';
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-
 /**
  * Send an HTML email via SMTP.
- * Returns true on success, false on failure.
+ *
+ * ✅ Backward-compatible:
+ *   - Old calls still work.
+ *   - Optional Reply-To lets clinics reply directly to the user's email.
  */
-function akas_send_mail(string $toEmail, string $toName, string $subject, string $htmlBody): bool {
+function akas_send_mail(
+  string $toEmail,
+  string $toName,
+  string $subject,
+  string $htmlBody,
+  string $replyToEmail = '',
+  string $replyToName  = ''
+): bool {
   $cfgPath = __DIR__ . '/smtp_config.php';
   $cfg = file_exists($cfgPath) ? require $cfgPath : [];
 
@@ -25,7 +34,6 @@ function akas_send_mail(string $toEmail, string $toName, string $subject, string
   $fromName  = (string)($cfg['from_name'] ?? 'AKAS');
 
   if ($host === '' || $user === '' || $pass === '' || $fromEmail === '') {
-    // Not configured
     return false;
   }
 
@@ -42,6 +50,13 @@ function akas_send_mail(string $toEmail, string $toName, string $subject, string
 
     $mail->setFrom($fromEmail, $fromName);
     $mail->addAddress($toEmail, $toName);
+
+    // ✅ Reply-To so the clinic's reply goes to the user (not the Brevo sender)
+    $replyToEmail = trim($replyToEmail);
+    if ($replyToEmail !== '' && filter_var($replyToEmail, FILTER_VALIDATE_EMAIL)) {
+      $replyToName = trim($replyToName);
+      $mail->addReplyTo($replyToEmail, $replyToName !== '' ? $replyToName : $replyToEmail);
+    }
 
     $mail->isHTML(true);
     $mail->Subject = $subject;

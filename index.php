@@ -20,4 +20,4 @@ include "includes/partials/head.php";
 
 <?php include "includes/partials/footer.php"; ?>
 <button id="backToTop" type="button" aria-label="Back to top">↑</button>
-<script src="<?= $baseUrl ?>/assets/js/contact.js" defer></script>
+<script src="<?= h($baseUrl); ?>/assets/js/contact.js?v=<?= (int)@filemtime(__DIR__ . '/../assets/js/contact.js'); ?>"></script>

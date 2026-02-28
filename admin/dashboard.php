@@ -126,6 +126,17 @@ include __DIR__ . '/../includes/partials/head.php';
       data-base-url="<?php echo htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8'); ?>"
       data-clinic-id="<?php echo (int)$clinicId; ?>">
 
+<!-- ✅ Tiny CSS just for making the schedule toggle + month cells more intuitive (no Tailwind purge issues) -->
+<style>
+  .view-toggle-wrap{display:inline-flex;background:#f1f5f9;border-radius:12px;padding:4px;gap:4px}
+  .view-toggle{padding:10px 16px;border-radius:10px;font-weight:800;font-size:13px;color:#334155;transition:all .15s ease;white-space:nowrap}
+  .view-toggle:hover{background:#e2e8f0}
+  .view-toggle.is-active{background:#3b82f6;color:#fff;box-shadow:0 8px 18px rgba(59,130,246,.25)}
+  .cal-cell{border:1px solid #e2e8f0;border-radius:16px;background:#fff;transition:background .15s ease, transform .15s ease}
+  .cal-cell:hover{background:#f8fafc;transform:translateY(-1px)}
+  .cal-cell.is-selected{outline:2px solid rgba(56,189,248,.6)}
+</style>
+
 <main class="max-w-5xl mx-auto px-6 py-10">
 
   <!-- HEADER -->
@@ -419,73 +430,84 @@ include __DIR__ . '/../includes/partials/head.php';
   ?>
 
   <section class="mt-8 rounded-3xl bg-white shadow-sm border border-slate-200 p-6">
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
       <div>
-        <h2 class="text-xl font-bold" style="color: var(--secondary);">Appointments Calendar</h2>
-        <p class="text-sm text-slate-600 mt-1">Click a day to see appointments booked for your clinic.</p>
-      </div>
-
-      <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
-        <div class="text-sm font-semibold text-slate-700">Filter doctor:</div>
-        <select id="adminDoctorFilter" class="h-11 px-3 rounded-xl border border-slate-200 bg-white">
-          <option value="0">All doctors</option>
-          <?php foreach ($doctors as $d): ?>
-            <option value="<?php echo (int)$d['id']; ?>"><?php echo htmlspecialchars((string)$d['name']); ?></option>
-          <?php endforeach; ?>
-        </select>
-
-        <button type="button" id="adminCreateBtn"
-          class="h-11 px-4 rounded-xl font-extrabold text-white shadow-sm hover:opacity-95 transition"
-          style="background: var(--primary);">
-          Create Appointment
-        </button>
+        <h2 class="text-xl font-bold" style="color: var(--secondary);">Schedule</h2>
+        <p class="text-sm text-slate-600 mt-1">View and manage appointments by day or month.</p>
       </div>
     </div>
 
-    <div class="mt-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-      <div class="flex items-center gap-2">
-        <button id="adminPrevMonth" type="button"
-                class="h-10 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-bold">‹</button>
+    <div class="mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">
 
-        <div id="adminMonthLabel" class="font-extrabold text-slate-900"></div>
+    
 
-        <button id="adminNextMonth" type="button"
-                class="h-10 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-bold">›</button>
-      </div>
+      <!-- LEFT: Toolbar + calendar/day grid -->
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-3">
 
-      <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-        <!-- View Toggle -->
-        <div class="flex items-center border border-slate-200 rounded-xl bg-white p-1">
-          <button id="adminViewMonth" type="button" 
-                  class="adminViewToggle px-4 py-2 rounded-lg font-bold text-sm transition bg-slate-900 text-white"
-                  data-view="month">
-            Month
+          <div class="flex items-center gap-2">
+            <button id="adminPrevMonth" type="button"
+                    class="h-10 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-bold">‹</button>
+
+            <div id="adminMonthLabel" class="min-w-[160px] text-center font-extrabold text-slate-900"></div>
+
+            <button id="adminNextMonth" type="button"
+                    class="h-10 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-bold">›</button>
+          </div>
+
+          <!-- Segmented toggle -->
+          <div class="view-toggle-wrap">
+            <button id="adminDayBtn" type="button" class="view-toggle">Day</button>
+            <button id="adminMonthBtn" type="button" class="view-toggle is-active">Month</button>
+          </div>
+
+          <button id="adminTodayBtn" type="button"
+                  class="h-10 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-bold">Today</button>
+
+          <div class="flex items-center gap-2">
+            <input id="adminDatePicker" type="date" class="h-10 px-3 rounded-xl border border-slate-200 bg-white" />
+          </div>
+
+          <select id="adminDoctorFilter" class="h-10 px-3 rounded-xl border border-slate-200 bg-white">
+            <option value="0">All Doctors</option>
+            <?php foreach ($doctors as $d): ?>
+              <option value="<?php echo (int)$d['id']; ?>"><?php echo htmlspecialchars((string)$d['name']); ?></option>
+            <?php endforeach; ?>
+          </select>
+
+          <button type="button" id="adminCreateBtn"
+            class="h-10 px-4 rounded-xl font-extrabold text-white shadow-sm hover:opacity-95 transition"
+            style="background: var(--primary);">
+            + New
           </button>
-          <button id="adminViewDay" type="button"
-                  class="adminViewToggle px-4 py-2 rounded-lg font-bold text-sm transition bg-white text-slate-900"
-                  data-view="day">
-            Day
-          </button>
+
+          <div class="text-sm text-slate-600">
+            <span class="hidden sm:inline">Selected:</span>
+            <span class="font-bold text-slate-900" id="adminSelectedDateText">None</span>
+          </div>
         </div>
 
-        <div class="text-sm text-slate-600">
-          Selected date: <span class="font-bold text-slate-900" id="adminSelectedDateText">None</span>
+        <!-- Weekday header (Month view only) -->
+        <div id="adminWeekdaysRow" class="mt-4 grid grid-cols-7 gap-2 text-xs font-bold text-slate-500">
+          <div class="text-center">Su</div><div class="text-center">Mo</div><div class="text-center">Tu</div>
+          <div class="text-center">We</div><div class="text-center">Th</div><div class="text-center">Fr</div>
+          <div class="text-center">Sa</div>
         </div>
+
+        <div id="adminCalendarGrid" class="mt-2"></div>
       </div>
-    </div>
 
-    <!-- calendar grid (7 columns) -->
-    <div class="mt-4 grid grid-cols-7 gap-2 text-xs font-bold text-slate-500">
-      <div class="text-center">Su</div><div class="text-center">Mo</div><div class="text-center">Tu</div>
-      <div class="text-center">We</div><div class="text-center">Th</div><div class="text-center">Fr</div>
-      <div class="text-center">Sa</div>
-    </div>
+      <!-- RIGHT: Appointments list -->
+      <aside class="rounded-3xl border border-slate-200 bg-white p-5">
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="text-lg font-extrabold text-slate-900">Appointments</h3>
+        </div>
+        <p class="mt-1 text-sm text-slate-600">Select a day to view appointments.</p>
+        <div id="adminApptList" class="mt-4">
+          <div class="text-sm text-slate-500">Select a day to view appointments.</div>
+        </div>
+      </aside>
 
-    <div id="adminCalendarGrid" class="mt-2 grid grid-cols-7 gap-2"></div>
-
-    <div class="mt-6">
-      <h3 class="text-lg font-bold text-slate-900">Appointments</h3>
-      <div id="adminApptList" class="mt-3"></div>
     </div>
 
     <!-- Appointment Modal -->
@@ -609,6 +631,11 @@ include __DIR__ . '/../includes/partials/head.php';
     </div>
 
   </section>
+
+<!-- inject doctors for schedule JS -->
+<script>
+  window.AKAS_DOCTORS = <?php echo json_encode($doctors); ?>;
+</script>
 
 </main>
 

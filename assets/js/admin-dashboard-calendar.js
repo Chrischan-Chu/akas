@@ -10,8 +10,16 @@
   const selectedText = document.getElementById("adminSelectedDateText");
   const listWrap = document.getElementById("adminApptList");
   const doctorFilter = document.getElementById("adminDoctorFilter");
-  const viewMonthBtn = document.getElementById("adminViewMonth");
-  const viewDayBtn = document.getElementById("adminViewDay");
+
+  const dayBtn = document.getElementById("adminDayBtn");
+  const monthBtn = document.getElementById("adminMonthBtn");
+
+  const todayBtn = document.getElementById("adminTodayBtn");
+  const datePicker = document.getElementById("adminDatePicker");
+  const weekdaysRow = document.getElementById("adminWeekdaysRow");
+
+  // list of approved doctors (id,name) injected from PHP
+  const DOCTORS = window.AKAS_DOCTORS || [];
 
   // Modal refs
   const modal = document.getElementById("adminApptModal");
@@ -49,16 +57,6 @@
     return `${h12}:${mm} ${ampm}`;
   }
 
-  // doctor overlay: {sun:true,mon:false,...}
-  let doctorOverlay = {};
-
-  let currentView = "month"; // "month" or "day"
-  let viewDate = new Date();
-  let selectedDate = null;
-  let monthCounts = {}; // ymd -> {total,pending,approved,cancelled,done}
-  let selectedAppointment = null;
-  let dayAppointments = []; // appointments for day view
-
   function h(s) {
     return String(s ?? "").replace(/[&<>"']/g, (m) => ({
       "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
@@ -71,14 +69,11 @@
   }
 
   function dowKey(dateObj) {
-    // JS getDay() 0=Sun
     const keys = ["sun","mon","tue","wed","thu","fri","sat"];
     return keys[dateObj.getDay()];
   }
 
   function badgeClassForDay(counts) {
-    // Consistent soft badges
-    // Priority: pending -> approved -> done/cancelled
     if (!counts || counts.total <= 0) {
       return "border-slate-200 bg-slate-50 text-slate-600";
     }
@@ -106,66 +101,112 @@
     return "border-slate-200 bg-slate-50 text-slate-700";
   }
 
+  function applyMonthLayout() {
+    calGrid.classList.remove("overflow-auto", "overflow-x-auto");
+    calGrid.classList.add("grid", "grid-cols-7", "gap-2");
+    weekdaysRow?.classList.remove("hidden");
+  }
+
+  function applyDayLayout() {
+    calGrid.classList.remove("grid", "grid-cols-7", "gap-2");
+    calGrid.classList.add("overflow-x-auto");
+    weekdaysRow?.classList.add("hidden");
+  }
+
+  function setActiveToggle() {
+    document.querySelectorAll(".view-toggle").forEach(b => b.classList.remove("is-active"));
+    if (currentView === "month") monthBtn?.classList.add("is-active");
+    else dayBtn?.classList.add("is-active");
+  }
+
+  // ==========================
+  // State + caches (less lag)
+  // ==========================
+  let currentView = "month"; // "month" or "day"
+  let viewDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  let selectedDate = null; // Date|null
+
+  let monthCounts = {};
+  let doctorOverlay = {};
+  let dayAppointments = [];
+  let selectedAppointment = null;
+
+  const monthCache = new Map(); // key: `${ym}|docId`
+  const dayCache = new Map();   // key: `${ymd}|docId`
+
   async function apiMonthCounts(ym) {
     const docId = getDoctorId();
+    const key = `${ym}|${docId}`;
+    if (monthCache.has(key)) {
+      const cached = monthCache.get(key);
+      monthCounts = cached.monthCounts || {};
+      doctorOverlay = cached.doctorOverlay || {};
+      return;
+    }
+
     const url = `${BASE_URL}/api/admin_appointments.php?month=${encodeURIComponent(ym)}${docId ? `&doctor_id=${docId}` : ""}`;
     const res = await fetch(url, { credentials: "same-origin", cache: "no-store" });
     const data = await res.json();
     if (!data.ok) throw new Error(data.message || "Failed to load month counts");
+
     monthCounts = data.month_counts || {};
     doctorOverlay = data.doctor_overlay || {};
+    monthCache.set(key, { monthCounts, doctorOverlay });
   }
 
   async function apiDayList(ymd) {
     const docId = getDoctorId();
+    const key = `${ymd}|${docId}`;
+    if (dayCache.has(key)) return dayCache.get(key);
+
     const url = `${BASE_URL}/api/admin_appointments.php?date=${encodeURIComponent(ymd)}${docId ? `&doctor_id=${docId}` : ""}`;
     const res = await fetch(url, { credentials: "same-origin", cache: "no-store" });
     const data = await res.json();
     if (!data.ok) throw new Error(data.message || "Failed to load appointments");
-    return Array.isArray(data.appointments) ? data.appointments : [];
+
+    const appts = Array.isArray(data.appointments) ? data.appointments : [];
+    dayCache.set(key, appts);
+    return appts;
   }
 
   async function safeJson(res) {
     const text = await res.text();
     try {
-        return JSON.parse(text);
+      return JSON.parse(text);
     } catch {
-        // show the first part of HTML so you can see what's returned
-        throw new Error("Server returned HTML (not JSON): " + text.slice(0, 120));
+      throw new Error("Server returned HTML (not JSON): " + text.slice(0, 120));
     }
-    }
+  }
 
-    async function apiAction(appointmentId, action) {
+  async function apiAction(appointmentId, action) {
     const res = await fetch(`${BASE_URL}/api/admin_appointment_action.php`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointment_id: appointmentId, action })
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ appointment_id: appointmentId, action })
     });
 
     const data = await safeJson(res);
     if (!data.ok) throw new Error(data.message || "Action failed");
     return data;
-    }
+  }
 
-
+  // ==========================
+  // Modal
+  // ==========================
   function openModal(appt) {
     selectedAppointment = appt;
     if (!modal) return;
 
     mMsg.textContent = "";
-    const sub = `${appt.date} • ${to12(appt.time)}`;
-    mSub.textContent = sub;
+    mSub.textContent = `${appt.date} • ${to12(appt.time)}`;
 
     mPatient.textContent = appt.patient_name || "—";
-    const contact = [appt.patient_email, appt.patient_phone].filter(Boolean).join(" • ");
-    mContact.textContent = contact || "—";
-
+    mContact.textContent = [appt.patient_email, appt.patient_phone].filter(Boolean).join(" • ") || "—";
     mDoctor.textContent = appt.doctor_name || "—";
     mStatus.textContent = (appt.status || "—").toUpperCase();
     mNotes.textContent = appt.notes ? appt.notes : "—";
 
-    // Disable actions if already closed
     const closed = ["DONE","CANCELLED"].includes(String(appt.status || "").toUpperCase());
     mCancel.disabled = closed;
     mDone.disabled = closed;
@@ -183,7 +224,56 @@
     selectedAppointment = null;
   }
 
+  // ==========================
+  // Rendering
+  // ==========================
+  function renderList(appts) {
+    listWrap.innerHTML = ""; // ✅ prevents duplicate text
+
+    if (!appts.length) {
+      listWrap.innerHTML = `<div class="text-sm text-slate-500">No appointments for this day.</div>`;
+      return;
+    }
+
+    const rows = appts.map((a) => {
+      const pill = statusPillClass(a.status);
+      return `
+        <button type="button"
+                class="text-left rounded-3xl border border-slate-200 p-5 bg-white hover:bg-slate-50 hover:shadow-sm transition"
+                data-appt='${h(JSON.stringify(a))}'>
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="font-extrabold text-slate-900">
+                ${h(to12(a.time))} — ${h(a.patient_name)}
+              </div>
+              <div class="text-sm text-slate-600 mt-1">
+                Doctor: <span class="font-semibold">${h(a.doctor_name)}</span>
+              </div>
+              ${a.notes ? `<div class="text-sm text-slate-700 mt-2"><span class="font-semibold">Notes:</span> ${h(a.notes)}</div>` : ""}
+            </div>
+            <span class="shrink-0 inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold border ${pill}">
+              ${h(String(a.status || "").toUpperCase())}
+            </span>
+          </div>
+        </button>
+      `;
+    }).join("");
+
+    listWrap.innerHTML = `<div class="grid gap-3">${rows}</div>`;
+
+    listWrap.querySelectorAll("button[data-appt]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        try {
+          const appt = JSON.parse(btn.getAttribute("data-appt") || "{}");
+          openModal(appt);
+        } catch {}
+      });
+    });
+  }
+
   function renderMonth() {
+    applyMonthLayout();
+
     const year = viewDate.getFullYear();
     const month = viewDate.getMonth();
 
@@ -192,13 +282,12 @@
 
     const first = new Date(year, month, 1);
     const last = new Date(year, month + 1, 0);
-    const startDow = first.getDay(); // 0 Sun
+    const startDow = first.getDay();
     const daysInMonth = last.getDate();
 
-    // blanks
     for (let i = 0; i < startDow; i++) {
       const div = document.createElement("div");
-      div.className = "h-16 rounded-2xl border border-slate-200 bg-slate-50";
+      div.className = "h-20 rounded-2xl border border-slate-200 bg-slate-50";
       calGrid.appendChild(div);
     }
 
@@ -209,22 +298,19 @@
 
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className =
-        "h-16 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition text-left p-2 flex flex-col justify-between";
+      btn.className = "cal-cell h-20 p-3 flex flex-col justify-between text-left";
 
-      // Selected ring
-      if (selectedDate && toYMD(selectedDate) === ymd) {
-        btn.classList.add("ring-2", "ring-slate-300");
-      }
+      if (selectedDate && toYMD(selectedDate) === ymd) btn.classList.add("is-selected");
 
       const top = document.createElement("div");
       top.className = "flex items-start justify-between gap-2";
 
       const dayNum = document.createElement("div");
-      dayNum.className = "text-sm font-extrabold text-slate-800";
+      dayNum.className = "text-sm font-extrabold text-slate-900";
       dayNum.textContent = String(day);
 
-      // Availability overlay tag (only when filtering a doctor)
+      top.appendChild(dayNum);
+
       const docId = getDoctorId();
       if (docId > 0) {
         const k = dowKey(d);
@@ -236,8 +322,6 @@
         tag.textContent = isOn ? "Available" : "Off";
         top.appendChild(tag);
       }
-
-      top.appendChild(dayNum);
 
       const bottom = document.createElement("div");
       bottom.className = "flex items-center justify-between gap-2";
@@ -270,7 +354,9 @@
       btn.addEventListener("click", async () => {
         selectedDate = d;
         selectedText.textContent = ymd;
-        
+        if (datePicker) datePicker.value = ymd;
+
+        // Month view: just load list on the right
         if (currentView === "month") {
           renderMonth();
           listWrap.innerHTML = `<div class="text-sm text-slate-500">Loading appointments…</div>`;
@@ -280,14 +366,16 @@
           } catch (e) {
             listWrap.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
           }
-        } else {
-          // Day view: load appointments and render
-          try {
-            dayAppointments = await apiDayList(ymd);
-            renderDay();
-          } catch (e) {
-            calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
-          }
+          return;
+        }
+
+        // Day view: load and render the day table
+        calGrid.innerHTML = `<div class="text-sm text-slate-500">Loading day schedule…</div>`;
+        try {
+          dayAppointments = await apiDayList(ymd);
+          renderDay();
+        } catch (e) {
+          calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
         }
       });
 
@@ -295,262 +383,227 @@
     }
   }
 
-  function renderList(appts) {
-    if (!appts.length) {
-      listWrap.innerHTML = `<div class="text-sm text-slate-500">No appointments for this day.</div>`;
-      return;
-    }
-
-    const rows = appts.map((a) => {
-      const pill = statusPillClass(a.status);
-      return `
-        <button type="button"
-                class="text-left rounded-3xl border border-slate-200 p-5 bg-white hover:bg-slate-50 hover:shadow-sm transition"
-                data-appt='${h(JSON.stringify(a))}'>
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <div class="font-extrabold text-slate-900">
-                ${h(to12(a.time))} — ${h(a.patient_name)}
-              </div>
-              <div class="text-sm text-slate-600 mt-1">
-                Doctor: <span class="font-semibold">${h(a.doctor_name)}</span>
-              </div>
-              ${a.notes ? `<div class="text-sm text-slate-700 mt-2"><span class="font-semibold">Notes:</span> ${h(a.notes)}</div>` : ""}
-            </div>
-            <span class="shrink-0 inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold border ${pill}">
-              ${h(String(a.status || "").toUpperCase())}
-            </span>
-          </div>
-        </button>
-      `;
-    }).join("");
-
-    listWrap.innerHTML = `<div class="grid gap-3">${rows}</div>`;
-
-    // click handler (event delegation)
-    listWrap.querySelectorAll("button[data-appt]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        try {
-          const appt = JSON.parse(btn.getAttribute("data-appt") || "{}");
-          openModal(appt);
-        } catch {
-          // ignore
-        }
-      });
-    });
-  }
-
   function renderDay() {
+    applyDayLayout();
+
     if (!selectedDate) {
       monthLabel.textContent = "Select a date";
-      calGrid.innerHTML = `<div class="col-span-7 text-center py-8 text-slate-600">Select a date to view day details</div>`;
-      listWrap.innerHTML = "";
+      calGrid.innerHTML = `<div class="text-sm text-slate-600 py-6">Select a date to view day schedule.</div>`;
       return;
     }
 
     const ymd = toYMD(selectedDate);
-    const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][selectedDate.getDay()];
-    monthLabel.textContent = `${dayName}, ${selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+    const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][selectedDate.getDay()];
+    monthLabel.textContent =
+      `${dayName}, ${selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
 
-    // Render hourly slots (9 AM to 5 PM)
-    calGrid.innerHTML = "";
-    const startHour = 9;
-    const endHour = 17;
-
-    // Create a map of appointments by hour
-    const apptsByHour = {};
+    const startHour = 8;
+    const endHour = 18;
+    const slots = [];
     for (let h = startHour; h < endHour; h++) {
-      apptsByHour[h] = [];
+      slots.push(`${pad2(h)}:00`);
+      slots.push(`${pad2(h)}:30`);
     }
-    
+    slots.push(`${pad2(endHour)}:00`);
+
+    // docs filtered
+    let docs = DOCTORS.map(d => ({ ...d, appts: [] }));
+    const filterId = getDoctorId();
+    if (filterId) docs = docs.filter(d => Number(d.id) === filterId);
+
+    // map per doctor for faster lookup
+    const byDoctor = new Map();
+    docs.forEach(d => byDoctor.set(String(d.id), new Map()));
+
     dayAppointments.forEach(appt => {
-      const time = appt.time?.substring(0, 5) || "00:00";
-      const parts = time.split(":");
-      const apptHour = parseInt(parts[0] || "0", 10);
-      
-      if (apptHour >= startHour && apptHour < endHour) {
-        apptsByHour[apptHour].push(appt);
-      }
+      const did = String(appt.doctor_id);
+      const m = byDoctor.get(did);
+      if (!m) return;
+      const t = String(appt.time || "");
+      if (!t) return;
+      m.set(t.slice(0,5), appt);
     });
 
-    // Show all hours
-    for (let hour = startHour; hour < endHour; hour++) {
-      const hourDisplay = to12(`${pad2(hour)}:00`);
-      const appts = apptsByHour[hour] || [];
+    let html = '<div class="overflow-auto rounded-2xl border border-slate-200 bg-white">';
+    html += '<table class="min-w-[900px] w-full table-fixed border-collapse">';
+    html += '<thead class="bg-slate-50 sticky top-0 z-10">';
+    html += '<tr>';
+    html += '<th class="w-48 border-b border-slate-200 p-2 text-left text-xs font-extrabold text-slate-600">Doctor</th>';
+    slots.forEach(time => {
+      html += `<th class="w-24 border-b border-slate-200 p-2 text-center text-xs font-extrabold text-slate-600">${h(to12(time))}</th>`;
+    });
+    html += '</tr></thead><tbody>';
 
-      const slot = document.createElement("div");
-      slot.className = "col-span-7 rounded-2xl border border-slate-200 p-4 bg-white hover:shadow-md transition";
-
-      const header = document.createElement("div");
-      header.className = "font-extrabold text-slate-900 mb-3 text-sm";
-      header.textContent = hourDisplay;
-      slot.appendChild(header);
-
-      if (appts.length === 0) {
-        const empty = document.createElement("div");
-        empty.className = "text-sm text-slate-400";
-        empty.textContent = "No appointments";
-        slot.appendChild(empty);
-      } else {
-        const grid = document.createElement("div");
-        grid.className = "grid gap-2";
-
-        appts.forEach(appt => {
-          const apptDiv = document.createElement("button");
-          apptDiv.type = "button";
-          apptDiv.className = "text-left rounded-xl border border-slate-200 p-3 bg-slate-50 hover:bg-slate-100 transition text-sm";
-
+    docs.forEach(doc => {
+      const m = byDoctor.get(String(doc.id)) || new Map();
+      html += '<tr>';
+      html += `<td class="border-t border-slate-200 p-2 text-sm font-extrabold text-slate-900">${h(doc.name)}</td>`;
+      slots.forEach(slot => {
+        const appt = m.get(slot);
+        if (appt) {
           const pill = statusPillClass(appt.status);
-          const apptTime = to12(appt.time);
+          html += `
+            <td class="border-t border-slate-200 p-1">
+              <button type="button"
+                data-appt-id="${h(appt.id)}"
+                class="w-full text-left text-xs rounded-lg border ${pill} px-2 py-1 hover:opacity-95">
+                <div class="font-extrabold truncate">${h(appt.patient_name || "—")}</div>
+                <div class="text-[11px] opacity-80 truncate">${h(String(appt.status || "").toUpperCase())}</div>
+              </button>
+            </td>`;
+        } else {
+          html += '<td class="border-t border-slate-200 p-1"></td>';
+        }
+      });
+      html += '</tr>';
+    });
 
-          apptDiv.innerHTML = `
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <div class="font-semibold text-slate-900">${h(apptTime)} - ${h(appt.patient_name || "—")}</div>
-                <div class="text-xs text-slate-600 mt-0.5">Dr. ${h(appt.doctor_name || "—")}</div>
-              </div>
-              <span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-extrabold border ${pill}">
-                ${h(String(appt.status || "").toUpperCase())}
-              </span>
-            </div>
-          `;
+    html += '</tbody></table></div>';
+    calGrid.innerHTML = html;
 
-          apptDiv.addEventListener("click", () => {
-            openModal(appt);
-          });
+    calGrid.querySelectorAll('button[data-appt-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-appt-id');
+        const appt = dayAppointments.find(a => String(a.id) === String(id));
+        if (appt) openModal(appt);
+      });
+    });
 
-          grid.appendChild(apptDiv);
-        });
-
-        slot.appendChild(grid);
-      }
-
-      calGrid.appendChild(slot);
-    }
-
-    listWrap.innerHTML = "";
+    // Update right panel for the selected day (optional quality of life)
+    listWrap.innerHTML = `<div class="text-sm text-slate-500">Loading appointments…</div>`;
+    apiDayList(ymd)
+      .then(renderList)
+      .catch(e => listWrap.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`);
   }
 
-  function updateViewToggleButtons() {
-    if (currentView === "month") {
-      viewMonthBtn?.classList.add("bg-slate-900", "text-white");
-      viewMonthBtn?.classList.remove("bg-white", "text-slate-900");
-      viewDayBtn?.classList.remove("bg-slate-900", "text-white");
-      viewDayBtn?.classList.add("bg-white", "text-slate-900");
-    } else {
-      viewDayBtn?.classList.add("bg-slate-900", "text-white");
-      viewDayBtn?.classList.remove("bg-white", "text-slate-900");
-      viewMonthBtn?.classList.remove("bg-slate-900", "text-white");
-      viewMonthBtn?.classList.add("bg-white", "text-slate-900");
-    }
-  }
-
-  function render() {
-    if (currentView === "month") {
-      renderMonth();
-    } else {
-      renderDay();
-    }
-    updateViewToggleButtons();
-  }
-
-  async function refreshAfterAction() {
-    // Re-fetch month counts and the selected day list
-    await apiMonthCounts(toYM(viewDate));
-    
-    if (selectedDate) {
-      const ymd = toYMD(selectedDate);
-      dayAppointments = await apiDayList(ymd);
-      
-      if (currentView === "month") {
-        renderMonth();
-      } else {
-        renderDay();
-      }
-    }
-  }
-
-  async function boot() {
-    selectedText.textContent = selectedDate ? toYMD(selectedDate) : "None";
-    
+  async function bootMonth() {
+    const ym = toYM(viewDate);
+    calGrid.innerHTML = `<div class="text-sm text-slate-500">Loading calendar…</div>`;
     try {
-      await apiMonthCounts(toYM(viewDate));
-      
-      if (selectedDate) {
-        const ymd = toYMD(selectedDate);
-        dayAppointments = await apiDayList(ymd);
-      } else {
-        dayAppointments = [];
-      }
-      
-      render();
+      await apiMonthCounts(ym);
+      renderMonth();
     } catch (e) {
       calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
     }
   }
 
+  async function bootDay() {
+    if (!selectedDate) selectedDate = new Date();
+    const ymd = toYMD(selectedDate);
+
+    selectedText.textContent = ymd;
+    if (datePicker) datePicker.value = ymd;
+
+    calGrid.innerHTML = `<div class="text-sm text-slate-500">Loading day schedule…</div>`;
+    try {
+      dayAppointments = await apiDayList(ymd);
+      renderDay();
+    } catch (e) {
+      calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
+    }
+  }
+
+  function invalidateCaches() {
+    monthCache.clear();
+    dayCache.clear();
+  }
+
+  // ==========================
+  // Events
+  // ==========================
   prevBtn.addEventListener("click", async () => {
     if (currentView === "month") {
       viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
-      selectedDate = null;
-      selectedText.textContent = "None";
-      listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
-    } else {
-      // Day view: go to previous day
-      if (selectedDate) {
-        selectedDate = new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000);
-        selectedText.textContent = toYMD(selectedDate);
-      }
+      await bootMonth();
+      return;
     }
-    await boot();
+
+    // Day: previous day
+    if (!selectedDate) selectedDate = new Date();
+    selectedDate = new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000);
+    await bootDay();
   });
 
   nextBtn.addEventListener("click", async () => {
     if (currentView === "month") {
       viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
-      selectedDate = null;
-      selectedText.textContent = "None";
-      listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
-    } else {
-      // Day view: go to next day
-      if (selectedDate) {
-        selectedDate = new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000);
-        selectedText.textContent = toYMD(selectedDate);
-      }
+      await bootMonth();
+      return;
     }
-    await boot();
+
+    // Day: next day
+    if (!selectedDate) selectedDate = new Date();
+    selectedDate = new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000);
+    await bootDay();
+  });
+
+  monthBtn?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    currentView = "month";
+    setActiveToggle();
+    await bootMonth();
+  });
+
+  dayBtn?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    currentView = "day";
+    setActiveToggle();
+    await bootDay();
+  });
+
+  todayBtn?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    selectedDate = new Date();
+    viewDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+
+    if (currentView === "month") {
+      await bootMonth();
+      // also load list for today (nice)
+      const ymd = toYMD(selectedDate);
+      selectedText.textContent = ymd;
+      if (datePicker) datePicker.value = ymd;
+      listWrap.innerHTML = `<div class="text-sm text-slate-500">Loading appointments…</div>`;
+      apiDayList(ymd).then(renderList).catch(err => listWrap.innerHTML = `<div class="text-sm text-rose-600">${h(err.message || err)}</div>`);
+      return;
+    }
+
+    await bootDay();
+  });
+
+  datePicker?.addEventListener("change", async () => {
+    const v = String(datePicker.value || "").trim();
+    if (!v) return;
+
+    // v is YYYY-MM-DD
+    const parts = v.split("-");
+    if (parts.length !== 3) return;
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    if (Number.isNaN(d.getTime())) return;
+
+    selectedDate = d;
+    viewDate = new Date(d.getFullYear(), d.getMonth(), 1);
+    selectedText.textContent = toYMD(d);
+
+    if (currentView === "month") {
+      await bootMonth();
+      listWrap.innerHTML = `<div class="text-sm text-slate-500">Loading appointments…</div>`;
+      apiDayList(toYMD(d)).then(renderList).catch(err => listWrap.innerHTML = `<div class="text-sm text-rose-600">${h(err.message || err)}</div>`);
+      return;
+    }
+
+    await bootDay();
   });
 
   doctorFilter?.addEventListener("change", async () => {
+    invalidateCaches();
     selectedDate = null;
     selectedText.textContent = "None";
     listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
-    await boot();
-  });
 
-  // View toggle events
-  viewMonthBtn?.addEventListener("click", async () => {
-    currentView = "month";
-    selectedDate = null;
-    selectedText.textContent = "None";
-    listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
-    await boot();
-  });
+    if (datePicker) datePicker.value = "";
 
-  viewDayBtn?.addEventListener("click", async () => {
-    currentView = "day";
-    if (!selectedDate) {
-      selectedDate = new Date();
-    }
-    selectedText.textContent = toYMD(selectedDate);
-    
-    try {
-      const ymd = toYMD(selectedDate);
-      dayAppointments = await apiDayList(ymd);
-      render();
-    } catch (e) {
-      calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
-    }
+    if (currentView === "month") await bootMonth();
+    else await bootDay();
   });
 
   // Modal events
@@ -558,6 +611,22 @@
   modal?.addEventListener("click", (e) => {
     if (e.target === modal) closeModal();
   });
+
+  async function refreshAfterAction() {
+    invalidateCaches();
+
+    // refresh month grid
+    await apiMonthCounts(toYM(viewDate));
+    if (currentView === "month") renderMonth();
+
+    // refresh selected day list/table
+    if (selectedDate) {
+      const ymd = toYMD(selectedDate);
+      dayAppointments = await apiDayList(ymd);
+      if (currentView === "day") renderDay();
+      else renderList(dayAppointments);
+    }
+  }
 
   mCancel?.addEventListener("click", async () => {
     if (!selectedAppointment) return;
@@ -607,7 +676,7 @@
       alert("Select a date first.");
       return;
     }
-    cSub.textContent = `Selected date: ${selectedDate}`;
+    cSub.textContent = `Selected date: ${toYMD(selectedDate)}`;
     cMsg.textContent = "";
     cModal.classList.remove("hidden");
     cModal.classList.add("flex");
@@ -627,7 +696,7 @@
     if (!did || !selectedDate) return;
 
     try {
-      const res = await fetch(`${BASE_URL}/api/get_slots.php?clinic_id=${encodeURIComponent(CLINIC_ID)}&doctor_id=${encodeURIComponent(did)}&date=${encodeURIComponent(selectedDate)}`);
+      const res = await fetch(`${BASE_URL}/api/get_slots.php?clinic_id=${encodeURIComponent(CLINIC_ID)}&doctor_id=${encodeURIComponent(did)}&date=${encodeURIComponent(toYMD(selectedDate))}`);
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to load slots");
 
@@ -642,7 +711,7 @@
         opt.textContent = to12(s.time);
         cTime.appendChild(opt);
       }
-    } catch (e) {
+    } catch {
       cTime.innerHTML = '<option value="">Failed to load</option>';
     }
   }
@@ -658,6 +727,7 @@
     const time = String(cTime?.value || "").trim();
     const notes = String(cNotes?.value || "").trim();
     if (!selectedDate) return;
+
     if (!email) return alert("Patient email is required");
     if (!did) return alert("Select a doctor");
     if (!time) return alert("Select a time");
@@ -665,6 +735,7 @@
     cMsg.textContent = "Saving…";
     cMsg.className = "mt-3 text-xs text-slate-500";
     cSave.disabled = true;
+
     try {
       const res = await fetch(`${BASE_URL}/api/admin_create_appointment.php`, {
         method: 'POST',
@@ -672,15 +743,17 @@
         body: JSON.stringify({
           patient_email: email,
           doctor_id: did,
-          date: selectedDate,
+          date: toYMD(selectedDate),
           time,
           notes
         })
       });
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || 'Failed');
+
       cMsg.textContent = "Appointment created.";
-      await boot();
+      invalidateCaches();
+      await bootMonth();
       closeCreate();
     } catch (e) {
       cMsg.textContent = String(e.message || e);
@@ -690,5 +763,9 @@
     }
   });
 
-  boot();
+  // ==========================
+  // Start
+  // ==========================
+  setActiveToggle();
+  bootMonth();
 })();
