@@ -6,6 +6,7 @@ $appTitle = 'AKAS | Clinic Details';
 $baseUrl  = '';
 
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/geocode.php';
 auth_require_role('clinic_admin', $baseUrl);
 
 $pdo = db();
@@ -101,6 +102,39 @@ if ($specialty === 'Other' && $specialtyOther === '') {
   $description = trim((string)($_POST['description'] ?? ''));
   $address     = trim((string)($_POST['address'] ?? ''));
 
+
+// Map pin (lat/lng) are optional, but REQUIRED if Address is provided.
+$latRaw = trim((string)($_POST['latitude'] ?? ''));
+$lngRaw = trim((string)($_POST['longitude'] ?? ''));
+
+$latitude = ($latRaw !== '' ? (float)$latRaw : null);
+$longitude = ($lngRaw !== '' ? (float)$lngRaw : null);
+
+if ($address === '') {
+  // If no address, keep location empty (clinic won't appear on the map section).
+  $latitude = null;
+  $longitude = null;
+} else {
+  // Address exists -> pin is required.
+  if ($latitude === null || $longitude === null) {
+    flash_set('error', 'Please pin the clinic location on the map before saving.');
+    header('Location: ' . $baseUrl . '/admin/clinic-details.php');
+    exit;
+  }
+
+  // Angeles City bounds (rough bounding box). Prevent pins outside the city.
+  $minLat = 15.06;  $maxLat = 15.22;
+  $minLng = 120.50; $maxLng = 120.70;
+
+  if (!is_finite($latitude) || !is_finite($longitude) ||
+      $latitude < $minLat || $latitude > $maxLat ||
+      $longitude < $minLng || $longitude > $maxLng) {
+    flash_set('error', 'Pinned location must be within Angeles City, Pampanga.');
+    header('Location: ' . $baseUrl . '/admin/clinic-details.php');
+    exit;
+  }
+}
+
   // contact required, store digits only (10 digits starting with 9)
   $contactRaw = (string)($_POST['contact'] ?? '');
   $contact    = preg_replace('/\D/', '', $contactRaw) ?? '';
@@ -140,6 +174,8 @@ if ($specialty === 'Other' && $specialtyOther === '') {
            is_open         = :is_open,
            open_time       = :open_time,
            close_time      = :close_time,
+           latitude        = :latitude,
+           longitude       = :longitude,
            updated_at      = CURRENT_TIMESTAMP
      WHERE id = :id
      LIMIT 1
@@ -158,6 +194,8 @@ if ($specialty === 'Other' && $specialtyOther === '') {
     ':is_open' => $isOpen,
     ':open_time' => $openTime,
     ':close_time' => $closeTime,
+    ':latitude' => $latitude,
+    ':longitude' => $longitude,
   ]);
 
   // Handle logo upload (optional) -> clinics.logo_path
@@ -304,16 +342,20 @@ include __DIR__ . '/../includes/partials/head.php';
         ><?php echo h($row['description'] ?? ''); ?></textarea>
 
         <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-semibold text-slate-700">Address</label>
-            <input
-              type="text"
-              name="address"
-              value="<?php echo h($row['address'] ?? ''); ?>"
-              class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
-              placeholder="e.g., Angeles City, Pampanga"
-            />
-          </div>
+
+<div>
+  <label class="block text-sm font-semibold text-slate-700">Email (Optional)</label>
+  <input
+    type="email"
+    name="email"
+    value="<?php echo h($row['email'] ?? ''); ?>"
+    class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+    placeholder="clinic@gmail.com"
+  />
+  <p class="mt-2 text-xs text-slate-500">
+    To appear in the Contact section, please provide an email address.
+  </p>
+</div>
 <div>
   <label class="block text-sm font-semibold text-slate-700">Contact</label>
 
@@ -340,16 +382,59 @@ include __DIR__ . '/../includes/partials/head.php';
 </div>
 
 
-          <div class="sm:col-span-2">
-            <label class="block text-sm font-semibold text-slate-700">Email (Optional)</label>
-            <input
-              type="email"
-              name="email"
-              value="<?php echo h($row['email'] ?? ''); ?>"
-              class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
-              placeholder="clinic@gmail.com"
-            />
-          </div>
+
+<div class="sm:col-span-2">
+  <label class="block text-sm font-semibold text-slate-700">Address (Optional)</label>
+  <input
+    id="akasClinicAddress"
+    type="text"
+    name="address"
+    value="<?php echo h($row['address'] ?? ''); ?>"
+    class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+    placeholder="e.g., Angeles City, Pampanga"
+  />
+  <p class="mt-2 text-xs text-slate-500">
+    To appear on the Map section, please input an address and drop a pin below.
+  </p>
+
+  <div class="mt-4 rounded-2xl border border-slate-200 overflow-hidden bg-white">
+    <div class="p-3 border-b border-slate-200 flex items-start sm:items-center justify-between gap-3">
+      <div>
+        <p class="text-sm font-semibold text-slate-700">Pin your clinic location</p>
+        <p class="text-xs text-slate-500 mt-1">
+          Use <span class="font-semibold">Use My Current Location</span> only if you are physically inside your clinic.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        id="akasUseMyLocationBtn"
+        class="shrink-0 px-4 py-2 rounded-xl font-semibold border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled
+      >
+        Use My Current Location
+      </button>
+    </div>
+
+    <div class="relative">
+      <div id="akasClinicMap" style="height: 320px;"></div>
+
+      <!-- Overlay to lock map until address is provided -->
+      <div
+        id="akasClinicMapOverlay"
+        class="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-700 bg-white/70 backdrop-blur-[1px]"
+      >
+        Enter an address to enable pinning.
+      </div>
+    </div>
+
+    <div id="akasClinicMapError" class="hidden p-3 text-sm text-red-700 bg-red-50 border-t border-red-200"></div>
+  </div>
+
+  <!-- Hidden lat/lng -->
+  <input type="hidden" id="akasClinicLat" name="latitude" value="<?php echo h($row['latitude'] ?? ''); ?>">
+  <input type="hidden" id="akasClinicLng" name="longitude" value="<?php echo h($row['longitude'] ?? ''); ?>">
+</div>
         </div>
       </div>
 
@@ -436,6 +521,8 @@ include __DIR__ . '/../includes/partials/head.php';
 </main>
 
 <script src="<?php echo $baseUrl; ?>/assets/js/form-validators.js" defer></script>
+
+<script src="<?php echo $baseUrl; ?>/assets/js/clinic-location-picker.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/clinic-location-picker.js'); ?>"></script>
 
 <script>
   (function () {

@@ -34,6 +34,7 @@ $isSuperAdmin  = $isLoggedIn && $role === 'super_admin';
           <li><a href="<?php echo $baseUrl; ?>/index.php#about" class="nav-link transition-colors">About</a></li>
           <li><a href="<?php echo $baseUrl; ?>/index.php#clinics" class="nav-link transition-colors">Clinics</a></li>
           <li><a href="<?php echo $baseUrl; ?>/index.php#contact" class="nav-link transition-colors">Contact</a></li>
+          <li><a href="<?php echo $baseUrl; ?>/index.php#clinic-map" class="nav-link transition-colors">Map</a></li>
         </ul>
 
         <!-- Right side (keep relative so dropdowns anchor correctly) -->
@@ -244,8 +245,18 @@ $isSuperAdmin  = $isLoggedIn && $role === 'super_admin';
           </span>
         </a>
 
-        <a href="<?php echo $baseUrl; ?>/index.php#contact" class="mobileLink flex items-center justify-between px-5 py-4 text-lg font-semibold">
+        
+<a href="<?php echo $baseUrl; ?>/index.php#contact" class="mobileLink flex items-center justify-between px-5 py-4 text-lg font-semibold">
           Contact
+          <span class="text-slate-400">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
+            </svg>
+          </span>
+        </a>
+        
+        <a href="<?php echo $baseUrl; ?>/index.php#clinic-map" class="mobileLink flex items-center justify-between px-5 py-4 text-lg font-semibold">
+          Map
           <span class="text-slate-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />

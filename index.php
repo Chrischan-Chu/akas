@@ -16,8 +16,11 @@ include "includes/partials/head.php";
   <?php include "pages/mission-vision.php"; ?>
   <?php include "pages/clinics.php"; ?>
   <?php include "pages/contact.php"; ?>
+  <?php include "pages/contact-map.php"; ?>
 </main>
 
 <?php include "includes/partials/footer.php"; ?>
 <button id="backToTop" type="button" aria-label="Back to top">↑</button>
 <script src="<?= h($baseUrl); ?>/assets/js/contact.js?v=<?= (int)@filemtime(__DIR__ . '/../assets/js/contact.js'); ?>"></script>
+
+<script src="<?= h($baseUrl); ?>/assets/js/contact-map.js?v=<?= (int)@filemtime(__DIR__ . '/../assets/js/contact-map.js'); ?>"></script>

@@ -7,10 +7,12 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use Ably\AblyRest;
 
-$key = getenv('ABLY_API_KEY') ?: '';
+// FIXED: The API key is now correctly assigned to the $key variable
+$key = getenv('ABLY_API_KEY') ?: 'KtC7rw.-df6sw:fEo5tVYYnOpj_RrNA450TNLUaST_v6qYWplSC79SdmU';
+
 if ($key === '') {
   http_response_code(500);
-  echo json_encode(['error' => 'KtC7rw.-df6sw:fEo5tVYYnOpj_RrNA450TNLUaST_v6qYWplSC79SdmU']);
+  echo json_encode(['error' => 'Ably API key is missing.']);
   exit;
 }
 
@@ -28,5 +30,5 @@ try {
   echo json_encode($tokenRequest);
 } catch (Throwable $e) {
   http_response_code(500);
-  echo json_encode(['error' => 'Token creation failed']);
+  echo json_encode(['error' => 'Token creation failed: ' . $e->getMessage()]);
 }

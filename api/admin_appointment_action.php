@@ -148,4 +148,19 @@ if ($action === 'CANCELLED') {
   }
 }
 
+
+// --- REAL-TIME TRIGGER ---
+$date = (string)($row['APT_Date'] ?? '');
+if ($date !== '') {
+  try {
+    require_once __DIR__ . '/../includes/realtime_ably.php';
+    if (function_exists('publish_slots_updated')) {
+      publish_slots_updated($clinicId, $date); 
+    }
+  } catch (Throwable $rt) {
+    // silently ignore realtime errors so it doesn't break the response
+  }
+}
+// -------------------------
+
 json_out(['ok' => true, 'status' => $action]);

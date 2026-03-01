@@ -92,6 +92,18 @@ try {
   $st->execute([$userId, $doctorId, $clinicId, $date, $time, $finalNotes]);
 
   $pdo->commit();
+  
+  // --- REAL-TIME TRIGGER ---
+  try {
+    require_once __DIR__ . '/../includes/realtime_ably.php';
+    if (function_exists('publish_slots_updated')) {
+      publish_slots_updated($clinicId, $date); 
+    }
+  } catch (Throwable $rt) {
+    // silently ignore realtime errors so it doesn't break the response
+  }
+  // -------------------------
+  
   echo json_encode(['ok' => true]);
   exit;
 } catch (Throwable $e) {

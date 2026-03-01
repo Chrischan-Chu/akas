@@ -27,6 +27,8 @@ CREATE TABLE `clinics` (
   `email` varchar(190) DEFAULT NULL,
   `description` text DEFAULT NULL,
   `address` varchar(255) DEFAULT NULL,
+  `latitude` decimal(10,7) DEFAULT NULL,
+  `longitude` decimal(10,7) DEFAULT NULL,
   `approval_status` enum('PENDING','APPROVED','DECLINED') NOT NULL DEFAULT 'PENDING',
   `approved_at` datetime DEFAULT NULL,
   `declined_at` datetime DEFAULT NULL,

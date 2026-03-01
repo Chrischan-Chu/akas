@@ -639,7 +639,7 @@ include __DIR__ . '/../includes/partials/head.php';
 
 </main>
 
-<script src="<?php echo $baseUrl; ?>/assets/js/admin-dashboard-calendar.js"></script>
+<script src="<?php echo $baseUrl; ?>/assets/js/admin-dashboard-calendar.js?v=6"></script>
 
 </body>
 </html>

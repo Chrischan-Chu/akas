@@ -4,13 +4,6 @@ if (!isset($appTitle)) { $appTitle = "AKAS"; }
 if (!isset($baseUrl) || $baseUrl === "") { $baseUrl = defined('BASE_URL') ? (string)BASE_URL : ""; }
 require_once dirname(__DIR__) . "/auth.php";
 
-/**
- * IMPORTANT:
- * We DO NOT force clinic_admin/superadmin to stay inside /admin/*
- * because they should be able to view the public website (View Website button).
- * Admin page protection is handled by /admin/_guard.php and auth_require_role().
- */
-
 $cssFile = dirname(__DIR__, 2) . "/assets/css/output.css";
 $cssVer  = file_exists($cssFile) ? filemtime($cssFile) : time();
 ?>
@@ -24,6 +17,10 @@ $cssVer  = file_exists($cssFile) ? filemtime($cssFile) : time();
   <title><?php echo htmlspecialchars($appTitle); ?></title>
 
   <link rel="stylesheet" href="<?php echo $baseUrl; ?>/assets/css/output.css?v=<?php echo $cssVer; ?>">
+
+  <!-- Leaflet (for Clinic Map on Contact page) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <script>
     (function () {

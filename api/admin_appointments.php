@@ -144,6 +144,7 @@ if ($date !== '') {
   $sql = "
     SELECT
       ap.APT_AppointmentID AS id,
+      ap.APT_DoctorID AS doctor_id,   /* <--- THIS IS THE MISSING PIECE! */
       ap.APT_Date AS date,
       ap.APT_Time AS time,
       ap.APT_Status AS status,

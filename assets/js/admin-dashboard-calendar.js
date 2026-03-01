@@ -16,7 +16,11 @@
 
   const todayBtn = document.getElementById("adminTodayBtn");
   const datePicker = document.getElementById("adminDatePicker");
+  
+  // Layout wrapping elements
   const weekdaysRow = document.getElementById("adminWeekdaysRow");
+  const rightSidebar = listWrap?.closest("aside");
+  const scheduleGridWrap = rightSidebar?.parentElement;
 
   // list of approved doctors (id,name) injected from PHP
   const DOCTORS = window.AKAS_DOCTORS || [];
@@ -105,12 +109,20 @@
     calGrid.classList.remove("overflow-auto", "overflow-x-auto");
     calGrid.classList.add("grid", "grid-cols-7", "gap-2");
     weekdaysRow?.classList.remove("hidden");
+    
+    // Show the sidebar and restore the 2-column layout
+    rightSidebar?.classList.remove("hidden");
+    scheduleGridWrap?.classList.add("xl:grid-cols-[1fr_360px]");
   }
 
   function applyDayLayout() {
     calGrid.classList.remove("grid", "grid-cols-7", "gap-2");
     calGrid.classList.add("overflow-x-auto");
     weekdaysRow?.classList.add("hidden");
+    
+    // Hide the sidebar and let the calendar stretch to full width
+    rightSidebar?.classList.add("hidden");
+    scheduleGridWrap?.classList.remove("xl:grid-cols-[1fr_360px]");
   }
 
   function setActiveToggle() {
@@ -228,7 +240,7 @@
   // Rendering
   // ==========================
   function renderList(appts) {
-    listWrap.innerHTML = ""; // ✅ prevents duplicate text
+    listWrap.innerHTML = ""; 
 
     if (!appts.length) {
       listWrap.innerHTML = `<div class="text-sm text-slate-500">No appointments for this day.</div>`;
@@ -268,6 +280,42 @@
           openModal(appt);
         } catch {}
       });
+    });
+  }
+  
+  // ==============================
+  // ABLY REALTIME (Admin Listener)
+  // ==============================
+  function initRealtime() {
+    if (!CLINIC_ID) return;
+    if (typeof Ably === "undefined" || !Ably?.Realtime) {
+      console.warn("Ably JS not loaded. Realtime disabled.");
+      return;
+    }
+
+    const ably = new Ably.Realtime({ 
+        authUrl: `${BASE_URL}/api/ably_token.php`,
+        authMethod: "POST"
+    });
+    const channel = ably.channels.get(`clinic-${CLINIC_ID}`);
+
+    channel.subscribe('slots-updated', async (message) => {
+        console.log("Admin Alert: New booking detected in real-time.");
+        
+        // 1. MUST clear the cache first, or the admin will just see old data!
+        invalidateCaches();
+
+        // 2. Refresh the currently active view
+        if (currentView === "month") {
+            await bootMonth();
+            // If the admin is actively looking at a specific day's list, refresh that too
+            if (selectedDate) {
+                const appts = await apiDayList(toYMD(selectedDate));
+                renderList(appts);
+            }
+        } else {
+            await bootDay();
+        }
     });
   }
 
@@ -397,6 +445,7 @@
     monthLabel.textContent =
       `${dayName}, ${selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
 
+    // Generate time slots (8:00 AM to 6:00 PM)
     const startHour = 8;
     const endHour = 18;
     const slots = [];
@@ -406,54 +455,100 @@
     }
     slots.push(`${pad2(endHour)}:00`);
 
-    // docs filtered
+    // 1. Get filtered list of doctors
     let docs = DOCTORS.map(d => ({ ...d, appts: [] }));
     const filterId = getDoctorId();
     if (filterId) docs = docs.filter(d => Number(d.id) === filterId);
 
-    // map per doctor for faster lookup
+    // 2. Prepare the lookup map
     const byDoctor = new Map();
-    docs.forEach(d => byDoctor.set(String(d.id), new Map()));
+    docs.forEach(d => byDoctor.set(String(d.id).trim(), new Map()));
 
+    // 3. Map appointments
     dayAppointments.forEach(appt => {
-      const did = String(appt.doctor_id);
-      const m = byDoctor.get(did);
-      if (!m) return;
-      const t = String(appt.time || "");
+      let did = String(appt.doctor_id || "").trim();
+      let m = byDoctor.get(did);
+      
+      if (!m) {
+        const docByName = docs.find(d => String(d.name).trim().toLowerCase() === String(appt.doctor_name || "").trim().toLowerCase());
+        if (docByName) m = byDoctor.get(String(docByName.id).trim());
+      }
+      if (!m) return; 
+
+      let t = String(appt.time || "").trim().toUpperCase();
       if (!t) return;
-      m.set(t.slice(0,5), appt);
+      
+      let isPM = t.includes("PM");
+      let isAM = t.includes("AM");
+      t = t.replace(/[^\d:]/g, ""); 
+      let parts = t.split(':');
+      let hh = parseInt(parts[0] || "0", 10);
+      let mm = parseInt(parts[1] || "0", 10);
+      
+      if (isPM && hh < 12) hh += 12;
+      if (isAM && hh === 12) hh = 0;
+      
+      const slotMm = mm >= 30 ? "30" : "00";
+      const normalizedTime = `${String(hh).padStart(2, '0')}:${slotMm}`;
+
+      if (!m.has(normalizedTime)) m.set(normalizedTime, []);
+      m.get(normalizedTime).push(appt);
     });
 
-    let html = '<div class="overflow-auto rounded-2xl border border-slate-200 bg-white">';
-    html += '<table class="min-w-[900px] w-full table-fixed border-collapse">';
-    html += '<thead class="bg-slate-50 sticky top-0 z-10">';
+    // 4. Build the Redesigned Vertical HTML Grid
+    let html = '<div class="max-h-[600px] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm custom-scrollbar">';
+    html += '<table class="w-full text-left border-collapse min-w-[600px]">'; 
+    
+    // Table Header (Doctors as Columns)
+    html += '<thead class="bg-slate-50 sticky top-0 z-30 shadow-sm ring-1 ring-slate-200">';
     html += '<tr>';
-    html += '<th class="w-48 border-b border-slate-200 p-2 text-left text-xs font-extrabold text-slate-600">Doctor</th>';
-    slots.forEach(time => {
-      html += `<th class="w-24 border-b border-slate-200 p-2 text-center text-xs font-extrabold text-slate-600">${h(to12(time))}</th>`;
-    });
-    html += '</tr></thead><tbody>';
-
+    // Top-left sticky corner
+    html += '<th class="w-28 border-r border-slate-200 p-4 font-extrabold text-slate-500 text-xs uppercase sticky left-0 top-0 bg-slate-100 z-40">Time</th>';
+    
     docs.forEach(doc => {
-      const m = byDoctor.get(String(doc.id)) || new Map();
-      html += '<tr>';
-      html += `<td class="border-t border-slate-200 p-2 text-sm font-extrabold text-slate-900">${h(doc.name)}</td>`;
-      slots.forEach(slot => {
-        const appt = m.get(slot);
-        if (appt) {
-          const pill = statusPillClass(appt.status);
-          html += `
-            <td class="border-t border-slate-200 p-1">
-              <button type="button"
-                data-appt-id="${h(appt.id)}"
-                class="w-full text-left text-xs rounded-lg border ${pill} px-2 py-1 hover:opacity-95">
-                <div class="font-extrabold truncate">${h(appt.patient_name || "—")}</div>
-                <div class="text-[11px] opacity-80 truncate">${h(String(appt.status || "").toUpperCase())}</div>
-              </button>
-            </td>`;
-        } else {
-          html += '<td class="border-t border-slate-200 p-1"></td>';
+      html += `<th class="min-w-[220px] p-4 font-extrabold text-slate-800 text-sm bg-slate-50 border-r border-slate-200">${h(doc.name)}</th>`;
+    });
+    html += '</tr></thead>';
+
+    // Table Body (Time slots as Rows)
+    html += '<tbody class="divide-y divide-slate-100">';
+    slots.forEach(slot => {
+      // Added h-12 to the TR to force every single row to be exactly the same height
+      html += '<tr class="group hover:bg-slate-50/50 transition-colors h-12">';
+      
+      // Sticky Time Column
+      html += `<td class="border-r border-slate-100 p-2 align-top sticky left-0 bg-white group-hover:bg-slate-50 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.02)] w-24">
+                  <span class="text-xs font-bold text-slate-500 block mt-0.5">${h(to12(slot))}</span>
+               </td>`;
+      
+      // Appointment Cells
+      docs.forEach(doc => {
+        const docIdStr = String(doc.id).trim();
+        const m = byDoctor.get(docIdStr);
+        const apptsInSlot = m ? (m.get(slot) || []) : [];
+        
+        // Changed padding to p-1, removed height constraints from the cell
+        html += `<td class="p-1 align-top border-r border-slate-100 relative">`;
+        
+        if (apptsInSlot.length > 0) {
+          html += `<div class="flex flex-col gap-1">`;
+          apptsInSlot.forEach(appt => {
+            const pill = statusPillClass(appt.status);
+            // Ultra-compact button
+            html += `
+              <button type="button" data-appt-id="${h(appt.id)}"
+                class="w-full text-left rounded border ${pill} px-2 py-0.5 hover:shadow-md transition-all overflow-hidden">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-[11px] truncate pr-1">${h(appt.patient_name || "—")}</span>
+                  <span class="text-[9px] font-bold opacity-60 shrink-0">#${appt.id}</span>
+                </div>
+                <div class="text-[8px] uppercase tracking-wider font-extrabold opacity-80 leading-tight mt-0.5">${h(String(appt.status || ""))}</div>
+              </button>`;
+          });
+          html += `</div>`;
         }
+        
+        html += `</td>`;
       });
       html += '</tr>';
     });
@@ -461,6 +556,7 @@
     html += '</tbody></table></div>';
     calGrid.innerHTML = html;
 
+    // Attach click listeners
     calGrid.querySelectorAll('button[data-appt-id]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-appt-id');
@@ -468,12 +564,6 @@
         if (appt) openModal(appt);
       });
     });
-
-    // Update right panel for the selected day (optional quality of life)
-    listWrap.innerHTML = `<div class="text-sm text-slate-500">Loading appointments…</div>`;
-    apiDayList(ymd)
-      .then(renderList)
-      .catch(e => listWrap.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`);
   }
 
   async function bootMonth() {
