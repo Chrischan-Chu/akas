@@ -74,7 +74,7 @@ include __DIR__ . '/../includes/partials/head.php';
     <div class="p-10" style="background: var(--primary);">
       <h1 class="text-3xl sm:text-4xl font-extrabold text-black text-center">Resend Verification Email</h1>
       <p class="text-black/80 text-center mt-3 text-sm sm:text-base">
-        Enter your email and we\'ll send a new verification link (manual accounts only).
+        Enter your email and we'll send a new verification link (manual accounts only).
       </p>
     </div>
 
@@ -102,9 +102,12 @@ include __DIR__ . '/../includes/partials/head.php';
           Send Verification Link
         </button>
 
-        <div class="text-center text-sm text-slate-600">
-          <a class="underline" href="<?php echo $baseUrl; ?>/pages/login.php<?php echo $emailPrefill ? ('?email=' . urlencode($emailPrefill)) : ''; ?>">Back to Login</a>
-        </div>
+        <div class="text-center mt-4">
+    <a href="<?php echo $baseUrl; ?>/pages/login.php"
+       class="text-sm text-blue-600 hover:underline">
+        Back to Login
+    </a>
+</div>
       </form>
     </div>
 

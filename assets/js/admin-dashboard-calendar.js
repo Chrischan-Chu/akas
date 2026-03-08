@@ -36,6 +36,7 @@
   const mNotes = document.getElementById("admNotes");
   const mCancel = document.getElementById("admCancelBtn");
   const mDone = document.getElementById("admDoneBtn");
+  const mResched = document.getElementById("admReschedBtn");// new
   const mMsg = document.getElementById("admModalMsg");
 
   if (!CLINIC_ID) return;
@@ -318,6 +319,7 @@
         }
     });
   }
+  initRealtime();
 
   function renderMonth() {
     applyMonthLayout();
@@ -445,15 +447,18 @@
     monthLabel.textContent =
       `${dayName}, ${selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
 
-    // Generate time slots (8:00 AM to 6:00 PM)
+    // Generate time slots (8:00 AM to 6:00 PM) in 5-minute steps
     const startHour = 8;
     const endHour = 18;
+    const stepMins = 5;
+    
     const slots = [];
-    for (let h = startHour; h < endHour; h++) {
-      slots.push(`${pad2(h)}:00`);
-      slots.push(`${pad2(h)}:30`);
+    for (let h = startHour; h <= endHour; h++) {
+      for (let m = 0; m < 60; m += stepMins) {
+        if (h === endHour && m > 0) break; // stop at 18:00 only
+        slots.push(`${pad2(h)}:${pad2(m)}`);
+      }
     }
-    slots.push(`${pad2(endHour)}:00`);
 
     // 1. Get filtered list of doctors
     let docs = DOCTORS.map(d => ({ ...d, appts: [] }));
@@ -487,9 +492,18 @@
       
       if (isPM && hh < 12) hh += 12;
       if (isAM && hh === 12) hh = 0;
-      
-      const slotMm = mm >= 30 ? "30" : "00";
-      const normalizedTime = `${String(hh).padStart(2, '0')}:${slotMm}`;
+      //CHANGED FOR 20 min slots
+      function normalizeDbTime(t) {
+          // handles "09:20:00" or "09:20"
+          const s = String(t || "").trim();
+          if (!s) return "";
+          if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s.slice(0, 5);
+          if (/^\d{2}:\d{2}$/.test(s)) return s;
+          return ""; // don't guess if format is unexpected
+        }
+        
+        // later when mapping appointments:
+        const normalizedTime = normalizeDbTime(ap.time);
 
       if (!m.has(normalizedTime)) m.set(normalizedTime, []);
       m.get(normalizedTime).push(appt);
@@ -720,6 +734,12 @@
 
   mCancel?.addEventListener("click", async () => {
     if (!selectedAppointment) return;
+    // ✅ prevent double-click spam
+    if (mCancel?.disabled) return;
+    if (mCancel) mCancel.disabled = true;
+    if (mDone) mDone.disabled = true;
+    if (mResched) mResched.disabled = true;
+
     mMsg.textContent = "Processing…";
     try {
       await apiAction(parseInt(selectedAppointment.id, 10), "CANCELLED");
@@ -727,6 +747,9 @@
       await refreshAfterAction();
       closeModal();
     } catch (e) {
+      if (mCancel) mCancel.disabled = false;
+      if (mDone) mDone.disabled = false;
+      if (mResched) mResched.disabled = false;
       mMsg.textContent = String(e.message || e);
       mMsg.className = "mt-3 text-xs text-rose-600";
     }
@@ -734,6 +757,12 @@
 
   mDone?.addEventListener("click", async () => {
     if (!selectedAppointment) return;
+    // ✅ prevent double-click spam
+    if (mDone?.disabled) return;
+    if (mDone) mDone.disabled = true;
+    if (mCancel) mCancel.disabled = true;
+    if (mResched) mResched.disabled = true;
+
     mMsg.textContent = "Processing…";
     try {
       await apiAction(parseInt(selectedAppointment.id, 10), "DONE");
@@ -741,118 +770,216 @@
       await refreshAfterAction();
       closeModal();
     } catch (e) {
+      if (mDone) mDone.disabled = false;
+      if (mCancel) mCancel.disabled = false;
+      if (mResched) mResched.disabled = false;
       mMsg.textContent = String(e.message || e);
       mMsg.className = "mt-3 text-xs text-rose-600";
     }
   });
 
+  
   // ==============================
-  // Create appointment (follow-up / reschedule)
-  // ==============================
-  const createBtn = document.getElementById("adminCreateBtn");
-  const cModal = document.getElementById("adminCreateModal");
-  const cClose = document.getElementById("admCreateClose");
-  const cSub = document.getElementById("admCreateSub");
-  const cEmail = document.getElementById("admCreateEmail");
-  const cDoctor = document.getElementById("admCreateDoctor");
-  const cTime = document.getElementById("admCreateTime");
-  const cNotes = document.getElementById("admCreateNotes");
-  const cSave = document.getElementById("admCreateSave");
-  const cMsg = document.getElementById("admCreateMsg");
+// Create appointment (follow-up / reschedule)
+// ==============================
+const createBtn = document.getElementById("adminCreateBtn");
+const cModal = document.getElementById("adminCreateModal");
+const cClose = document.getElementById("admCreateClose");
+const cSub = document.getElementById("admCreateSub");
+const cEmail = document.getElementById("admCreateEmail");
+const cDoctor = document.getElementById("admCreateDoctor");
+const cTime = document.getElementById("admCreateTime");
+const cNotes = document.getElementById("admCreateNotes");
+const cSave = document.getElementById("admCreateSave");
+const cMsg = document.getElementById("admCreateMsg");
+const cApptId = document.getElementById("admAppointmentId");
+const cDate = document.getElementById("admCreateDate"); // ✅ make sure this exists in dashboard.php
 
-  function openCreate() {
-    if (!cModal) return;
-    if (!selectedDate) {
-      alert("Select a date first.");
+function setCreateModeCreate() {
+  if (cApptId) cApptId.value = "";
+}
+
+function setCreateModeResched(appt) {
+  if (cApptId) cApptId.value = String(appt?.id || "");
+}
+
+function openCreate() {
+  if (!cModal) return;
+
+  // default selectedDate (if admin didn't click a day)
+  if (!selectedDate) selectedDate = new Date();
+
+  // sync the create modal date input + subtitle
+  if (cDate) cDate.value = toYMD(selectedDate);
+  if (cSub) cSub.textContent = `Selected date: ${toYMD(selectedDate)}`;
+
+  if (cMsg) cMsg.textContent = "";
+
+  cModal.classList.remove("hidden");
+  cModal.classList.add("flex");
+
+  // load slots for current date+doctor
+  loadCreateSlots();
+}
+
+function closeCreate() {
+  if (!cModal) return;
+  cModal.classList.add("hidden");
+  cModal.classList.remove("flex");
+}
+
+async function loadCreateSlots() {
+  if (!cDoctor || !cTime) return;
+
+  cTime.innerHTML = '<option value="">Select time</option>';
+
+  const did = parseInt(cDoctor.value || "0", 10);
+  if (!did || !selectedDate) return;
+
+  try {
+    const res = await fetch(
+      `${BASE_URL}/api/get_slots.php?clinic_id=${encodeURIComponent(CLINIC_ID)}&doctor_id=${encodeURIComponent(did)}&date=${encodeURIComponent(toYMD(selectedDate))}`
+    );
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.error || "Failed to load slots");
+
+    const available = (data.slots || []).filter(s => s.status === "AVAILABLE");
+    if (available.length === 0) {
+      cTime.innerHTML = '<option value="">No available slots</option>';
       return;
     }
-    cSub.textContent = `Selected date: ${toYMD(selectedDate)}`;
-    cMsg.textContent = "";
-    cModal.classList.remove("hidden");
-    cModal.classList.add("flex");
-    loadCreateSlots();
+
+    for (const s of available) {
+      const opt = document.createElement("option");
+      opt.value = s.time;
+      opt.textContent = to12(s.time);
+      cTime.appendChild(opt);
+    }
+  } catch {
+    cTime.innerHTML = '<option value="">Failed to load</option>';
   }
+}
 
-  function closeCreate() {
-    if (!cModal) return;
-    cModal.classList.add("hidden");
-    cModal.classList.remove("flex");
-  }
+// ✅ attach once (NOT inside openCreate)
+cDate?.addEventListener("change", async () => {
+  const v = String(cDate.value || "").trim();
+  if (!v) return;
 
-  async function loadCreateSlots() {
-    if (!cDoctor || !cTime) return;
-    cTime.innerHTML = '<option value="">Select time</option>';
-    const did = parseInt(cDoctor.value || "0", 10);
-    if (!did || !selectedDate) return;
+  const parts = v.split("-");
+  if (parts.length !== 3) return;
 
-    try {
-      const res = await fetch(`${BASE_URL}/api/get_slots.php?clinic_id=${encodeURIComponent(CLINIC_ID)}&doctor_id=${encodeURIComponent(did)}&date=${encodeURIComponent(toYMD(selectedDate))}`);
-      const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "Failed to load slots");
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  if (Number.isNaN(d.getTime())) return;
 
-      const available = (data.slots || []).filter(s => s.status === 'AVAILABLE');
-      if (available.length === 0) {
-        cTime.innerHTML = '<option value="">No available slots</option>';
-        return;
-      }
-      for (const s of available) {
-        const opt = document.createElement('option');
-        opt.value = s.time;
-        opt.textContent = to12(s.time);
-        cTime.appendChild(opt);
-      }
-    } catch {
-      cTime.innerHTML = '<option value="">Failed to load</option>';
+  selectedDate = d;
+
+  if (cSub) cSub.textContent = `Selected date: ${toYMD(selectedDate)}`;
+
+  // clear time and reload slots for that date
+  if (cTime) cTime.innerHTML = '<option value="">Select time</option>';
+  await loadCreateSlots();
+});
+
+// Resched button (from appointment modal)
+mResched?.addEventListener("click", () => {
+  if (!selectedAppointment) return;
+
+  // use appointment's date as default when rescheduling
+  if (selectedAppointment.date) {
+    const p = String(selectedAppointment.date).split("-");
+    if (p.length === 3) {
+      const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+      if (!Number.isNaN(d.getTime())) selectedDate = d;
     }
   }
 
-  createBtn?.addEventListener("click", openCreate);
-  cClose?.addEventListener("click", closeCreate);
-  cModal?.addEventListener("click", (e) => { if (e.target === cModal) closeCreate(); });
-  cDoctor?.addEventListener("change", loadCreateSlots);
+  setCreateModeResched(selectedAppointment);
 
-  cSave?.addEventListener("click", async () => {
-    const email = String(cEmail?.value || "").trim();
-    const did = parseInt(cDoctor?.value || "0", 10);
-    const time = String(cTime?.value || "").trim();
-    const notes = String(cNotes?.value || "").trim();
-    if (!selectedDate) return;
+  // prefill patient email
+  if (cEmail) cEmail.value = String(selectedAppointment.patient_email || "");
 
-    if (!email) return alert("Patient email is required");
-    if (!did) return alert("Select a doctor");
-    if (!time) return alert("Select a time");
+  // clear doctor/time (admin chooses new)
+  if (cDoctor) cDoctor.value = "0";
+  if (cTime) cTime.innerHTML = '<option value="">Select time</option>';
 
-    cMsg.textContent = "Saving…";
-    cMsg.className = "mt-3 text-xs text-slate-500";
-    cSave.disabled = true;
+  closeModal();
+  openCreate();
+});
 
-    try {
-      const res = await fetch(`${BASE_URL}/api/admin_create_appointment.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patient_email: email,
-          doctor_id: did,
-          date: toYMD(selectedDate),
-          time,
-          notes
-        })
-      });
-      const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || 'Failed');
+// New button = create mode
+createBtn?.addEventListener("click", () => {
+  setCreateModeCreate();
 
-      cMsg.textContent = "Appointment created.";
-      invalidateCaches();
-      await bootMonth();
-      closeCreate();
-    } catch (e) {
-      cMsg.textContent = String(e.message || e);
-      cMsg.className = "mt-3 text-xs text-rose-600";
-    } finally {
-      cSave.disabled = false;
-    }
-  });
+  // default to currently selected calendar day if any
+  if (!selectedDate) selectedDate = new Date();
 
+  // clear fields
+  if (cEmail) cEmail.value = "";
+  if (cDoctor) cDoctor.value = "0";
+  if (cTime) cTime.innerHTML = '<option value="">Select time</option>';
+  if (cNotes) cNotes.value = "";
+
+  openCreate();
+});
+
+cClose?.addEventListener("click", closeCreate);
+cModal?.addEventListener("click", (e) => { if (e.target === cModal) closeCreate(); });
+cDoctor?.addEventListener("change", loadCreateSlots);
+
+cSave?.addEventListener("click", async () => {
+  const email = String(cEmail?.value || "").trim();
+  const did = parseInt(cDoctor?.value || "0", 10);
+  const time = String(cTime?.value || "").trim();
+  const notes = String(cNotes?.value || "").trim();
+
+  // ✅ use date from date input
+  const dateStr = String(cDate?.value || "").trim() || (selectedDate ? toYMD(selectedDate) : "");
+
+  if (!email) return alert("Patient email is required");
+  if (!dateStr) return alert("Select a date");
+  if (!did) return alert("Select a doctor");
+  if (!time) return alert("Select a time");
+
+  cMsg.textContent = "Saving…";
+  cMsg.className = "mt-3 text-xs text-slate-500";
+  cSave.disabled = true;
+
+  try {
+    const apptId = parseInt(String(cApptId?.value || "0"), 10) || 0;
+
+    // ✅ ensure selectedDate matches chosen date (so refreshAfterAction updates correct day)
+    const p = dateStr.split("-");
+    if (p.length === 3) selectedDate = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+
+    const res = await fetch(`${BASE_URL}/api/admin_create_appointment.php`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: apptId > 0 ? "RESCHEDULE" : "CREATE",
+        appointment_id: apptId > 0 ? apptId : undefined,
+        patient_email: email,
+        doctor_id: did,
+        date: dateStr,
+        time,
+        notes
+      })
+    });
+
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.error || "Failed");
+
+    cMsg.textContent = apptId > 0 ? "Appointment rescheduled." : "Appointment created.";
+
+    await refreshAfterAction(); // updates month + right panel instantly
+    closeCreate();
+  } catch (e) {
+    cMsg.textContent = String(e.message || e);
+    cMsg.className = "mt-3 text-xs text-rose-600";
+  } finally {
+    cSave.disabled = false;
+  }
+});
+    
   // ==========================
   // Start
   // ==========================

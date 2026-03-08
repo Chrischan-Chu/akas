@@ -29,7 +29,7 @@ $stmt = $pdo->prepare("
   LEFT JOIN clinics c ON c.id = a.APT_ClinicID
   LEFT JOIN clinic_doctors d ON d.id = a.APT_DoctorID
   WHERE a.APT_UserID = :uid
-    AND a.APT_Status = 'approved'
+    AND a.APT_Status = 'APPROVED'
     AND (
       a.APT_Date > :today
       OR (a.APT_Date = :today AND a.APT_Time >= :nowTime)

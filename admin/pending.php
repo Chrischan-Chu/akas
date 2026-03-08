@@ -208,7 +208,7 @@ $pref_business_id = (string)($c['business_id'] ?? '');
   <meta charset="utf-8">
   <title>Clinic Approval</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="<?php echo $baseUrl; ?>/assets/css/output.css">
 </head>
 
 <body class="bg-[#f6f8fb] min-h-screen flex items-center justify-center p-6">

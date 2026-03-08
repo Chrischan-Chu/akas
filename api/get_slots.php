@@ -17,7 +17,7 @@ $clinicId = (int)($_GET['clinic_id'] ?? 0);
 $date     = trim((string)($_GET['date'] ?? ''));
 $doctorId = (int)($_GET['doctor_id'] ?? 0);
 
-$allowedIntervals = [15, 20, 30];
+$allowedIntervals = [15, 20];
 
 if ($clinicId <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
   json_out(['ok' => false, 'message' => 'Invalid request.'], 400);
@@ -57,23 +57,33 @@ function resolve_schedule(string $raw, string $date, array $allowedIntervals): ?
     $days = array_map('intval', $schedule['days']);
 
     // supports 0-6 OR 1-7 (with 7 meaning Sunday)
+    // supports:
+    // - PHP dow: 0..6 where Sun=0
+    // - Mon-based: 0..6 where Mon=0 (common JS format)
+    // - ISO-ish: 1..7 where Sunday=7
     $enabledToday = false;
+
     foreach ($days as $d) {
+      $d = (int)$d;
+    
+      // PHP dow format (Sun=0..Sat=6)
+      // allow ISO Sunday=7 if ever used
       if ($d === $dow || ($d === 7 && $dow === 0)) {
         $enabledToday = true;
         break;
       }
     }
+    
     if (!$enabledToday) return null;
 
     $start = (string)($schedule['start'] ?? '');
     $end   = (string)($schedule['end'] ?? '');
-    $mins  = (int)($schedule['slot_mins'] ?? 30);
+    $mins  = (int)($schedule['slot_mins'] ?? 20);
 
     if (!preg_match('/^\d{2}:\d{2}$/', $start)) return null;
     if (!preg_match('/^\d{2}:\d{2}$/', $end)) return null;
 
-    if (!in_array($mins, $allowedIntervals, true)) $mins = 30;
+    if (!in_array($mins, $allowedIntervals, true)) $mins = 20;
 
     return [
       'start' => $start,
@@ -92,12 +102,12 @@ function resolve_schedule(string $raw, string $date, array $allowedIntervals): ?
 
     $start = (string)($row['start'] ?? '');
     $end   = (string)($row['end'] ?? '');
-    $mins  = (int)($row['slot_mins'] ?? 30);
+    $mins  = (int)($row['slot_mins'] ?? 20);
 
     if (!preg_match('/^\d{2}:\d{2}$/', $start)) return null;
     if (!preg_match('/^\d{2}:\d{2}$/', $end)) return null;
 
-    if (!in_array($mins, $allowedIntervals, true)) $mins = 30;
+    if (!in_array($mins, $allowedIntervals, true)) $mins = 20;
 
     return [
       'start' => $start,

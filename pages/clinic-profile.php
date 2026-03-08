@@ -264,7 +264,16 @@ include "../includes/partials/head.php";
           class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200">
           <option value="">Select a doctor</option>
           <?php foreach ($doctors as $d): ?>
-            <option value="<?php echo (int)$d['id']; ?>"><?php echo h((string)$d['name']); ?></option>
+            <?php 
+              // We MUST grab the schedule text so the Javascript has data to read!
+              $rawSched = (string)($d['schedule'] ?? '');
+              if (trim($rawSched) === '') {
+                  $rawSched = (string)($d['availability'] ?? '');
+              }
+            ?>
+            <option value="<?php echo (int)$d['id']; ?>" data-schedule="<?php echo h($rawSched); ?>">
+              <?php echo h((string)$d['name']); ?>
+            </option>
           <?php endforeach; ?>
         </select>
 
@@ -400,7 +409,7 @@ include "../includes/partials/head.php";
   style="-webkit-overflow-scrolling: touch;">
 
   <div class="w-full max-w-5xl my-auto bg-white rounded-3xl shadow-2xl border border-white/30
-              flex flex-col max-h-[calc(100vh-3rem)] overflow-hidden">
+              flex flex-col max-h-[calc(100vh-2rem)] overflow-hidden">
 
     <!-- Header (sticky) -->
     <div class="sticky top-0 z-20 flex items-start justify-between gap-4 px-6 py-5 border-b border-slate-200"
@@ -443,40 +452,44 @@ include "../includes/partials/head.php";
               <div>
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Full name</label>
                 <input id="patientName" name="patient_name" type="text"
-                  class="w-full rounded-2xl px-4 py-2.5 border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="Full name"
                   value="<?php echo h($viewer['name']); ?>"
-                  <?php echo $isUser ? 'readonly' : ''; ?>
+                  <?php echo $isUser ? 'readonly aria-readonly="true"' : ''; ?>
                   required>
               </div>
 
               <div>
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Contact number</label>
                 <input id="patientContact" name="patient_contact" type="text"
-                  class="w-full rounded-2xl px-4 py-2.5 border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="09xx xxx xxxx"
                   value="<?php echo h($viewer['phone']); ?>"
-                  <?php echo $isUser ? 'readonly' : ''; ?>
+                  <?php echo $isUser ? 'readonly aria-readonly="true"' : ''; ?>
                   required>
               </div>
 
               <div>
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Email</label>
                 <input id="patientEmail" name="patient_email" type="email"
-                  class="w-full rounded-2xl px-4 py-2.5 border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="name@email.com"
                   value="<?php echo h($viewer['email']); ?>"
-                  <?php echo $isUser ? 'readonly' : ''; ?>
+                  <?php echo $isUser ? 'readonly aria-readonly="true"' : ''; ?>
                   required>
               </div>
 
               <div>
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Age</label>
                 <input id="patientAge" name="patient_age" type="number" min="0" max="120"
-                  class="w-full rounded-2xl px-4 py-2.5 border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="Age"
                   >
               </div>
+
+              <?php if ($isUser): ?>
+                <p class="text-xs text-slate-500 mt-3">Your account details are locked for booking accuracy.</p>
+              <?php endif; ?>
 
               <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
                 Appointment type is fixed to <span class="font-bold">Visit / Checkup</span>.
@@ -490,7 +503,7 @@ include "../includes/partials/head.php";
             <p class="text-sm text-slate-600 mt-1">Approved doctors only.</p>
 
             <select id="doctorSelect"
-              class="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200">
+              class="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-slate-50/70 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300">
               <option value="">Select a doctor</option>
               <?php foreach ($doctors as $d): ?>
                 <option value="<?php echo (int)$d['id']; ?>">
@@ -577,7 +590,7 @@ include "../includes/partials/head.php";
               <div class="mt-5">
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Notes (optional)</label>
                 <textarea id="notes"
-                  class="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   rows="3"
                   placeholder="Any additional notes…"
                   <?php echo (!$isUser ? 'disabled' : ''); ?>></textarea>
@@ -691,17 +704,26 @@ include "../includes/partials/head.php";
   </div>
 </section>
 
-<div id="doctorModal" class="fixed inset-0 z-[9999] hidden" aria-hidden="true">
-  <div id="doctorBackdrop" class="absolute inset-0 bg-black/55"></div>
-  <div class="relative h-full w-full flex items-center justify-center p-4 sm:p-6">
-    <div class="w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-white/40">
-      <div class="flex items-center justify-between px-5 py-4" style="background: rgba(64,183,255,.12);">
-        <h3 class="font-extrabold" style="color: var(--secondary);">Doctor Profile</h3>
+<div id="doctorModal"
+     class="fixed inset-0 z-[25000] hidden items-center justify-center bg-black/60 p-4 sm:p-6 lg:p-8"
+     aria-hidden="true">
+  <div id="doctorBackdrop" class="absolute inset-0 bg-transparent"></div>
+
+  <div class="relative z-10 flex w-full items-center justify-center">
+    <div class="w-full max-w-5xl rounded-[28px] border border-slate-200 bg-white shadow-2xl overflow-hidden flex flex-col max-h-[80svh] min-h-0">
+      <div class="flex items-center justify-between gap-4 px-5 sm:px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+        <div>
+          <h3 class="text-lg sm:text-xl font-extrabold text-slate-900">Doctor Profile</h3>
+          <p class="text-xs sm:text-sm text-slate-500">Quick overview, schedule, and contact details</p>
+        </div>
+
         <button id="closeDoctorModal"
-                class="h-10 w-10 rounded-full bg-white border border-slate-200 hover:bg-slate-50 flex items-center justify-center"
-                aria-label="Close">✕</button>
+                type="button"
+                class="h-11 w-11 rounded-full bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 flex items-center justify-center shrink-0"
+                aria-label="Close doctor profile">✕</button>
       </div>
-      <div id="doctorModalBody" class="p-5 sm:p-6">
+
+      <div id="doctorModalBody" class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 lg:p-6 bg-slate-50">
         <div class="text-slate-600 text-sm">Loading…</div>
       </div>
     </div>

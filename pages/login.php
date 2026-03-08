@@ -19,13 +19,6 @@ include "../includes/partials/head.php";
 
 <body class="min-h-screen bg-white">
 
-<style>
-  .login-title {
-    font-family: ui-monospace, "Courier New", monospace;
-    letter-spacing: .14em;
-  }
-</style>
-
 <main class="min-h-screen flex items-center justify-center py-10">
 
   <section
@@ -54,7 +47,7 @@ include "../includes/partials/head.php";
 
         <div class="w-full max-w-sm px-4 sm:px-6 lg:px-0">
 
-          <h1 class="login-title text-5xl font-semibold text-white mb-6 text-center">
+          <h1 class=" text-5xl font-extrabold text-white mb-6 text-center">
             SIGN IN
           </h1>
 
@@ -128,10 +121,15 @@ include "../includes/partials/head.php";
 
            <!-- Password -->
 <div class="mb-2">
-  <label for="password"
-         class="block text-sm font-semibold text-white/90 mb-2">
-    Password
-  </label>
+  <div class="flex items-center justify-between mb-2">
+    <label for="password" class="block text-sm font-semibold text-white/90">
+      Password
+    </label>
+
+    <a href="<?php echo $baseUrl; ?>/pages/forgot-password.php" class="text-xs text-white/90 hover:underline">
+      Forgot password?
+    </a>
+  </div>
 
   <div class="flex items-center bg-white rounded-xl overflow-hidden">
 
@@ -165,9 +163,7 @@ include "../includes/partials/head.php";
 </div>
 
 
-            <div class="mt-3 text-xs text-black/80">
-              <a href="#" class="hover:underline">Forgot password?</a>
-            </div>
+
 
             <!-- Login button ONLY -->
             <div class="mt-5">

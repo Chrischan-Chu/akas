@@ -69,6 +69,10 @@ CREATE TABLE `accounts` (
   `email_verify_token_hash` varchar(64) DEFAULT NULL,
   `email_verify_expires_at` datetime DEFAULT NULL,
 
+  -- ✅ Password reset (manual/local accounts)
+  `password_reset_token_hash` varchar(64) DEFAULT NULL,
+  `password_reset_expires_at` datetime DEFAULT NULL,
+
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_email` (`email`),
@@ -76,6 +80,7 @@ CREATE TABLE `accounts` (
   KEY `idx_clinic_id` (`clinic_id`),
   KEY `idx_google_sub` (`google_sub`),
   KEY `idx_email_verified` (`email_verified_at`),
+  KEY `idx_password_reset_hash` (`password_reset_token_hash`),
   CONSTRAINT `fk_accounts_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -154,7 +159,8 @@ CREATE TABLE `clinic_doctors` (
   KEY `idx_clinic_id` (`clinic_id`),
   KEY `idx_doc_status` (`approval_status`),
   KEY `idx_doc_via` (`created_via`),
-  CONSTRAINT `fk_clinic_doctors_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_clinic_doctors_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE,
+  UNIQUE KEY `uniq_doctor_prc_no` (`prc_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 /* =====================
@@ -175,6 +181,8 @@ CREATE TABLE `appointments` (
   KEY `idx_appt_clinic_dt` (`APT_ClinicID`,`APT_Date`,`APT_Time`),
   KEY `idx_appt_user` (`APT_UserID`),
   KEY `idx_appt_doctor` (`APT_DoctorID`),
+  KEY `idx_appt_status` (`APT_Status`),
+  UNIQUE KEY `unique_doctor_slot` (`APT_DoctorID`,`APT_Date`,`APT_Time`),
   CONSTRAINT `fk_appt_user` FOREIGN KEY (`APT_UserID`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_appt_clinic` FOREIGN KEY (`APT_ClinicID`) REFERENCES `clinics` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_appt_doctor` FOREIGN KEY (`APT_DoctorID`) REFERENCES `clinic_doctors` (`id`) ON DELETE CASCADE
