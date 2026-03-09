@@ -1,184 +1,16 @@
-(function () {
+(() => {
   const root = document.body;
   const BASE_URL = root?.dataset?.baseUrl || "";
-  const CLINIC_ID = parseInt(root?.dataset?.clinicId || "0", 10);
+  const IS_USER = root?.dataset?.isUser === "1";
+  const CLINIC_ID = Number.parseInt(root?.dataset?.clinicId || "0", 10) || 0;
 
-  const calGrid = document.getElementById("adminCalendarGrid");
-  const monthLabel = document.getElementById("adminMonthLabel");
-  const prevBtn = document.getElementById("adminPrevMonth");
-  const nextBtn = document.getElementById("adminNextMonth");
-  const selectedText = document.getElementById("adminSelectedDateText");
-  const listWrap = document.getElementById("adminApptList");
-  const doctorFilter = document.getElementById("adminDoctorFilter");
-
-  const dayBtn = document.getElementById("adminDayBtn");
-  const monthBtn = document.getElementById("adminMonthBtn");
-
-  const todayBtn = document.getElementById("adminTodayBtn");
-  const datePicker = document.getElementById("adminDatePicker");
-  
-  // Layout wrapping elements
-  const weekdaysRow = document.getElementById("adminWeekdaysRow");
-  const rightSidebar = listWrap?.closest("aside");
-  const scheduleGridWrap = rightSidebar?.parentElement;
-
-  // list of approved doctors (id,name) injected from PHP
-  const DOCTORS = window.AKAS_DOCTORS || [];
-
-  // Modal refs
-  const modal = document.getElementById("adminApptModal");
-  const mClose = document.getElementById("admModalClose");
-  const mSub = document.getElementById("admModalSub");
-  const mPatient = document.getElementById("admPatient");
-  const mContact = document.getElementById("admContact");
-  const mDoctor = document.getElementById("admDoctor");
-  const mStatus = document.getElementById("admStatus");
-  const mNotes = document.getElementById("admNotes");
-  const mCancel = document.getElementById("admCancelBtn");
-  const mDone = document.getElementById("admDoneBtn");
-  const mMsg = document.getElementById("admModalMsg");
-
-  if (!CLINIC_ID) return;
-  if (!calGrid || !monthLabel || !prevBtn || !nextBtn || !selectedText || !listWrap) return;
-
-  const monthNames = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December"
-  ];
+  const $ = (id) => document.getElementById(id);
 
   const pad2 = (n) => String(n).padStart(2, "0");
-  const toYM = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
   const toYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
-  function to12(timeHHMM) {
-    const t = String(timeHHMM || "").trim();
-    if (!t) return "";
-    const parts = t.split(":");
-    const hh = parseInt(parts[0] || "0", 10);
-    const mm = parts[1] || "00";
-    const ampm = hh >= 12 ? "PM" : "AM";
-    const h12 = ((hh + 11) % 12) + 1;
-    return `${h12}:${mm} ${ampm}`;
-  }
-
-  function h(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (m) => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-    }[m]));
-  }
-
-  function getDoctorId() {
-    const v = parseInt(doctorFilter?.value || "0", 10);
-    return Number.isFinite(v) ? v : 0;
-  }
-
-  function dowKey(dateObj) {
-    const keys = ["sun","mon","tue","wed","thu","fri","sat"];
-    return keys[dateObj.getDay()];
-  }
-
-  function badgeClassForDay(counts) {
-    if (!counts || counts.total <= 0) {
-      return "border-slate-200 bg-slate-50 text-slate-600";
-    }
-    if ((counts.pending || 0) > 0) {
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    }
-    if ((counts.approved || 0) > 0) {
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    }
-    if ((counts.done || 0) > 0) {
-      return "border-sky-200 bg-sky-50 text-sky-700";
-    }
-    if ((counts.cancelled || 0) > 0) {
-      return "border-rose-200 bg-rose-50 text-rose-700";
-    }
-    return "border-slate-200 bg-slate-100 text-slate-700";
-  }
-
-  function statusPillClass(st) {
-    st = String(st || "").toUpperCase();
-    if (st === "PENDING") return "border-amber-200 bg-amber-50 text-amber-700";
-    if (st === "APPROVED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    if (st === "DONE") return "border-sky-200 bg-sky-50 text-sky-700";
-    if (st === "CANCELLED") return "border-rose-200 bg-rose-50 text-rose-700";
-    return "border-slate-200 bg-slate-50 text-slate-700";
-  }
-
-  function applyMonthLayout() {
-    calGrid.classList.remove("overflow-auto", "overflow-x-auto");
-    calGrid.classList.add("grid", "grid-cols-7", "gap-2");
-    weekdaysRow?.classList.remove("hidden");
-    
-    // Show the sidebar and restore the 2-column layout
-    rightSidebar?.classList.remove("hidden");
-    scheduleGridWrap?.classList.add("xl:grid-cols-[1fr_360px]");
-  }
-
-  function applyDayLayout() {
-    calGrid.classList.remove("grid", "grid-cols-7", "gap-2");
-    calGrid.classList.add("overflow-x-auto");
-    weekdaysRow?.classList.add("hidden");
-    
-    // Hide the sidebar and let the calendar stretch to full width
-    rightSidebar?.classList.add("hidden");
-    scheduleGridWrap?.classList.remove("xl:grid-cols-[1fr_360px]");
-  }
-
-  function setActiveToggle() {
-    document.querySelectorAll(".view-toggle").forEach(b => b.classList.remove("is-active"));
-    if (currentView === "month") monthBtn?.classList.add("is-active");
-    else dayBtn?.classList.add("is-active");
-  }
-
-  // ==========================
-  // State + caches (less lag)
-  // ==========================
-  let currentView = "month"; // "month" or "day"
-  let viewDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  let selectedDate = null; // Date|null
-
-  let monthCounts = {};
-  let doctorOverlay = {};
-  let dayAppointments = [];
-  let selectedAppointment = null;
-
-  const monthCache = new Map(); // key: `${ym}|docId`
-  const dayCache = new Map();  // key: `${ymd}|docId`
-
-  async function apiMonthCounts(ym) {
-    const docId = getDoctorId();
-    const key = `${ym}|${docId}`;
-    if (monthCache.has(key)) {
-      const cached = monthCache.get(key);
-      monthCounts = cached.monthCounts || {};
-      doctorOverlay = cached.doctorOverlay || {};
-      return;
-    }
-
-    const url = `${BASE_URL}/api/admin_appointments.php?month=${encodeURIComponent(ym)}${docId ? `&doctor_id=${docId}` : ""}`;
-    const res = await fetch(url, { credentials: "same-origin", cache: "no-store" });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.message || "Failed to load month counts");
-
-    monthCounts = data.month_counts || {};
-    doctorOverlay = data.doctor_overlay || {};
-    monthCache.set(key, { monthCounts, doctorOverlay });
-  }
-
-  async function apiDayList(ymd) {
-    const docId = getDoctorId();
-    const key = `${ymd}|${docId}`;
-    if (dayCache.has(key)) return dayCache.get(key);
-
-    const url = `${BASE_URL}/api/admin_appointments.php?date=${encodeURIComponent(ymd)}${docId ? `&doctor_id=${docId}` : ""}`;
-    const res = await fetch(url, { credentials: "same-origin", cache: "no-store" });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.message || "Failed to load appointments");
-
-    const appts = Array.isArray(data.appointments) ? data.appointments : [];
-    dayCache.set(key, appts);
-    return appts;
+  function setBodyScrollLock(locked) {
+    document.body.style.overflow = locked ? "hidden" : "";
   }
 
   async function safeJson(res) {
@@ -186,101 +18,463 @@
     try {
       return JSON.parse(text);
     } catch {
-      throw new Error("Server returned HTML (not JSON): " + text.slice(0, 120));
+      throw new Error(`Server returned HTML (not JSON): ${text.slice(0, 120)}`);
     }
   }
 
-  async function apiAction(appointmentId, action) {
-    const res = await fetch(`${BASE_URL}/api/admin_appointment_action.php`, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ appointment_id: appointmentId, action })
-    });
-
-    const data = await safeJson(res);
-    if (!data.ok) throw new Error(data.message || "Action failed");
-    return data;
+  function to12FromHHMM(t) {
+    // "13:30" -> "1:30 PM"
+    if (!t) return "";
+    const m = String(t).trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return t; // fallback if not HH:MM
+    let hh = Number(m[1]);
+    const mm = m[2];
+    const ampm = hh >= 12 ? "PM" : "AM";
+    hh = hh % 12;
+    if (hh === 0) hh = 12;
+    return `${hh}:${mm} ${ampm}`;
   }
 
-  // ==========================
-  // Modal
-  // ==========================
-  function openModal(appt) {
-    selectedAppointment = appt;
-    if (!modal) return;
+    function fmtPHTime(ts) {
+    // accepts "YYYY-MM-DD HH:MM:SS" OR "HH:MM"
+    if (!ts) return "";
 
-    mMsg.textContent = "";
-    mSub.textContent = `${appt.date} • ${to12(appt.time)}`;
+    // if it's just HH:MM, convert directly
+    if (/^\d{1,2}:\d{2}$/.test(ts)) return to12FromHHMM(ts);
 
-    mPatient.textContent = appt.patient_name || "—";
-    mContact.textContent = [appt.patient_email, appt.patient_phone].filter(Boolean).join(" • ") || "—";
-    mDoctor.textContent = appt.doctor_name || "—";
-    mStatus.textContent = (appt.status || "—").toUpperCase();
-    mNotes.textContent = appt.notes ? appt.notes : "—";
+    // try date-time
+    const d = new Date(String(ts).replace(" ", "T") + "+08:00");
+    if (Number.isNaN(d.getTime())) return ts;
 
-    const closed = ["DONE","CANCELLED"].includes(String(appt.status || "").toUpperCase());
-    mCancel.disabled = closed;
-    mDone.disabled = closed;
-    mCancel.classList.toggle("opacity-50", closed);
-    mDone.classList.toggle("opacity-50", closed);
-
-    modal.classList.remove("hidden");
-    modal.classList.add("flex");
+    return d.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
   }
 
-  function closeModal() {
-    if (!modal) return;
-    modal.classList.add("hidden");
-    modal.classList.remove("flex");
-    selectedAppointment = null;
+
+
+  
+
+  // -----------------------------
+  // BOOKING MODAL OPEN/CLOSE
+  // -----------------------------
+  const bookingModal = $("bookingModal");
+  const openBooking = $("openBooking");
+  const closeBooking = $("closeBooking");
+  const closeBookingAlt = $("closeBookingAlt");
+
+  function openBookingModal() {
+    if (!bookingModal) return;
+    bookingModal.classList.remove("hidden");
+    setBodyScrollLock(true);
+    const mobileMenu = document.getElementById("mobileMenu");
+    mobileMenu?.classList.add("hidden");
+  }
+  function closeBookingModal() {
+    if (!bookingModal) return;
+    bookingModal.classList.add("hidden");
+    setBodyScrollLock(false);
   }
 
-  // ==========================
-  // Rendering
-  // ==========================
-  function renderList(appts) {
-    listWrap.innerHTML = ""; 
+  openBooking?.addEventListener("click", openBookingModal);
+  closeBooking?.addEventListener("click", closeBookingModal);
+  closeBookingAlt?.addEventListener("click", closeBookingModal);
 
-    if (!appts.length) {
-      listWrap.innerHTML = `<div class="text-sm text-slate-500">No appointments for this day.</div>`;
+
+  // -----------------------------
+  // CALENDAR + SLOTS
+  // -----------------------------
+  const calendarGrid = $("calendarGrid");
+  const monthLabel = $("monthLabel");
+  const selectedDateText = $("selectedDateText");
+  const slotGrid = $("slotGrid");
+  const bookBtn = $("bookBtn");
+  const prevMonthBtn = $("prevMonth");
+  const nextMonthBtn = $("nextMonth");
+
+  // global refresh hook for Ably
+  window.__refreshSlotsIfSelected = null;
+
+  const monthNames = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
+
+  function statusLabel(status) {
+    switch (status) {
+      case "AVAILABLE": return "Available";
+      case "PAST": return "Past";
+      case "NOT_YET_OPEN": return "Not yet open";
+      case "BLOCKED": return "Blocked";
+      case "BOOKED_APPROVED": return "Booked";
+      case "BOOKED_PENDING": return "Pending";
+      default: return status || "Unavailable";
+    }
+  }
+
+  function applySlotStyles(btn, status, available) {
+    btn.className = "rounded-xl border px-3 py-2 text-sm font-extrabold transition";
+
+    if (available) {
+      btn.classList.add("bg-emerald-50", "border-emerald-200", "hover:bg-emerald-100");
+      btn.style.color = "#0f172a";
       return;
     }
 
-    const rows = appts.map((a) => {
-      const pill = statusPillClass(a.status);
-      return `
-        <button type="button"
-                class="text-left rounded-3xl border border-slate-200 p-5 bg-white hover:bg-slate-50 hover:shadow-sm transition"
-                data-appt='${h(JSON.stringify(a))}'>
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <div class="font-extrabold text-slate-900">
-                ${h(to12(a.time))} — ${h(a.patient_name)}
-              </div>
-              <div class="text-sm text-slate-600 mt-1">
-                Doctor: <span class="font-semibold">${h(a.doctor_name)}</span>
-              </div>
-              ${a.notes ? `<div class="text-sm text-slate-700 mt-2"><span class="font-semibold">Notes:</span> ${h(a.notes)}</div>` : ""}
-            </div>
-            <span class="shrink-0 inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold border ${pill}">
-              ${h(String(a.status || "").toUpperCase())}
-            </span>
-          </div>
-        </button>
-      `;
-    }).join("");
+    // unavailable states
+    const disabledCommon = ["opacity-70", "cursor-not-allowed"];
+    if (status === "NOT_YET_OPEN") {
+      btn.classList.add("bg-slate-50", "border-slate-200", ...disabledCommon);
+      btn.style.color = "#334155";
+    } else if (status === "PAST") {
+      btn.classList.add("bg-slate-50", "border-slate-200", ...disabledCommon);
+      btn.style.color = "#64748b";
+    } else {
+      // booked/blocked/etc
+      btn.classList.add("bg-rose-50", "border-rose-200", ...disabledCommon);
+      btn.style.color = "#7f1d1d";
+    }
+  }
 
-    listWrap.innerHTML = `<div class="grid gap-3">${rows}</div>`;
-
-    listWrap.querySelectorAll("button[data-appt]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        try {
-          const appt = JSON.parse(btn.getAttribute("data-appt") || "{}");
-          openModal(appt);
-        } catch {}
-      });
+  function setSelectedSlotButton(btn) {
+    slotGrid?.querySelectorAll("button[data-slot='1']").forEach((x) => {
+      x.classList.remove("text-white");
+      x.style.background = "";
+      x.style.borderColor = "";
     });
+
+    btn.classList.add("text-white");
+    btn.style.background = getComputedStyle(document.documentElement).getPropertyValue("--primary");
+    btn.style.borderColor = "transparent";
+  }
+
+  // calendar state
+  let viewDate = new Date();
+  let selectedDate = null;
+  let selectedSlot = null;
+  let lastMeta = null;
+
+  function clearSlots() {
+    if (!slotGrid) return;
+    slotGrid.innerHTML = "";
+    selectedSlot = null;
+    if (IS_USER && bookBtn) bookBtn.disabled = true;
+  }
+
+  function getDoctorId() {
+    const doctorSelect = $("doctorSelect");
+    return Number.parseInt(doctorSelect?.value || "0", 10) || 0;
+  }
+
+  async function fetchSlotsFromApi(ymd) {
+    if (!CLINIC_ID) return { slots: [], meta: null };
+
+    const doctorId = getDoctorId();
+    const url =
+      `${BASE_URL}/api/get_slots.php?clinic_id=${CLINIC_ID}` +
+      `&date=${encodeURIComponent(ymd)}` +
+      (doctorId ? `&doctor_id=${doctorId}` : "");
+
+    const res = await fetch(url, { credentials: "same-origin", cache: "no-store" });
+    const data = await safeJson(res);
+
+    if (!data.ok) throw new Error(data.message || "Failed to load slots.");
+    return {
+      slots: Array.isArray(data.slots) ? data.slots : [],
+      meta: data.meta || null,
+    };
+  }
+
+  function renderClinicStatusMessage(meta) {
+    const clinicStatus = meta?.clinic_status || "";
+
+    if (clinicStatus === "CLOSED_FULL") {
+      return `
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+          <p class="font-extrabold text-slate-900">Closed</p>
+          <p class="text-sm text-slate-600 mt-1">All slots for this day are already taken.</p>
+        </div>
+      `;
+    }
+
+    if (clinicStatus === "CLOSED_NOT_YET_OPEN") {
+      const gate = fmtPHTime(meta?.booking_gate_open);
+      return `
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+          <p class="font-extrabold text-slate-900">Booking not available yet</p>
+          <p class="text-sm text-slate-600 mt-1">
+            Booking opens at <b>${gate || "the allowed time"}</b> (PH time).
+          </p>
+        </div>
+      `;
+    }
+
+    return "";
+  }
+
+  async function renderSlots() {
+    if (!slotGrid) return;
+
+    clearSlots();
+    lastMeta = null;
+
+    if (!selectedDate) return;
+
+    const ymd = toYMD(selectedDate);
+
+    let slots = [];
+    let meta = null;
+
+    try {
+      const out = await fetchSlotsFromApi(ymd);
+      slots = out.slots;
+      meta = out.meta;
+      lastMeta = meta;
+    } catch (e) {
+      console.error(e);
+      slotGrid.innerHTML = `<div class="text-sm text-slate-600">Failed to load slots.</div>`;
+      return;
+    }
+
+    // day-level message (may still show slots if they exist)
+    const statusMsg = renderClinicStatusMessage(meta);
+    if (statusMsg && (meta?.clinic_status === "CLOSED_FULL")) {
+      slotGrid.innerHTML = statusMsg;
+      return;
+    } else if (statusMsg) {
+      slotGrid.innerHTML = statusMsg;
+    }
+
+    if (!slots.length) {
+      slotGrid.innerHTML += `<div class="text-sm text-slate-600 mt-2">No slots for this date.</div>`;
+      return;
+    }
+
+        // container for buttons
+    const wrap = document.createElement("div");
+    wrap.className = "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mt-3";
+
+    slots.forEach((s) => {
+      const time24 = typeof s === "string" ? s : (s.time || "");
+      const status = typeof s === "string" ? "AVAILABLE" : (s.status || "AVAILABLE");
+      const canBook = typeof s === "string" ? true : !!s.can_book;
+
+      if (!time24) return;
+
+      const available = status === "AVAILABLE" && canBook;
+
+      const b = document.createElement("button");
+      b.type = "button";
+      b.dataset.slot = "1";
+
+      // ✅ show 12hr, store 24hr
+      b.dataset.time24 = time24;
+      b.textContent = to12FromHHMM(time24);
+
+      b.disabled = !available;
+      b.title = statusLabel(status);
+
+      applySlotStyles(b, status, available);
+
+      b.addEventListener("click", () => {
+        if (!available) return;
+        setSelectedSlotButton(b);
+
+        // ✅ keep booking value in 24-hour format
+        selectedSlot = time24;
+
+        if (IS_USER && bookBtn) bookBtn.disabled = false;
+      });
+
+      wrap.appendChild(b);
+    });
+
+    slotGrid.appendChild(wrap);
+
+  }
+
+  function renderCalendar() {
+    if (!calendarGrid || !monthLabel || !selectedDateText) return;
+
+    calendarGrid.innerHTML = "";
+    clearSlots();
+
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    monthLabel.textContent = `${monthNames[month]} ${year}`;
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startWeekday = firstDay.getDay(); // 0=Sun
+    const daysInMonth = lastDay.getDate();
+
+    // leading blanks
+    for (let i = 0; i < startWeekday; i++) {
+      const empty = document.createElement("div");
+      empty.className = "h-10";
+      calendarGrid.appendChild(empty);
+    }
+
+    const todayYMD = toYMD(new Date());
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const d = new Date(year, month, day);
+      const ymd = toYMD(d);
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = String(day);
+
+      // consistent card-like day style
+      btn.className =
+        "h-10 rounded-xl font-extrabold transition border bg-white/90 hover:bg-white " +
+        "text-slate-800";
+
+      btn.style.borderColor = "rgba(255,255,255,.35)";
+
+      if (ymd === todayYMD) {
+        btn.style.outline = "2px solid rgba(255,190,138,.9)";
+        btn.style.outlineOffset = "2px";
+      }
+
+      if (selectedDate && ymd === toYMD(selectedDate)) {
+        btn.style.background = "white";
+        btn.style.borderColor = "rgba(255,190,138,.95)";
+      }
+
+      btn.addEventListener("click", async () => {
+        selectedDate = d;
+        selectedDateText.textContent = ymd;
+        renderCalendar();
+        await renderSlots();
+      });
+
+      calendarGrid.appendChild(btn);
+    }
+  }
+
+  function wireCalendarEvents() {
+    prevMonthBtn?.addEventListener("click", () => {
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+      renderCalendar();
+    });
+
+    nextMonthBtn?.addEventListener("click", () => {
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+      renderCalendar();
+    });
+
+    // When doctor changes, refresh slots for selected date
+    $("doctorSelect")?.addEventListener("change", async () => {
+      if (!selectedDate) return;
+      await renderSlots();
+    });
+  }
+
+  async function handleBooking() {
+    if (!IS_USER) {
+      window.location.href = `${BASE_URL}/pages/login.php`;
+      return;
+    }
+
+    if (!selectedDate || !selectedSlot) {
+      alert("Please select a date and time slot first.");
+      return;
+    }
+
+    const clinicStatus = lastMeta?.clinic_status || "";
+    if (clinicStatus === "CLOSED_FULL") {
+      alert("All slots are already taken for this day.");
+      return;
+    }
+    if (clinicStatus === "CLOSED_NOT_YET_OPEN") {
+      const gate = fmtPHTime(lastMeta?.booking_gate_open);
+      alert(`Booking is not available yet. It opens at ${gate || "the allowed time"} (PH time).`);
+      return;
+    }
+
+    const doctorId = getDoctorId();
+    if (!doctorId) {
+      alert("Please select a doctor first.");
+      return;
+    }
+
+    const notes = ($("notes")?.value || "").trim();
+    const dateYMD = toYMD(selectedDate);
+    const patientName = $("patientName")?.value || "";
+    const patientEmail = $("patientEmail")?.value || "";
+    const patientContact = $("patientContact")?.value || "";
+    const form = new FormData();
+    //New
+    const slotDT = new Date(`${dateYMD}T${selectedSlot}:00`);
+    const now = new Date();
+    const diffMs = slotDT.getTime() - now.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    
+    if (diffMinutes > 0 && diffMinutes <= 60) {
+      const proceed = confirm(
+        "Warning: This appointment is only within 1 hour from the current time. Do you want to continue?"
+      );
+      if (!proceed) return;
+    }
+        
+    form.append("clinic_id", String(CLINIC_ID));
+    form.append("doctor_id", String(doctorId));
+    form.append("date", dateYMD);
+    form.append("time", selectedSlot);
+    form.append("notes", notes);
+
+    // safe even if backend ignores these
+    form.append("patient_name", patientName);
+    form.append("patient_email", patientEmail);
+    form.append("patient_contact", patientContact);
+
+    // Disable button while booking
+    const oldText = bookBtn?.textContent || "Book";
+    if (bookBtn) {
+      bookBtn.disabled = true;
+      bookBtn.textContent = "Booking…";
+    }
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/book_appointment.php`, {
+        method: "POST",
+        body: form,
+        credentials: "same-origin",
+      });
+
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        alert(data.error || "Booking failed.");
+        return;
+      }
+
+      alert(data.message || "Booked!");
+      await renderSlots();
+
+      closeBookingModal();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || "Network error. Please try again.");
+    } finally {
+      if (bookBtn) {
+        bookBtn.textContent = oldText;
+        bookBtn.disabled = !(IS_USER && selectedDate && selectedSlot);
+      }
+    }
+  }
+
+  bookBtn?.addEventListener("click", handleBooking);
+
+  // expose refresh for Ably
+  window.__refreshSlotsIfSelected = () => {
+    if (!selectedDate) return;
+    renderSlots();
+  };
+
+  // boot calendar if elements exist
+  if (calendarGrid && monthLabel && selectedDateText && slotGrid && bookBtn && prevMonthBtn && nextMonthBtn) {
+    wireCalendarEvents();
+    renderCalendar();
   }
 
   // -----------------------------
@@ -299,561 +493,340 @@
     });
 
     const channel = ably.channels.get(`clinic-${CLINIC_ID}`);
-    
-    // Use "slots-updated" to match the PHP trigger
-    channel.subscribe("slots-updated", (message) => {
-      console.log("Real-time update received!");
-      
-      const updatedDate = message?.data?.date;
-      
-      if (selectedDate && updatedDate === toYMD(selectedDate)) {
-          console.log("Refreshing current day slots...");
-          renderSlots(); 
-      } else {
-          renderCalendar(); 
+    channel.subscribe("slots.updated", () => {
+      if (typeof window.__refreshSlotsIfSelected === "function") {
+        window.__refreshSlotsIfSelected();
       }
     });
   }
 
   initRealtime();
 
-  function renderMonth() {
-    applyMonthLayout();
+  // -----------------------------
+  // DOCTOR MODAL
+  // -----------------------------
+  const doctorModal = $("doctorModal");
+  const doctorBody = $("doctorModalBody");
+  const closeDoctorBtn = $("closeDoctorModal");
+  const doctorBackdrop = $("doctorBackdrop");
 
-    const year = viewDate.getFullYear();
-    const month = viewDate.getMonth();
+  function openDoctorModal() {
+    if (!doctorModal) return;
+    doctorModal.classList.remove("hidden");
+    doctorModal.setAttribute("aria-hidden", "false");
+    setBodyScrollLock(true);
+    if (doctorBody) { doctorBody.scrollTop = 0; doctorBody.scrollLeft = 0; }
+  }
 
-    monthLabel.textContent = `${monthNames[month]} ${year}`;
-    calGrid.innerHTML = "";
+  function closeDoctorModal() {
+    if (!doctorModal) return;
+    doctorModal.classList.add("hidden");
+    doctorModal.setAttribute("aria-hidden", "true");
+    if (doctorBody) doctorBody.innerHTML = '<div class="text-slate-600 text-sm">Loading…</div>';
+    setBodyScrollLock(false);
+  }
 
-    const first = new Date(year, month, 1);
-    const last = new Date(year, month + 1, 0);
-    const startDow = first.getDay();
-    const daysInMonth = last.getDate();
+  closeDoctorBtn?.addEventListener("click", closeDoctorModal);
+  doctorBackdrop?.addEventListener("click", closeDoctorModal);
 
-    for (let i = 0; i < startDow; i++) {
-      const div = document.createElement("div");
-      div.className = "h-20 rounded-2xl border border-slate-200 bg-slate-50";
-      calGrid.appendChild(div);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && doctorModal && !doctorModal.classList.contains("hidden")) {
+      closeDoctorModal();
+    }
+  });
+
+  document.addEventListener("click", async (e) => {
+    const card = e.target.closest(".doctorCard");
+    if (!card) return;
+
+    e.preventDefault();
+
+    const doctorId = card.dataset.doctorId;
+    const clinicId = card.dataset.clinicId || "";
+
+    if (!doctorId) return;
+
+    openDoctorModal();
+
+    try {
+      const url =
+        `${BASE_URL}/pages/doctor-modal.php?id=${encodeURIComponent(doctorId)}` +
+        `&clinic_id=${encodeURIComponent(clinicId)}`;
+
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load doctor profile");
+
+      if (doctorBody) {
+        doctorBody.innerHTML = await res.text();
+        requestAnimationFrame(() => { doctorBody.scrollTop = 0; doctorBody.scrollLeft = 0; });
+      }
+    } catch (err) {
+      console.error(err);
+      if (doctorBody) {
+        doctorBody.innerHTML = `
+          <div class="rounded-2xl bg-slate-50 border border-slate-200 p-6">
+            <p class="font-extrabold text-slate-900">Couldn’t load doctor profile.</p>
+            <p class="text-sm text-slate-600 mt-1">Please try again.</p>
+          </div>
+        `;
+      }
+    }
+  });
+
+  // ==============================
+  // INLINE SCHEDULE PREVIEW (card)
+  // Requires these elements in clinic-profile.php:
+  // #previewDoctorSelect, #previewCalendarGrid, #previewSlotGrid, #previewSelectedDate
+  // Modal elements already exist: #openBooking, #doctorSelect
+  // ==============================
+  (() => {
+    const baseUrl = document.body?.dataset?.baseUrl || "";
+    const clinicId = document.body?.dataset?.clinicId || "0";
+
+    const doctorSel = document.getElementById("previewDoctorSelect");
+    const calGrid   = document.getElementById("previewCalendarGrid");
+    const slotGrid  = document.getElementById("previewSlotGrid");
+    const dateText  = document.getElementById("previewSelectedDate");
+
+    // month controls (optional)
+    const prevBtn = document.getElementById("previewPrevMonth");
+    const nextBtn = document.getElementById("previewNextMonth");
+    const monthLbl = document.getElementById("previewMonthLabel");
+
+    const modalOpenBtn = document.getElementById("openBooking"); // opens modal
+    const modalDoctor  = document.getElementById("doctorSelect"); // inside modal
+
+    // If preview UI not present on this page, do nothing.
+    if (!doctorSel || !calGrid || !slotGrid || !dateText) return;
+
+    // --- simple month calendar render ---
+    let cur = new Date();
+    cur.setDate(1);
+    let selectedDate = null;
+
+    const monthNames = [
+      "January","February","March","April","May","June",
+      "July","August","September","October","November","December"
+    ];
+
+    function setMonthLabel() {
+      if (!monthLbl) return;
+      monthLbl.textContent = `${monthNames[cur.getMonth()]} ${cur.getFullYear()}`;
     }
 
-    for (let day = 1; day <= daysInMonth; day++) {
-      const d = new Date(year, month, day);
-      const ymd = toYMD(d);
-      const counts = monthCounts[ymd] || null;
+    function sameMonth(a, b) {
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+    }
 
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "cal-cell h-20 p-3 flex flex-col justify-between text-left";
+    function fmt(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
 
-      if (selectedDate && toYMD(selectedDate) === ymd) btn.classList.add("is-selected");
+    function buildCalendar() {
+      calGrid.innerHTML = "";
 
-      const top = document.createElement("div");
-      top.className = "flex items-start justify-between gap-2";
+      setMonthLabel();
 
-      const dayNum = document.createElement("div");
-      dayNum.className = "text-sm font-extrabold text-slate-900";
-      dayNum.textContent = String(day);
+      const firstDay = new Date(cur.getFullYear(), cur.getMonth(), 1);
+      const startDow = firstDay.getDay(); // 0..6
+      const daysInMonth = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
 
-      top.appendChild(dayNum);
+      const today = new Date();
+      const todayYMD = fmt(today);
+      const isCurrentMonth = sameMonth(cur, today);
 
-      const docId = getDoctorId();
-      if (docId > 0) {
-        const k = dowKey(d);
-        const isOn = !!doctorOverlay?.[k];
-        const tag = document.createElement("span");
-        tag.className =
-          "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-extrabold border " +
-          (isOn ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-500");
-        tag.textContent = isOn ? "Available" : "Off";
-        top.appendChild(tag);
+      // empty cells
+      for (let i = 0; i < startDow; i++) {
+        const div = document.createElement("div");
+        calGrid.appendChild(div);
       }
 
-      const bottom = document.createElement("div");
-      bottom.className = "flex items-center justify-between gap-2";
+      for (let day = 1; day <= daysInMonth; day++) {
+        const d = new Date(cur.getFullYear(), cur.getMonth(), day);
+        const ymd = fmt(d);
 
-      if (counts && counts.total > 0) {
-        const badge = document.createElement("span");
-        badge.className =
-          "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-extrabold border " +
-          badgeClassForDay(counts);
-        badge.textContent = `${counts.total} appt`;
-        bottom.appendChild(badge);
+        // In current month preview: do not show past days (per requirement)
+        if (isCurrentMonth && ymd < todayYMD) {
+          const div = document.createElement("div");
+          calGrid.appendChild(div);
+          continue;
+        }
 
-        const hint = document.createElement("span");
-        hint.className = "text-[11px] text-slate-500";
-        if (counts.pending > 0) hint.textContent = `${counts.pending} pending`;
-        else if (counts.approved > 0) hint.textContent = `${counts.approved} approved`;
-        else if (counts.done > 0) hint.textContent = `${counts.done} done`;
-        else if (counts.cancelled > 0) hint.textContent = `${counts.cancelled} cancelled`;
-        bottom.appendChild(hint);
-      } else {
-        const empty = document.createElement("span");
-        empty.className = "text-[11px] text-slate-400";
-        empty.textContent = "—";
-        bottom.appendChild(empty);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = String(day);
+        btn.className =
+          "h-10 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold";
+
+        btn.dataset.date = ymd;
+
+        btn.addEventListener("click", async () => {
+          selectedDate = btn.dataset.date;
+          dateText.textContent = selectedDate;
+
+          // highlight
+          [...calGrid.querySelectorAll("button[data-date]")].forEach((b) => {
+            b.classList.remove("ring-2", "ring-slate-400");
+          });
+          btn.classList.add("ring-2", "ring-slate-400");
+
+          await loadSlots();
+        });
+
+        calGrid.appendChild(btn);
+      }
+    }
+
+    async function loadSlots() {
+      slotGrid.innerHTML = "";
+      const doctorId = doctorSel.value;
+
+      const todayYMD = fmt(new Date());
+
+      // Past dates can be viewed (for month navigation), but cannot be booked / loaded
+      if (selectedDate && selectedDate < todayYMD) {
+        slotGrid.innerHTML = `<div class="text-sm text-slate-600">Past dates can’t be booked.</div>`;
+        return;
       }
 
-      btn.appendChild(top);
-      btn.appendChild(bottom);
+      if (!doctorId) {
+        slotGrid.innerHTML = `<div class="text-sm text-slate-600">Select a doctor first.</div>`;
+        return;
+      }
+      if (!selectedDate) {
+        slotGrid.innerHTML = `<div class="text-sm text-slate-600">Pick a date to see slots.</div>`;
+        return;
+      }
 
-      btn.addEventListener("click", async () => {
-        selectedDate = d;
-        selectedText.textContent = ymd;
-        if (datePicker) datePicker.value = ymd;
+      slotGrid.innerHTML = `<div class="text-sm text-slate-600">Loading…</div>`;
 
-        // Month view: just load list on the right
-        if (currentView === "month") {
-          renderMonth();
-          listWrap.innerHTML = `<div class="text-sm text-slate-500">Loading appointments…</div>`;
-          try {
-            const appts = await apiDayList(ymd);
-            renderList(appts);
-          } catch (e) {
-            listWrap.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
-          }
+      const url = `${baseUrl}/api/get_slots.php?clinic_id=${encodeURIComponent(
+        clinicId
+      )}&doctor_id=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(selectedDate)}`;
+
+      try {
+        const res = await fetch(url, { headers: { Accept: "application/json" } });
+        const data = await res.json();
+
+        if (!data || data.ok !== true) {
+          slotGrid.innerHTML = `<div class="text-sm text-rose-600 font-semibold">Failed to load slots.</div>`;
           return;
         }
 
-        // Day view: load and render the day table
-        calGrid.innerHTML = `<div class="text-sm text-slate-500">Loading day schedule…</div>`;
-        try {
-          dayAppointments = await apiDayList(ymd);
-          renderDay();
-        } catch (e) {
-          calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
+        const slotsRaw = Array.isArray(data.slots) ? data.slots : [];
+        const slots = slotsRaw.map((s) => (typeof s === "string" ? { time: s, status: "AVAILABLE", can_book: true } : s));
+
+        if (slots.length === 0) {
+          slotGrid.innerHTML = `<div class="text-sm text-slate-600">No slots for this date.</div>`;
+          return;
         }
-      });
 
-      calGrid.appendChild(btn);
-    }
-  }
+        // render buttons (green = available, red = unavailable)
+        const wrap = document.createElement("div");
+        wrap.className = "grid grid-cols-2 sm:grid-cols-3 gap-2";
 
-  function renderDay() {
-    applyDayLayout();
+        slots.forEach((s) => {
+          const time24 = (s.time || "").trim();
+          if (!time24) return;
 
-    if (!selectedDate) {
-      monthLabel.textContent = "Select a date";
-      calGrid.innerHTML = `<div class="text-sm text-slate-600 py-6">Select a date to view day schedule.</div>`;
-      return;
-    }
+          const status = (s.status || "AVAILABLE").trim();
+          const canBook = !!s.can_book;
+          const available = status === "AVAILABLE" && canBook;
 
-    const ymd = toYMD(selectedDate);
-    const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][selectedDate.getDay()];
-    monthLabel.textContent =
-      `${dayName}, ${selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+          const b = document.createElement("button");
+          b.type = "button";
 
-    // Generate time slots (8:00 AM to 6:00 PM)
-    const startHour = 8;
-    const endHour = 18;
-    const slots = [];
-    for (let h = startHour; h < endHour; h++) {
-      slots.push(`${pad2(h)}:00`);
-      slots.push(`${pad2(h)}:30`);
-    }
-    slots.push(`${pad2(endHour)}:00`);
+          // ✅ show 12hr, store 24hr
+          b.dataset.time24 = time24;
+          b.textContent = to12FromHHMM(time24);
 
-    // 1. Get filtered list of doctors
-    let docs = DOCTORS.map(d => ({ ...d, appts: [] }));
-    const filterId = getDoctorId();
-    if (filterId) docs = docs.filter(d => Number(d.id) === filterId);
+          // base
+          b.className = "h-10 rounded-xl border px-3 text-sm font-extrabold transition";
+          if (available) {
+            b.classList.add("bg-emerald-50", "border-emerald-200", "hover:bg-emerald-100");
+            b.style.color = "#0f172a";
+          } else {
+            b.disabled = true;
+            b.classList.add("bg-rose-50", "border-rose-200", "opacity-70", "cursor-not-allowed");
+            b.style.color = "#7f1d1d";
+          }
 
-    // 2. Prepare the lookup map
-    const byDoctor = new Map();
-    docs.forEach(d => byDoctor.set(String(d.id).trim(), new Map()));
+          // Click slot => open modal + set doctor/date/time
+          b.addEventListener("click", () => {
+            if (!available) return;
+            // open modal
+            modalOpenBtn?.click();
 
-    // 3. Map appointments
-    dayAppointments.forEach(appt => {
-      let did = String(appt.doctor_id || "").trim();
-      let m = byDoctor.get(did);
-      
-      if (!m) {
-        const docByName = docs.find(d => String(d.name).trim().toLowerCase() === String(appt.doctor_name || "").trim().toLowerCase());
-        if (docByName) m = byDoctor.get(String(docByName.id).trim());
-      }
-      if (!m) return; 
+            // set doctor inside modal
+            if (modalDoctor) {
+              modalDoctor.value = doctorId;
+              modalDoctor.dispatchEvent(new Event("change", { bubbles: true }));
+            }
 
-      let t = String(appt.time || "").trim().toUpperCase();
-      if (!t) return;
-      
-      let isPM = t.includes("PM");
-      let isAM = t.includes("AM");
-      t = t.replace(/[^\d:]/g, ""); 
-      let parts = t.split(':');
-      let hh = parseInt(parts[0] || "0", 10);
-      let mm = parseInt(parts[1] || "0", 10);
-      
-      if (isPM && hh < 12) hh += 12;
-      if (isAM && hh === 12) hh = 0;
-      
-      const slotMm = mm >= 30 ? "30" : "00";
-      const normalizedTime = `${String(hh).padStart(2, '0')}:${slotMm}`;
-
-      if (!m.has(normalizedTime)) m.set(normalizedTime, []);
-      m.get(normalizedTime).push(appt);
-    });
-
-    // 4. Build the Redesigned Vertical HTML Grid
-    let html = '<div class="max-h-[600px] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm custom-scrollbar">';
-    html += '<table class="w-full text-left border-collapse min-w-[600px]">'; 
-    
-    // Table Header (Doctors as Columns)
-    html += '<thead class="bg-slate-50 sticky top-0 z-30 shadow-sm ring-1 ring-slate-200">';
-    html += '<tr>';
-    // Top-left sticky corner
-    html += '<th class="w-28 border-r border-slate-200 p-4 font-extrabold text-slate-500 text-xs uppercase sticky left-0 top-0 bg-slate-100 z-40">Time</th>';
-    
-    docs.forEach(doc => {
-      html += `<th class="min-w-[220px] p-4 font-extrabold text-slate-800 text-sm bg-slate-50 border-r border-slate-200">${h(doc.name)}</th>`;
-    });
-    html += '</tr></thead>';
-
-    // Table Body (Time slots as Rows)
-    html += '<tbody class="divide-y divide-slate-100">';
-    slots.forEach(slot => {
-      // Added h-12 to the TR to force every single row to be exactly the same height
-      html += '<tr class="group hover:bg-slate-50/50 transition-colors h-12">';
-      
-      // Sticky Time Column
-      html += `<td class="border-r border-slate-100 p-2 align-top sticky left-0 bg-white group-hover:bg-slate-50 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.02)] w-24">
-                  <span class="text-xs font-bold text-slate-500 block mt-0.5">${h(to12(slot))}</span>
-               </td>`;
-      
-      // Appointment Cells
-      docs.forEach(doc => {
-        const docIdStr = String(doc.id).trim();
-        const m = byDoctor.get(docIdStr);
-        const apptsInSlot = m ? (m.get(slot) || []) : [];
-        
-        // Changed padding to p-1, removed height constraints from the cell
-        html += `<td class="p-1 align-top border-r border-slate-100 relative">`;
-        
-        if (apptsInSlot.length > 0) {
-          html += `<div class="flex flex-col gap-1">`;
-          apptsInSlot.forEach(appt => {
-            const pill = statusPillClass(appt.status);
-            // Ultra-compact button
-            html += `
-              <button type="button" data-appt-id="${h(appt.id)}"
-                class="w-full text-left rounded border ${pill} px-2 py-0.5 hover:shadow-md transition-all overflow-hidden">
-                <div class="flex items-center justify-between">
-                  <span class="font-bold text-[11px] truncate pr-1">${h(appt.patient_name || "—")}</span>
-                  <span class="text-[9px] font-bold opacity-60 shrink-0">#${appt.id}</span>
-                </div>
-                <div class="text-[8px] uppercase tracking-wider font-extrabold opacity-80 leading-tight mt-0.5">${h(String(appt.status || ""))}</div>
-              </button>`;
+            // ✅ store 24-hour time so modal can select it safely
+            window.__AKAS_PRESELECT = { doctorId, date: selectedDate, time: time24 };
           });
-          html += `</div>`;
+
+          wrap.appendChild(b);
+        });
+
+
+        slotGrid.innerHTML = "";
+        slotGrid.appendChild(wrap);
+      } catch (e) {
+        slotGrid.innerHTML = `<div class="text-sm text-rose-600 font-semibold">Failed to load slots.</div>`;
+      }
+
+      // ==============================
+      // PRESELECT FROM PREVIEW CARD
+      // ==============================
+      if (window.__AKAS_PRESELECT) {
+        const p = window.__AKAS_PRESELECT;
+
+        // Check if same date
+        if (p.date === selectedDate) {
+          const btns = document.querySelectorAll("#slotGrid button[data-time24]");
+
+          btns.forEach((b) => {
+            if ((b.dataset.time24 || "").trim() === (p.time || "").trim()) {
+              b.click(); // simulate selecting the slot
+            }
+          });
         }
-        
-        html += `</td>`;
-      });
-      html += '</tr>';
+
+
+        // clear after use so it doesn’t repeat
+        window.__AKAS_PRESELECT = null;
+      }
+    }
+
+    // reset slots when doctor changes
+    doctorSel.addEventListener("change", () => {
+      slotGrid.innerHTML = `<div class="text-sm text-slate-600">Pick a date to see slots.</div>`;
     });
 
-    html += '</tbody></table></div>';
-    calGrid.innerHTML = html;
-
-    // Attach click listeners
-    calGrid.querySelectorAll('button[data-appt-id]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-appt-id');
-        const appt = dayAppointments.find(a => String(a.id) === String(id));
-        if (appt) openModal(appt);
-      });
+    // month navigation (preview)
+    prevBtn?.addEventListener("click", () => {
+      cur = new Date(cur.getFullYear(), cur.getMonth() - 1, 1);
+      selectedDate = null;
+      dateText.textContent = "No date selected";
+      slotGrid.innerHTML = "";
+      buildCalendar();
     });
-  }
 
-  async function bootMonth() {
-    const ym = toYM(viewDate);
-    calGrid.innerHTML = `<div class="text-sm text-slate-500">Loading calendar…</div>`;
-    try {
-      await apiMonthCounts(ym);
-      renderMonth();
-    } catch (e) {
-      calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
-    }
-  }
+    nextBtn?.addEventListener("click", () => {
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+      selectedDate = null;
+      dateText.textContent = "No date selected";
+      slotGrid.innerHTML = "";
+      buildCalendar();
+    });
 
-  async function bootDay() {
-    if (!selectedDate) selectedDate = new Date();
-    const ymd = toYMD(selectedDate);
+    buildCalendar();
+  })();
 
-    selectedText.textContent = ymd;
-    if (datePicker) datePicker.value = ymd;
 
-    calGrid.innerHTML = `<div class="text-sm text-slate-500">Loading day schedule…</div>`;
-    try {
-      dayAppointments = await apiDayList(ymd);
-      renderDay();
-    } catch (e) {
-      calGrid.innerHTML = `<div class="text-sm text-rose-600">${h(e.message || e)}</div>`;
-    }
-  }
-
-  function invalidateCaches() {
-    monthCache.clear();
-    dayCache.clear();
-  }
-
-  // ==========================
-  // Events
-  // ==========================
-  prevBtn.addEventListener("click", async () => {
-    if (currentView === "month") {
-      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
-      await bootMonth();
-      return;
-    }
-
-    // Day: previous day
-    if (!selectedDate) selectedDate = new Date();
-    selectedDate = new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000);
-    await bootDay();
-  });
-
-  nextBtn.addEventListener("click", async () => {
-    if (currentView === "month") {
-      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
-      await bootMonth();
-      return;
-    }
-
-    // Day: next day
-    if (!selectedDate) selectedDate = new Date();
-    selectedDate = new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000);
-    await bootDay();
-  });
-
-  monthBtn?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    currentView = "month";
-    setActiveToggle();
-    await bootMonth();
-  });
-
-  dayBtn?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    currentView = "day";
-    setActiveToggle();
-    await bootDay();
-  });
-
-  todayBtn?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    selectedDate = new Date();
-    viewDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-
-    if (currentView === "month") {
-      await bootMonth();
-      // also load list for today (nice)
-      const ymd = toYMD(selectedDate);
-      selectedText.textContent = ymd;
-      if (datePicker) datePicker.value = ymd;
-      listWrap.innerHTML = `<div class="text-sm text-slate-500">Loading appointments…</div>`;
-      apiDayList(ymd).then(renderList).catch(err => listWrap.innerHTML = `<div class="text-sm text-rose-600">${h(err.message || err)}</div>`);
-      return;
-    }
-
-    await bootDay();
-  });
-
-  datePicker?.addEventListener("change", async () => {
-    const v = String(datePicker.value || "").trim();
-    if (!v) return;
-
-    // v is YYYY-MM-DD
-    const parts = v.split("-");
-    if (parts.length !== 3) return;
-    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    if (Number.isNaN(d.getTime())) return;
-
-    selectedDate = d;
-    viewDate = new Date(d.getFullYear(), d.getMonth(), 1);
-    selectedText.textContent = toYMD(d);
-
-    if (currentView === "month") {
-      await bootMonth();
-      listWrap.innerHTML = `<div class="text-sm text-slate-500">Loading appointments…</div>`;
-      apiDayList(toYMD(d)).then(renderList).catch(err => listWrap.innerHTML = `<div class="text-sm text-rose-600">${h(err.message || err)}</div>`);
-      return;
-    }
-
-    await bootDay();
-  });
-
-  doctorFilter?.addEventListener("change", async () => {
-    invalidateCaches();
-    selectedDate = null;
-    selectedText.textContent = "None";
-    listWrap.innerHTML = `<div class="text-sm text-slate-500">Select a day to view appointments.</div>`;
-
-    if (datePicker) datePicker.value = "";
-
-    if (currentView === "month") await bootMonth();
-    else await bootDay();
-  });
-
-  // Modal events
-  mClose?.addEventListener("click", closeModal);
-  modal?.addEventListener("click", (e) => {
-    if (e.target === modal) closeModal();
-  });
-
-  async function refreshAfterAction() {
-    invalidateCaches();
-
-    // refresh month grid
-    await apiMonthCounts(toYM(viewDate));
-    if (currentView === "month") renderMonth();
-
-    // refresh selected day list/table
-    if (selectedDate) {
-      const ymd = toYMD(selectedDate);
-      dayAppointments = await apiDayList(ymd);
-      if (currentView === "day") renderDay();
-      else renderList(dayAppointments);
-    }
-  }
-
-  mCancel?.addEventListener("click", async () => {
-    if (!selectedAppointment) return;
-    mMsg.textContent = "Processing…";
-    try {
-      await apiAction(parseInt(selectedAppointment.id, 10), "CANCELLED");
-      mMsg.textContent = "Appointment cancelled.";
-      await refreshAfterAction();
-      closeModal();
-    } catch (e) {
-      mMsg.textContent = String(e.message || e);
-      mMsg.className = "mt-3 text-xs text-rose-600";
-    }
-  });
-
-  mDone?.addEventListener("click", async () => {
-    if (!selectedAppointment) return;
-    mMsg.textContent = "Processing…";
-    try {
-      await apiAction(parseInt(selectedAppointment.id, 10), "DONE");
-      mMsg.textContent = "Marked as done.";
-      await refreshAfterAction();
-      closeModal();
-    } catch (e) {
-      mMsg.textContent = String(e.message || e);
-      mMsg.className = "mt-3 text-xs text-rose-600";
-    }
-  });
-
-  // ==============================
-  // Create appointment (follow-up / reschedule)
-  // ==============================
-  const createBtn = document.getElementById("adminCreateBtn");
-  const cModal = document.getElementById("adminCreateModal");
-  const cClose = document.getElementById("admCreateClose");
-  const cSub = document.getElementById("admCreateSub");
-  const cEmail = document.getElementById("admCreateEmail");
-  const cDoctor = document.getElementById("admCreateDoctor");
-  const cTime = document.getElementById("admCreateTime");
-  const cNotes = document.getElementById("admCreateNotes");
-  const cSave = document.getElementById("admCreateSave");
-  const cMsg = document.getElementById("admCreateMsg");
-
-  function openCreate() {
-    if (!cModal) return;
-    if (!selectedDate) {
-      alert("Select a date first.");
-      return;
-    }
-    cSub.textContent = `Selected date: ${toYMD(selectedDate)}`;
-    cMsg.textContent = "";
-    cModal.classList.remove("hidden");
-    cModal.classList.add("flex");
-    loadCreateSlots();
-  }
-
-  function closeCreate() {
-    if (!cModal) return;
-    cModal.classList.add("hidden");
-    cModal.classList.remove("flex");
-  }
-
-  async function loadCreateSlots() {
-    if (!cDoctor || !cTime) return;
-    cTime.innerHTML = '<option value="">Select time</option>';
-    const did = parseInt(cDoctor.value || "0", 10);
-    if (!did || !selectedDate) return;
-
-    try {
-      const res = await fetch(`${BASE_URL}/api/get_slots.php?clinic_id=${encodeURIComponent(CLINIC_ID)}&doctor_id=${encodeURIComponent(did)}&date=${encodeURIComponent(toYMD(selectedDate))}`);
-      const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "Failed to load slots");
-
-      const available = (data.slots || []).filter(s => s.status === 'AVAILABLE');
-      if (available.length === 0) {
-        cTime.innerHTML = '<option value="">No available slots</option>';
-        return;
-      }
-      for (const s of available) {
-        const opt = document.createElement('option');
-        opt.value = s.time;
-        opt.textContent = to12(s.time);
-        cTime.appendChild(opt);
-      }
-    } catch {
-      cTime.innerHTML = '<option value="">Failed to load</option>';
-    }
-  }
-
-  createBtn?.addEventListener("click", openCreate);
-  cClose?.addEventListener("click", closeCreate);
-  cModal?.addEventListener("click", (e) => { if (e.target === cModal) closeCreate(); });
-  cDoctor?.addEventListener("change", loadCreateSlots);
-
-  cSave?.addEventListener("click", async () => {
-    const email = String(cEmail?.value || "").trim();
-    const did = parseInt(cDoctor?.value || "0", 10);
-    const time = String(cTime?.value || "").trim();
-    const notes = String(cNotes?.value || "").trim();
-    if (!selectedDate) return;
-
-    if (!email) return alert("Patient email is required");
-    if (!did) return alert("Select a doctor");
-    if (!time) return alert("Select a time");
-
-    cMsg.textContent = "Saving…";
-    cMsg.className = "mt-3 text-xs text-slate-500";
-    cSave.disabled = true;
-
-    try {
-      const res = await fetch(`${BASE_URL}/api/admin_create_appointment.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patient_email: email,
-          doctor_id: did,
-          date: toYMD(selectedDate),
-          time,
-          notes
-        })
-      });
-      const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || 'Failed');
-
-      cMsg.textContent = "Appointment created.";
-      invalidateCaches();
-      await bootMonth();
-      closeCreate();
-    } catch (e) {
-      cMsg.textContent = String(e.message || e);
-      cMsg.className = "mt-3 text-xs text-rose-600";
-    } finally {
-      cSave.disabled = false;
-    }
-  });
-
-  // ==========================
-  // Start
-  // ==========================
-  setActiveToggle();
-  bootMonth();
 })();

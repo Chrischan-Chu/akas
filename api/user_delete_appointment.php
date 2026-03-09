@@ -62,13 +62,52 @@ try {
     echo json_encode(['error' => 'Cannot cancel this appointment']);
     exit;
   }
+  
+    // ===============================
+    // Cancel count + blacklist logic
+    // ===============================
+    $u = $pdo->prepare("
+      SELECT cancel_count, is_blacklisted
+      FROM accounts
+      WHERE id = ?
+      LIMIT 1
+      FOR UPDATE
+    ");
+    $u->execute([$userId]);
+    $userRow = $u->fetch(PDO::FETCH_ASSOC) ?: ['cancel_count' => 0, 'is_blacklisted' => 0];
+    
+    $cancelCount = (int)($userRow['cancel_count'] ?? 0);
+    $isBlacklisted = (int)($userRow['is_blacklisted'] ?? 0);
+    
+    if ($isBlacklisted === 1) {
+      $pdo->rollBack();
+      http_response_code(403);
+      echo json_encode(['error' => 'Your account is blacklisted from booking appointments.']);
+      exit;
+    }
+    
+    $newCancelCount = $cancelCount + 1;
+    
+    $updUser = $pdo->prepare("
+      UPDATE accounts
+      SET cancel_count = ?,
+          is_blacklisted = CASE WHEN ? >= 4 THEN 1 ELSE is_blacklisted END,
+          blacklisted_at = CASE WHEN ? >= 4 THEN NOW() ELSE blacklisted_at END,
+          blacklist_reason = CASE
+            WHEN ? >= 4 THEN 'Exceeded cancellation limit'
+            ELSE blacklist_reason
+          END
+      WHERE id = ?
+      LIMIT 1
+    ");
+    $updUser->execute([$newCancelCount, $newCancelCount, $newCancelCount, $newCancelCount, $userId]);
 
 
   $stmt = $pdo->prepare('UPDATE appointments
-    SET APT_Status = "cancelled"
+    SET APT_Status = "CANCELLED"
     WHERE APT_AppointmentID = ?
       AND APT_UserID = ?
-      AND APT_Status IN ("pending","approved")
+      AND APT_Status IN ("PENDING","APPROVED")
     LIMIT 1');
   $stmt->execute([$appointmentId, $userId]);
 
@@ -86,6 +125,52 @@ try {
   echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
   exit;
 }
+    // 🔔 REALTIME: notify admin dashboard calendar
+    try {
+      require_once __DIR__ . '/../includes/realtime_ably.php';
+      if (function_exists('publish_slots_updated')) {
+        $clinicId = (int)($details['APT_ClinicID'] ?? 0);
+        $date = (string)($details['APT_Date'] ?? '');
+        if ($clinicId > 0 && $date !== '') {
+          publish_slots_updated($clinicId, $date);
+        }
+      }
+    } catch (Throwable $rt) {
+      // ignore
+    }
+// ==========================================
+// 🔔 REAL-TIME (USER CANCEL -> ADMIN DASHBOARD)
+// publish "slots-updated" so the existing admin listener reacts
+// ==========================================
+    try {
+      $clinicId = (int)($details['APT_ClinicID'] ?? 0);
+      $date     = (string)($details['APT_Date'] ?? '');
+    
+      if ($clinicId > 0 && $date !== '') {
+        $ablyKey = getenv('ABLY_API_KEY') ?: 'KtC7rw.-df6sw:fEo5tVYYnOpj_RrNA450TNLUaST_v6qYWplSC79SdmU';
+    
+        $url = 'https://rest.ably.io/channels/clinic-' . $clinicId . '/messages';
+    
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_USERPWD, $ablyKey);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+          'name' => 'slots-updated',
+          'data' => [
+            'action' => 'user_cancel',
+            'appointment_id' => (int)$appointmentId,
+            'date' => $date
+          ]
+        ]));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+        curl_exec($ch);
+        curl_close($ch);
+      }
+    } catch (Throwable $e) {
+      // ignore
+    }
 
 // ✅ SMS notification (non-blocking)
 try {
@@ -107,6 +192,7 @@ try {
     $userPhone = (string)($details['user_phone'] ?? '');
     if (trim($userPhone) !== '') {
       $userMsg = sms_template('cancel_by_user_user', [
+        'clinic_name'  => (string)($details['clinic_name'] ?? ''),
         'patient_name' => $patientName,
         'doctor_name'  => $doctorName,
         'date'         => $whenDate,
@@ -125,6 +211,7 @@ try {
     $docPhone = (string)($details['doctor_phone'] ?? '');
     if (trim($docPhone) !== '') {
       $docMsg = sms_template('cancel_by_user_doctor', [
+        'clinic_name'  => (string)($details['clinic_name'] ?? ''),
         'patient_name' => $patientName,
         'doctor_name'  => $doctorName,
         'date'         => $whenDate,
@@ -143,5 +230,13 @@ try {
   // ignore SMS errors
 }
 
-echo json_encode(['ok' => true]);
+//NEW
+echo json_encode([
+  'ok' => true,
+  'cancel_count' => $newCancelCount,
+  'warning' => $newCancelCount === 3
+      ? 'Warning: You have reached 3 cancellations. Cancelling one more appointment will result in your account being blacklisted from booking.'
+      : null,
+  'blacklisted' => $newCancelCount >= 4
+]);
 exit;

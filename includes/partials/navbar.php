@@ -33,6 +33,7 @@ $isSuperAdmin  = $isLoggedIn && $role === 'super_admin';
           <li><a href="<?php echo $baseUrl; ?>/index.php#home" class="nav-link transition-colors">Home</a></li>
           <li><a href="<?php echo $baseUrl; ?>/index.php#about" class="nav-link transition-colors">About</a></li>
           <li><a href="<?php echo $baseUrl; ?>/index.php#clinics" class="nav-link transition-colors">Clinics</a></li>
+            <li><a href="<?php echo $baseUrl; ?>/index.php#faq" class="nav-link transition-colors">FAQ</a></li>
           <li><a href="<?php echo $baseUrl; ?>/index.php#contact" class="nav-link transition-colors">Contact</a></li>
           <li><a href="<?php echo $baseUrl; ?>/index.php#clinic-map" class="nav-link transition-colors">Map</a></li>
         </ul>
@@ -245,8 +246,16 @@ $isSuperAdmin  = $isLoggedIn && $role === 'super_admin';
           </span>
         </a>
 
+        <a href="<?php echo $baseUrl; ?>/index.php#faq" class="mobileLink flex items-center justify-between px-5 py-4 text-lg font-semibold">
+          FAQ
+          <span class="text-slate-400">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
+            </svg>
+          </span>
+        </a>
         
-<a href="<?php echo $baseUrl; ?>/index.php#contact" class="mobileLink flex items-center justify-between px-5 py-4 text-lg font-semibold">
+        <a href="<?php echo $baseUrl; ?>/index.php#contact" class="mobileLink flex items-center justify-between px-5 py-4 text-lg font-semibold">
           Contact
           <span class="text-slate-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -318,6 +327,7 @@ $isSuperAdmin  = $isLoggedIn && $role === 'super_admin';
 </div>
 
 <?php if ($isUser): ?>
+<script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
 <script>
 (function () {
   const BASE_URL = document.body?.dataset?.baseUrl || "<?php echo htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8'); ?>";
@@ -374,22 +384,43 @@ $isSuperAdmin  = $isLoggedIn && $role === 'super_admin';
 
     listEl.querySelectorAll('.notifCancelBtn').forEach(b => {
       b.addEventListener('click', async () => {
+    
         const id = b.getAttribute('data-appt-id');
         if (!id) return;
+    
+        if (!confirm("Cancel this appointment?")) return;
+    
         b.disabled = true;
+    
         try {
           const res = await fetch(`${BASE_URL}/api/user_delete_appointment.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ appointment_id: id })
           });
+    
           const data = await safeJson(res);
+    
           if (!res.ok) throw new Error(data.error || 'Cancel failed');
+    
+          // ✅ STEP 4 WARNING
+          if (typeof data.cancel_count !== "undefined") {
+              if (data.blacklisted) {
+                alert(`Cancellations used: ${data.cancel_count} / 3\n\nYour account has been blacklisted due to repeated cancellations.`);
+              } else if (data.warning) {
+                alert(`Cancellations used: ${data.cancel_count} / 3\n\n${data.warning}`);
+              } else {
+                alert(`Appointment cancelled.\n\nCancellations used: ${data.cancel_count} / 3`);
+              }
+            }
+    
           await loadAndRender();
+    
         } catch (e) {
           alert(e?.message || 'Cancel failed');
           b.disabled = false;
         }
+    
       });
     });
   }
@@ -453,6 +484,42 @@ $isSuperAdmin  = $isLoggedIn && $role === 'super_admin';
 
   // preload badges
   loadAndRender();
+     // ================================
+    // ✅ Realtime: refresh badge even when menu is CLOSED (with debug logs)
+    // ================================
+    const USER_ID = <?php echo (int)auth_user_id(); ?>;
+    
+    // prevent double init if navbar is included twice
+    if (!window.__AKAS_NOTIF_RT__) {
+      window.__AKAS_NOTIF_RT__ = true;
+    
+      console.log('[AKAS] init realtime for user:', USER_ID);
+    
+      if (window.Ably) {
+        const ably = new Ably.Realtime({
+          authUrl: `${BASE_URL}/api/ably_token.php`,
+          authMethod: 'GET'
+        });
+    
+        // ✅ connection debug
+        ably.connection.on('connected', () => console.log('[AKAS] Ably connected ✅'));
+        ably.connection.on('failed', (e) => console.log('[AKAS] Ably failed ❌', e));
+        ably.connection.on('disconnected', () => console.log('[AKAS] Ably disconnected'));
+    
+        const channelName = `user-${USER_ID}`;
+        console.log('[AKAS] Subscribing to:', channelName);
+    
+        const ch = ably.channels.get(channelName);
+    
+        ch.subscribe((msg) => {
+          console.log('[AKAS] notif realtime RECEIVED ✅', msg.name, msg.data);
+          loadAndRender();
+        });
+    
+      } else {
+        console.warn('[AKAS] Ably not loaded; realtime notifications disabled');
+      }
+    }
 })();
 </script>
 <?php endif; ?>

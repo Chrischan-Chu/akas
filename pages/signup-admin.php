@@ -605,9 +605,32 @@ document.addEventListener("DOMContentLoaded", function () {
                 style="background-color:#ffa154;"
                 onmouseover="this.style.backgroundColor='#f97316'"
                 onmouseout="this.style.backgroundColor='#ffa154'"
+                data-original-text="Create Clinic"
+        data-loading-text="Creating account..."
               >
                 Create Clinic
               </button>
+
+                <!-- ✅ Terms + Privacy + SMS Consent (ADDED ONLY) -->
+              <div class="pt-3 text-center text-xs text-white/90 leading-relaxed">
+                By creating an account, you agree to the
+                <button
+                  type="button"
+                  id="openTermsInline"
+                  class="underline underline-offset-2 font-semibold hover:text-white"
+                >
+                  Terms of Service
+                </button>.
+                For more information about AKAS's privacy practices, see the
+                <button
+                  type="button"
+                  id="openPrivacyInline"
+                  class="underline underline-offset-2 font-semibold hover:text-white"
+                >
+                  AKAS Privacy Statement
+                </button>.
+                We'll occasionally send you account-related emails.
+              </div>
 
               <!-- ✅ Already have account (STEP 2) -->
               <div class="pt-6">
@@ -633,6 +656,129 @@ document.addEventListener("DOMContentLoaded", function () {
 
             </div>
           </form>
+            
+          <!-- ✅ Privacy Policy Modal (ADDED ONLY) -->
+          <div id="privacyPolicyModal" class="fixed inset-0 z-[9999] hidden" aria-hidden="true">
+            <div class="absolute inset-0 bg-black/50"></div>
+            <div class="relative min-h-screen flex items-center justify-center p-4">
+              <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+                  <h3 class="text-slate-900 font-bold text-lg">Privacy Policy</h3>
+                  <button type="button" id="closePrivacyPolicy"
+                    class="text-slate-500 hover:text-slate-800 font-bold text-xl leading-none" aria-label="Close">×</button>
+                </div>
+
+                <div class="px-5 py-4 text-slate-700 text-sm leading-relaxed max-h-[70vh] overflow-auto">
+                  <p class="font-semibold text-slate-900">AKAS Privacy Policy</p>
+                  <p class="mt-2">
+                    AKAS collects and processes the information you provide during sign up (such as your admin name, email,
+                    clinic name, contact number, and business details) to create and manage your clinic account and to support
+                    appointment booking features.
+                  </p>
+
+                  <p class="mt-3">
+                    Your information is used only for system functionality, account verification, communication related to your
+                    appointments, and service improvement. We do not sell your personal information.
+                  </p>
+
+                  <p class="mt-3">
+                    Access to your data is limited to authorized personnel and system processes. We apply reasonable safeguards to
+                    protect your information against unauthorized access, misuse, or disclosure.
+                  </p>
+
+                  <p class="mt-3">
+                    By creating an account, you agree to the collection and use of your information as described in this policy.
+                    If you have questions or requests regarding your data, you may contact the AKAS administrators through the
+                    system’s contact channels.
+                  </p>
+
+                  <p class="mt-3 text-slate-500">Last updated: February 27, 2026</p>
+                </div>
+
+                <div class="px-5 py-4 border-t border-slate-200 flex justify-end">
+                  <button type="button" id="closePrivacyPolicy2"
+                    class="rounded-xl px-4 py-2 font-semibold text-white" style="background-color:#38B6FF;">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ✅ Terms of Service Modal (ADDED ONLY) -->
+          <div id="termsModal" class="fixed inset-0 z-[9999] hidden" aria-hidden="true">
+            <div class="absolute inset-0 bg-black/50"></div>
+            <div class="relative min-h-screen flex items-center justify-center p-4">
+              <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+                  <h3 class="text-slate-900 font-bold text-lg">Terms of Service</h3>
+                  <button type="button" id="closeTerms"
+                    class="text-slate-500 hover:text-slate-800 font-bold text-xl leading-none" aria-label="Close">×</button>
+                </div>
+
+                <div class="px-5 py-4 text-slate-700 text-sm leading-relaxed max-h-[70vh] overflow-auto">
+                  <p class="font-semibold text-slate-900">AKAS Terms of Service</p>
+
+                  <p class="mt-2">
+                    By creating an account and using AKAS, you agree to comply with these Terms of Service and all applicable laws and regulations.
+                    If you do not agree, please do not use the system.
+                  </p>
+
+                  <p class="mt-3 font-semibold text-slate-900">1) Account and Eligibility</p>
+                  <p class="mt-1">
+                    You must provide accurate and complete information during sign up. You are responsible for maintaining the confidentiality
+                    of your login credentials and for all activities that occur under your account.
+                  </p>
+
+                  <p class="mt-3 font-semibold text-slate-900">2) Appointment Use</p>
+                  <p class="mt-1">
+                    AKAS helps you manage your clinic profile, doctors, and appointment requests. Appointment availability,
+                    cancellations, and clinic policies may vary by clinic. AKAS does not guarantee appointment volume or user behavior.
+                  </p>
+
+                  <p class="mt-3 font-semibold text-slate-900">3) Acceptable Use</p>
+                  <p class="mt-1">
+                    You agree not to misuse the system, including attempting unauthorized access, submitting false information, disrupting
+                    service, or using AKAS for unlawful or harmful activities.
+                  </p>
+
+                  <p class="mt-3 font-semibold text-slate-900">4) Communications (Email and SMS)</p>
+                  <p class="mt-1">
+                    By creating an account, you consent to receive communications related to your account and appointments, including SMS
+                    notifications and emails. Message frequency may vary. Standard message and data rates may apply depending on your carrier. These messages are system-generated and are intended solely for appointment-related communication. Standard messaging rates
+                    from your mobile carrier may apply.
+                  </p>
+
+                  <p class="mt-3 font-semibold text-slate-900">5) Privacy</p>
+                  <p class="mt-1">
+                    Your use of AKAS is also governed by the AKAS Privacy Statement, which describes how your data is collected, used, and protected.
+                  </p>
+
+                  <p class="mt-3 font-semibold text-slate-900">6) Service Availability</p>
+                  <p class="mt-1">
+                    AKAS may be updated, modified, or temporarily unavailable due to maintenance or technical issues. We may improve features
+                    and adjust functionality without prior notice.
+                  </p>
+
+                  <p class="mt-3 font-semibold text-slate-900">7) Limitation of Liability</p>
+                  <p class="mt-1">
+                    To the extent permitted by law, AKAS and its developers are not liable for indirect, incidental, or consequential damages
+                    arising from your use of the system, including missed appointments or clinic decisions.
+                  </p>
+
+                  <p class="mt-3 font-semibold text-slate-900">8) Changes to These Terms</p>
+                  <p class="mt-1">
+                    We may update these Terms from time to time. Continued use of AKAS after updates means you accept the revised Terms.
+                  </p>
+
+                  <p class="mt-3 text-slate-500">Last updated: February 27, 2026</p>
+                </div>
+
+                <div class="px-5 py-4 border-t border-slate-200 flex justify-end">
+                  <button type="button" id="closeTerms2"
+                    class="rounded-xl px-4 py-2 font-semibold text-white" style="background-color:#38B6FF;">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
 
         </div>
       </div>
@@ -749,9 +895,8 @@ document.addEventListener("DOMContentLoaded", function () {
               <select id="docSlotMins" required
                       data-required-msg="Please select an option."
                       class="w-full h-11 rounded-xl border border-slate-200 px-4 text-slate-700 focus:outline-none focus:ring-2 focus:ring-white/60">
-                <option value="30" selected>30 minutes</option>
+                <option value="20" selected>20 minutes</option>
                 <option value="15">15 minutes</option>
-                <option value="60">60 minutes</option>
               </select>
               <p data-err-for="docSlotMins" class="mt-1 text-sm font-semibold text-red-600 leading-snug"></p>
             </div>
@@ -823,15 +968,56 @@ document.addEventListener("DOMContentLoaded", function () {
     </div>
   </div>
 </div>
-<script>
-  if ("scrollRestoration" in history) {
-    history.scrollRestoration = "manual";
-  }
+            <script>
+              if ("scrollRestoration" in history) {
+                history.scrollRestoration = "manual";
+              }
+            
+              window.addEventListener("load", function () {
+                window.scrollTo(0, 0);
+              });
+              
+              
+              <!-- ✅ Modal JS (ADDED ONLY) -->
+            (function () {
+              const bind = (openId, modalId, closeIds) => {
+                const openBtn = document.getElementById(openId);
+                const modal = document.getElementById(modalId);
+                if (!openBtn || !modal) return;
 
-  window.addEventListener("load", function () {
-    window.scrollTo(0, 0);
-  });
-</script>
+                const backdrop = modal.firstElementChild;
+
+                const open = () => {
+                  modal.classList.remove("hidden");
+                  modal.setAttribute("aria-hidden", "false");
+                };
+                const close = () => {
+                  modal.classList.add("hidden");
+                  modal.setAttribute("aria-hidden", "true");
+                };
+
+                openBtn.addEventListener("click", open);
+
+                closeIds.forEach((id) => {
+                  const btn = document.getElementById(id);
+                  if (btn) btn.addEventListener("click", close);
+                });
+
+                modal.addEventListener("click", (e) => {
+                  if (e.target === backdrop) close();
+                });
+
+                document.addEventListener("keydown", (e) => {
+                  if (e.key === "Escape" && !modal.classList.contains("hidden")) close();
+                });
+              };
+
+              bind("openTermsInline", "termsModal", ["closeTerms", "closeTerms2"]);
+              bind("openPrivacyInline", "privacyPolicyModal", ["closePrivacyPolicy", "closePrivacyPolicy2"]);
+              bind("openSmsInline", "smsModal", ["closeSms", "closeSms2"]);
+            })();
+          </script>
+
 
 <?php $v1 = @filemtime(__DIR__ . '/../assets/js/form-validators.js') ?: time(); ?>
 <script defer src="<?= $baseUrl ?>/assets/js/form-validators.js?v=<?= (int)$v1 ?>"></script>

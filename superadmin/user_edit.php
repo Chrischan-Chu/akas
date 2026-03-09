@@ -16,7 +16,7 @@ $stmt = $pdo->prepare("
   WHERE id=:id AND role='user'
 ");
 $stmt->execute([':id' => $userId]);
-$user = $stmt->fetch();
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$user) {
   header('Location: ' . $baseUrl . '/superadmin/users.php');
@@ -24,15 +24,17 @@ if (!$user) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $name  = trim((string)$_POST['name']);
-  $email = trim((string)$_POST['email']);
-  $phone = trim((string)$_POST['phone']);
+
+  $name  = trim((string)($_POST['name'] ?? ''));
+  $email = trim((string)($_POST['email'] ?? ''));
+  $phone = trim((string)($_POST['phone'] ?? ''));
 
   $upd = $pdo->prepare("
     UPDATE accounts
     SET name=:n, email=:e, phone=:p
     WHERE id=:id AND role='user'
   ");
+
   $upd->execute([
     ':n' => $name,
     ':e' => $email,
@@ -44,24 +46,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   header('Location: ' . $baseUrl . '/superadmin/users.php');
   exit;
 }
+
+function h($v){
+  return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+}
 ?>
 
 <?php require_once __DIR__ . '/partials/top.php'; ?>
 
-<h2 class="text-xl font-bold mb-4">Edit User</h2>
+<div class="flex items-center justify-between mb-6">
+  <h2 class="text-2xl font-bold text-slate-900">Edit User</h2>
+</div>
 
-<form method="POST" class="bg-white p-6 rounded-2xl shadow-sm max-w-lg">
-  <label class="block text-sm mb-1">Name</label>
-  <input name="name" value="<?= htmlspecialchars($user['name']) ?>" class="w-full border rounded-xl px-3 py-2 mb-3">
+<div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 max-w-xl">
 
-  <label class="block text-sm mb-1">Email</label>
-  <input name="email" value="<?= htmlspecialchars($user['email']) ?>" class="w-full border rounded-xl px-3 py-2 mb-3">
+<form method="POST" class="space-y-5">
 
-  <label class="block text-sm mb-1">Phone</label>
-  <input name="phone" value="<?= htmlspecialchars((string)$user['phone']) ?>" class="w-full border rounded-xl px-3 py-2 mb-4">
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">
+      Name
+    </label>
 
-  <button class="px-6 py-2 rounded-full text-white bg-blue-500">Save</button>
-  <a href="<?= $baseUrl ?>/superadmin/users.php" class="ml-3 text-slate-500">Cancel</a>
+    <input
+      name="name"
+      value="<?= h($user['name']) ?>"
+      required
+      class="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+    >
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">
+      Email
+    </label>
+
+    <input
+      name="email"
+      value="<?= h($user['email']) ?>"
+      required
+      class="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+    >
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">
+      Phone
+    </label>
+
+    <input
+      name="phone"
+      value="<?= h((string)$user['phone']) ?>"
+      class="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+    >
+  </div>
+
+  <div class="flex items-center gap-3 pt-2">
+
+    <button
+      type="submit"
+      class="h-10 px-5 rounded-lg text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+      style="background:var(--akas-blue);"
+    >
+      Save Changes
+    </button>
+
+    <a
+      href="<?= $baseUrl ?>/superadmin/users.php"
+      class="text-sm text-slate-500 hover:text-slate-700"
+    >
+      Cancel
+    </a>
+
+  </div>
+
 </form>
+
+</div>
 
 <?php require_once __DIR__ . '/partials/bottom.php'; ?>
