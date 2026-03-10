@@ -397,7 +397,7 @@ include __DIR__ . '/../includes/partials/head.php';
         <a href="<?php echo $baseUrl; ?>/admin/clinic-details.php"
            class="w-full h-12 rounded-2xl font-bold text-white text-center flex items-center justify-center
                   shadow-sm hover:opacity-95 transition"
-           style="background: var(--secondary);">
+           style="background: var(--primary);">
           Clinic Details
         </a>
 
@@ -413,6 +413,13 @@ include __DIR__ . '/../includes/partials/head.php';
                   shadow-sm hover:opacity-95 transition"
            style="background: var(--primary);">
           Add Admin Account
+        </a>
+        
+        <a href="<?php echo $baseUrl; ?>/admin/blacklisted-users.php"
+           class="w-full h-12 rounded-2xl font-bold text-white text-center flex items-center justify-center
+                  shadow-sm hover:opacity-95 transition"
+           style="background: var(--primary);">
+          Blacklisted Users
         </a>
       </div>
     </div>
@@ -552,6 +559,11 @@ include __DIR__ . '/../includes/partials/head.php';
           </div>
 
           <div class="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-end">
+            <!-- New --><button type="button" id="admReschedBtn"
+              class="h-11 px-5 rounded-2xl font-bold border border-slate-200 bg-white hover:bg-slate-50">
+              Reschedule
+            </button> 
+            
             <button type="button" id="admCancelBtn"
                     class="h-11 px-5 rounded-2xl font-bold border border-slate-200 bg-white hover:bg-slate-50">
               Cancel Appointment
@@ -572,7 +584,7 @@ include __DIR__ . '/../includes/partials/head.php';
     <!-- Create Appointment Modal -->
     <div id="adminCreateModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 px-4">
       <div class="w-full max-w-xl rounded-3xl bg-white shadow-xl border border-slate-200 overflow-hidden">
-
+       <!-- New --> <input type="hidden" id="admAppointmentId" value="">
         <div class="px-6 py-5 flex items-start justify-between gap-3 border-b border-slate-200">
           <div>
             <div class="text-lg font-extrabold" style="color: var(--secondary);">Create Appointment</div>
@@ -602,7 +614,13 @@ include __DIR__ . '/../includes/partials/head.php';
                   <?php endforeach; ?>
                 </select>
               </div>
-
+                
+                <div>
+                  <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Date</label>
+                  <input id="admCreateDate" type="date"
+                    class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white">
+                </div>
+                
               <div>
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Time</label>
                 <select id="admCreateTime" class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white">
@@ -614,6 +632,14 @@ include __DIR__ . '/../includes/partials/head.php';
             <div>
               <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Notes (optional)</label>
               <textarea id="admCreateNotes" rows="3" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white" placeholder="Follow-up / reschedule notes..."></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">
+                Reason for reschedule
+              </label>
+              <textarea id="admRescheduleReason" rows="3"
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white"
+                placeholder="Explain why the appointment is being moved..."></textarea>
             </div>
           </div>
 
@@ -638,8 +664,42 @@ include __DIR__ . '/../includes/partials/head.php';
 </script>
 
 </main>
+<script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+<script src="<?php echo $baseUrl; ?>/assets/js/admin-dashboard-calendar.js?v=10"></script>
+<script>
+(function () {
+  const BASE_URL  = document.body?.dataset?.baseUrl || "<?php echo htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8'); ?>";
+  const CLINIC_ID = Number(document.body?.dataset?.clinicId || "<?php echo (int)$clinicId; ?>");
 
-<script src="<?php echo $baseUrl; ?>/assets/js/admin-dashboard-calendar.js?v=6"></script>
+  console.log('[ADMIN] init realtime for clinic:', CLINIC_ID);
+
+  if (!window.Ably) {
+    console.warn('[ADMIN] Ably not loaded');
+    return;
+  }
+
+  const ably = new Ably.Realtime({
+    authUrl: `${BASE_URL}/api/ably_token.php`,
+    authMethod: 'GET'
+  });
+
+  ably.connection.on('connected', () => console.log('[ADMIN] Ably connected ✅'));
+
+  const ch = ably.channels.get(`clinic-${CLINIC_ID}`);
+  console.log('[ADMIN] Subscribing to:', `clinic-${CLINIC_ID}`);
+
+  ch.subscribe((msg) => {
+    console.log('[ADMIN] realtime:', msg.name, msg.data);
+
+    // ✅ Call your dashboard refresh if it exists; otherwise fallback reload
+    if (typeof window.adminReload === 'function') {
+      window.adminReload();               // (if you create this in admin-dashboard-calendar.js)
+    } else {
+      location.reload();                  // quick proof; replace later
+    }
+  });
+})();
+</script>
 
 </body>
 </html>

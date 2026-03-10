@@ -66,7 +66,7 @@ if ($action === 'approve') {
 
 if ($action === 'decline') {
   if ($reason === '') {
-    $reason = 'No reason provided.';
+    $reason = 'No comment provided.';
   } elseif (mb_strlen($reason) > 255) {
     $reason = mb_substr($reason, 0, 255);
   }

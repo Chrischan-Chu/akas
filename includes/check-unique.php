@@ -32,6 +32,7 @@ $allowed = [
   'clinic_contact',     // clinics.contact (10 digits)
   'clinic_email',       // clinics.email (optional but unique if filled)
   'clinic_business_id', // clinics.business_id
+  'prc',               // clinic_doctors.prc_no
 ];
 
 if (!in_array($type, $allowed, true)) {
@@ -76,6 +77,12 @@ try {
     ";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$num, $num, $num]);
+
+
+  } elseif ($type === 'prc') {
+    $prc = $digitsOnly(trim($value));
+    $stmt = $pdo->prepare('SELECT 1 FROM clinic_doctors WHERE prc_no = ? LIMIT 1');
+    $stmt->execute([$prc]);
 
   } else { // clinic_business_id
     $biz = $digitsOnly(trim($value));
