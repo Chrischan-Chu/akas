@@ -134,16 +134,59 @@ function resolve_schedule_from_row(array $row, string $date, array $allowedInter
    1) Clinic Hours
 =========================================================== */
 
-$stmt = $pdo->prepare('SELECT is_open, open_time, close_time FROM clinics WHERE id = ? LIMIT 1');
+$stmt = $pdo->prepare('SELECT is_open, open_time, close_time, weekly_schedule FROM clinics WHERE id = ? LIMIT 1');
 $stmt->execute([$clinicId]);
 $c = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+$defaultWeeklySchedule = [
+  'Mon' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Tue' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Wed' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Thu' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Fri' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Sat' => ['enabled' => false, 'start' => '',      'end' => ''],
+  'Sun' => ['enabled' => false, 'start' => '',      'end' => ''],
+];
+
+$weeklySchedule = $defaultWeeklySchedule;
+
+if (!empty($c['weekly_schedule'])) {
+  $decoded = json_decode((string)$c['weekly_schedule'], true);
+  if (is_array($decoded)) {
+    foreach ($defaultWeeklySchedule as $day => $defaults) {
+      $weeklySchedule[$day] = [
+        'enabled' => !empty($decoded[$day]['enabled']),
+        'start'   => (string)($decoded[$day]['start'] ?? $defaults['start']),
+        'end'     => (string)($decoded[$day]['end'] ?? $defaults['end']),
+      ];
+    }
+  }
+}
 
 if ((int)($c['is_open'] ?? 0) !== 1) {
   json_out(['ok'=>true,'slots'=>[],'meta'=>['clinic_status'=>'CLINIC_CLOSED']]);
 }
 
-$clinicOpen  = substr((string)($c['open_time'] ?? ''), 0, 5);
-$clinicClose = substr((string)($c['close_time'] ?? ''), 0, 5);
+$selectedDay = date('D', strtotime($date));
+$daySchedule = $weeklySchedule[$selectedDay] ?? null;
+
+if (
+  empty($daySchedule['enabled']) ||
+  empty($daySchedule['start']) ||
+  empty($daySchedule['end'])
+) {
+  json_out([
+    'ok' => true,
+    'slots' => [],
+    'meta' => [
+      'clinic_status' => 'CLINIC_CLOSED_DAY',
+      'clinic_day' => $selectedDay
+    ]
+  ]);
+}
+
+$clinicOpen  = substr((string)($daySchedule['start'] ?? ''), 0, 5);
+$clinicClose = substr((string)($daySchedule['end'] ?? ''), 0, 5);
 
 if (!preg_match('/^\d{2}:\d{2}$/', $clinicOpen) || !preg_match('/^\d{2}:\d{2}$/', $clinicClose)) {
   json_out(['ok'=>true,'slots'=>[],'meta'=>['clinic_status'=>'INVALID_CLINIC_HOURS']]);

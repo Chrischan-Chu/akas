@@ -464,11 +464,11 @@ $isSuperAdmin  = $isLoggedIn && $role === 'super_admin';
           // ✅ STEP 4 WARNING
           if (typeof data.cancel_count !== "undefined") {
               if (data.blacklisted) {
-                alert(`Cancellations used in this clinic: ${data.cancel_count} / 3\n\nYour account has been blacklisted from booking in this clinic due to repeated cancellations.`);
+                alert(`Your appointment has been cancelled successfully.\n\nCancellation count for this clinic: ${data.cancel_count} of 3.\n\nYour account has been restricted from booking further appointments in this clinic due to reaching the maximum number of cancellations allowed.`);
               } else if (data.warning) {
-                alert(`Cancellations used in this clinic: ${data.cancel_count} / 3\n\n${data.warning}`);
+                alert(`Your appointment has been cancelled successfully.\n\nCancellation count for this clinic: ${data.cancel_count} of 3.\n\nPlease be advised that repeated cancellations may result in booking restrictions for this clinic.`);
               } else {
-                alert(`Appointment cancelled.\n\nCancellations used in this clinic: ${data.cancel_count} / 3`);
+                alert(`Your appointment has been cancelled successfully.\n\nCancellation count for this clinic: ${data.cancel_count} of 3.\n\nPlease be reminded that repeated cancellations may lead to your account being restricted`);
               }
             }
     

@@ -503,7 +503,7 @@
         }
         
         // later when mapping appointments:
-        const normalizedTime = normalizeDbTime(ap.time);
+        const normalizedTime = normalizeDbTime(appt.time);
 
       if (!m.has(normalizedTime)) m.set(normalizedTime, []);
       m.get(normalizedTime).push(appt);

@@ -27,8 +27,9 @@ $stmt = $pdo->prepare(
       approval_status,
       is_open,
       open_time,
-      close_time,
-      updated_at
+        close_time,
+        weekly_schedule,
+        updated_at
    FROM clinics
    WHERE id=?
    LIMIT 1"
@@ -53,6 +54,43 @@ if ($approval !== 'APPROVED' && !$canViewUnapproved) {
 }
 
 $details = $clinic ?: [];
+
+$defaultWeeklySchedule = [
+  'Mon' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Tue' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Wed' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Thu' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Fri' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Sat' => ['enabled' => false, 'start' => '',      'end' => ''],
+  'Sun' => ['enabled' => false, 'start' => '',      'end' => ''],
+];
+
+$weeklySchedule = $defaultWeeklySchedule;
+
+if (!empty($clinic['weekly_schedule'])) {
+  $decoded = json_decode((string)$clinic['weekly_schedule'], true);
+  if (is_array($decoded)) {
+    foreach ($defaultWeeklySchedule as $day => $defaults) {
+      $weeklySchedule[$day] = [
+        'enabled' => !empty($decoded[$day]['enabled']),
+        'start'   => (string)($decoded[$day]['start'] ?? $defaults['start']),
+        'end'     => (string)($decoded[$day]['end'] ?? $defaults['end']),
+      ];
+    }
+  }
+}
+
+$todayKey = date('D');
+$todaySched = $weeklySchedule[$todayKey] ?? null;
+$todayHours = 'Closed';
+
+if (
+  !empty($todaySched['enabled']) &&
+  !empty($todaySched['start']) &&
+  !empty($todaySched['end'])
+) {
+  $todayHours = to12($todaySched['start']) . ' – ' . to12($todaySched['end']);
+}
 
 $isLoggedIn = auth_is_logged_in();
 $role = auth_role();
@@ -320,10 +358,30 @@ include "../includes/partials/head.php";
     <div class="lg:col-span-2 min-w-0 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
       <h3 class="text-xl font-extrabold" style="color:var(--secondary)">About the Clinic</h3>
 
-      <p class="mt-2 text-slate-600 leading-relaxed whitespace-normal break-words"
-         style="overflow-wrap:anywhere; word-break:break-word;">
-        <?php echo !empty($details['description']) ? nl2br(h((string)$details['description'])) : 'No clinic description yet.'; ?>
-      </p>
+      <?php $clinicDescription = trim((string)($details['description'] ?? '')); ?>
+
+        <div class="mt-2">
+          <div
+            id="clinicDescription"
+            class="text-slate-600 leading-relaxed whitespace-pre-line break-words overflow-hidden transition-all duration-300"
+            style="overflow-wrap:anywhere; word-break:break-word; max-height: 20rem;"
+            data-expanded="0"
+          >
+            <?php echo $clinicDescription !== '' ? h($clinicDescription) : 'No clinic description yet.'; ?>
+          </div>
+        
+          <?php if ($clinicDescription !== '' && mb_strlen($clinicDescription) > 350): ?>
+            <button
+              type="button"
+              id="toggleClinicDescription"
+              class="mt-3 inline-flex items-center text-sm font-semibold hover:underline"
+              style="color: var(--secondary);"
+              aria-expanded="false"
+            >
+              See more
+            </button>
+          <?php endif; ?>
+        </div>
 
       <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="rounded-xl p-4 min-w-0" style="background: rgba(64,183,255,.10);">
@@ -365,18 +423,11 @@ include "../includes/partials/head.php";
             <?php $isOpen = (int)($details['is_open'] ?? 1) === 1; ?>
             <span class="font-semibold"><?php echo $isOpen ? 'Open' : 'Closed'; ?></span>
           </div>
-
+            <!-- Modified -->
           <div class="flex items-center justify-between">
-            <span class="text-slate-500">Hours</span>
-            <?php
-              $ot = $details['open_time'] ?? null;
-              $ct = $details['close_time'] ?? null;
-              $hours = ($ot && $ct)
-                ? (date('g:i A', strtotime((string)$ot)) . ' – ' . date('g:i A', strtotime((string)$ct)))
-                : '—';
-            ?>
-            <span class="font-semibold"><?php echo h($hours); ?></span>
-          </div>
+              <span class="text-slate-500">Hours</span>
+              <span class="font-semibold"><?php echo h($todayHours); ?></span>
+            </div>
 
           <div class="flex items-center justify-between">
             <span class="text-slate-500">Type</span>
@@ -388,7 +439,26 @@ include "../includes/partials/head.php";
             </span>
           </div>
         </div>
-
+        
+        <div class="pt-3 mt-3 border-t border-slate-200">
+          <div class="text-slate-500 text-sm mb-2">Day Schedule</div>
+        
+          <?php foreach (['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as $day): ?>
+            <?php
+              $sched = $weeklySchedule[$day] ?? ['enabled' => false, 'start' => '', 'end' => ''];
+              $label = 'Closed';
+        
+              if (!empty($sched['enabled']) && !empty($sched['start']) && !empty($sched['end'])) {
+                $label = to12($sched['start']) . ' – ' . to12($sched['end']);
+              }
+            ?>
+            <div class="flex items-center justify-between py-1 text-sm">
+              <span class="text-slate-600"><?php echo h($day); ?></span>
+              <span class="font-medium text-slate-700"><?php echo h($label); ?></span>
+            </div>
+          <?php endforeach; ?>
+        </div>
+        
         <div class="mt-5 rounded-xl p-4 text-xs text-slate-600" style="background: rgba(15,23,42,.04);">
           <?php if ($isAdminViewer): ?>
             Admin accounts can view schedules, but can’t book appointments.
@@ -455,7 +525,6 @@ include "../includes/partials/head.php";
                   class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="Full name"
                   value="<?php echo h($viewer['name']); ?>"
-                  <?php echo $isUser ? 'readonly aria-readonly="true"' : ''; ?>
                   required>
               </div>
 
@@ -465,7 +534,6 @@ include "../includes/partials/head.php";
                   class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="09xx xxx xxxx"
                   value="<?php echo h($viewer['phone']); ?>"
-                  <?php echo $isUser ? 'readonly aria-readonly="true"' : ''; ?>
                   required>
               </div>
 
@@ -475,7 +543,6 @@ include "../includes/partials/head.php";
                   class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="name@email.com"
                   value="<?php echo h($viewer['email']); ?>"
-                  <?php echo $isUser ? 'readonly aria-readonly="true"' : ''; ?>
                   required>
               </div>
 
@@ -486,10 +553,6 @@ include "../includes/partials/head.php";
                   placeholder="Age"
                   >
               </div>
-
-              <?php if ($isUser): ?>
-                <p class="text-xs text-slate-500 mt-3">Your account details are locked for booking accuracy.</p>
-              <?php endif; ?>
 
               <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
                 Appointment type is fixed to <span class="font-bold">Visit / Checkup</span>.
@@ -741,6 +804,29 @@ include "../includes/partials/head.php";
     const alt = document.getElementById("closeBookingAlt");
     const main = document.getElementById("closeBooking");
     if (alt && main) alt.addEventListener("click", () => main.click());
+  })();
+  
+  (function () {
+    const box = document.getElementById("clinicDescription");
+    const btn = document.getElementById("toggleClinicDescription");
+
+    if (!box || !btn) return;
+
+    btn.addEventListener("click", function () {
+      const expanded = box.getAttribute("data-expanded") === "1";
+
+      if (expanded) {
+        box.style.maxHeight = "20rem";
+        box.setAttribute("data-expanded", "0");
+        btn.textContent = "See more";
+        btn.setAttribute("aria-expanded", "false");
+      } else {
+        box.style.maxHeight = box.scrollHeight + "px";
+        box.setAttribute("data-expanded", "1");
+        btn.textContent = "See less";
+        btn.setAttribute("aria-expanded", "true");
+      }
+    });
   })();
 </script>
 

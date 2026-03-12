@@ -240,12 +240,12 @@ try {
 
   // ✅ Clinic must be APPROVED and OPEN (optional but recommended)
   $c = $pdo->prepare("
-    SELECT approval_status, is_open, open_time, close_time
-    FROM clinics
-    WHERE id = ?
-    LIMIT 1
-    FOR UPDATE
-  ");
+      SELECT approval_status, is_open, open_time, close_time, weekly_schedule
+      FROM clinics
+      WHERE id = ?
+      LIMIT 1
+      FOR UPDATE
+    ");
   $c->execute([$clinicId]);
   $clinic = $c->fetch(PDO::FETCH_ASSOC);
 
@@ -264,16 +264,56 @@ try {
     json_out(['error' => 'Clinic is currently closed.'], 403);
   }
 
-  // ✅ enforce clinic hours if set (open_time/close_time expected like "09:00:00")
-  $ot = (string)($clinic['open_time'] ?? '');
-  $ct = (string)($clinic['close_time'] ?? '');
-  if ($ot !== '' && $ct !== '') {
-    $open = substr($ot, 0, 5);
-    $close = substr($ct, 0, 5);
-    if ($timeSql < $open || $timeSql >= $close) {
-      $pdo->rollBack();
-      json_out(['error' => "Selected time is outside clinic hours ($open–$close)."], 400);
+    // ✅ enforce clinic weekly schedule for the selected day
+  $defaultWeeklySchedule = [
+    'Mon' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+    'Tue' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+    'Wed' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+    'Thu' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+    'Fri' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+    'Sat' => ['enabled' => false, 'start' => '',      'end' => ''],
+    'Sun' => ['enabled' => false, 'start' => '',      'end' => ''],
+  ];
+
+  $weeklySchedule = $defaultWeeklySchedule;
+
+  if (!empty($clinic['weekly_schedule'])) {
+    $decoded = json_decode((string)$clinic['weekly_schedule'], true);
+    if (is_array($decoded)) {
+      foreach ($defaultWeeklySchedule as $day => $defaults) {
+        $weeklySchedule[$day] = [
+          'enabled' => !empty($decoded[$day]['enabled']),
+          'start'   => (string)($decoded[$day]['start'] ?? $defaults['start']),
+          'end'     => (string)($decoded[$day]['end'] ?? $defaults['end']),
+        ];
+      }
     }
+  }
+
+  $clinicDayKey = day_key_from_date($date);
+  $clinicDaySchedule = $clinicDayKey ? ($weeklySchedule[$clinicDayKey] ?? null) : null;
+
+  if (
+    !$clinicDayKey ||
+    empty($clinicDaySchedule['enabled']) ||
+    empty($clinicDaySchedule['start']) ||
+    empty($clinicDaySchedule['end'])
+  ) {
+    $pdo->rollBack();
+    json_out(['error' => 'Clinic is closed on the selected day.'], 400);
+  }
+
+  $clinicOpen = substr((string)$clinicDaySchedule['start'], 0, 5);
+  $clinicClose = substr((string)$clinicDaySchedule['end'], 0, 5);
+
+  if (!preg_match('/^\d{2}:\d{2}$/', $clinicOpen) || !preg_match('/^\d{2}:\d{2}$/', $clinicClose)) {
+    $pdo->rollBack();
+    json_out(['error' => 'Clinic schedule for the selected day is invalid.'], 400);
+  }
+
+  if ($timeSql < $clinicOpen || $timeSql >= $clinicClose) {
+    $pdo->rollBack();
+    json_out(['error' => "Selected time is outside clinic schedule for {$clinicDayKey} ({$clinicOpen}–{$clinicClose})."], 400);
   }
 
   // ✅ Doctor must belong to clinic + must be APPROVED + fetch JSON schedule

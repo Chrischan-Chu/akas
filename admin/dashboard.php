@@ -665,7 +665,7 @@ include __DIR__ . '/../includes/partials/head.php';
 
 </main>
 <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
-<script src="<?php echo $baseUrl; ?>/assets/js/admin-dashboard-calendar.js?v=10"></script>
+<script src="<?php echo $baseUrl; ?>/assets/js/admin-dashboard-calendar.js"></script>
 <script>
 (function () {
   const BASE_URL  = document.body?.dataset?.baseUrl || "<?php echo htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8'); ?>";
