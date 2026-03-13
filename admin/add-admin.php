@@ -43,18 +43,16 @@ include __DIR__ . '/../includes/partials/head.php';
 
   <section class="mt-6 rounded-3xl bg-white shadow-sm border border-slate-200 p-6">
 
-    <form action="<?php echo $baseUrl; ?>/admin/add-admin-process.php" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <form action="<?php echo $baseUrl; ?>/admin/add-admin-process.php" method="POST" enctype="multipart/form-data" data-inline-errors="1" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
       <div class="sm:col-span-2">
         <label class="block text-sm font-semibold text-slate-700">Admin Full Name</label>
         <input
           type="text"
           name="admin_name"
-          maxlength="50"
-          pattern="^[A-Za-z ]{1,50}$"
-          title="You can only use letters and spacing (Maximum of 50 characters)."
-          data-validate="full-name"
-          required
+         maxlength="50"
+data-validate="full-name"
+required
           placeholder="Full Name"
           class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
         />
@@ -66,6 +64,7 @@ include __DIR__ . '/../includes/partials/head.php';
           type="file"
           name="admin_work_id"
           accept="image/png,image/jpeg,image/webp"
+          data-validate="image-2mb"
           class="mt-2 block w-full text-sm text-slate-700
                  file:mr-4 file:py-2 file:px-4
                  file:rounded-xl file:border-0
@@ -79,8 +78,11 @@ include __DIR__ . '/../includes/partials/head.php';
       <div class="sm:col-span-2">
         <label class="block text-sm font-semibold text-slate-700">Admin Email</label>
         <input
-          type="text"
+         type="text"
+inputmode="email"
+autocomplete="email"
           name="email"
+          maxlength="255"
           required
           data-validate="email"
           data-unique="accounts_email"
@@ -97,7 +99,7 @@ include __DIR__ . '/../includes/partials/head.php';
             id="password"
             name="password"
             required
-            data-validate="password"
+data-validate="password"
             placeholder="Password"
             class="w-full h-12 rounded-2xl border border-slate-200 bg-white pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
           />
@@ -113,8 +115,8 @@ include __DIR__ . '/../includes/partials/head.php';
             id="confirm_password"
             name="confirm_password"
             required
-            data-validate="password-confirm"
-            data-match="password"
+data-validate="password-confirm"
+data-match="password"
             placeholder="Confirm Password"
             class="w-full h-12 rounded-2xl border border-slate-200 bg-white pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
           />
@@ -128,6 +130,7 @@ include __DIR__ . '/../includes/partials/head.php';
           Cancel
         </a>
         <button
+          id="createAdminBtn"
           type="submit"
           class="flex-1 py-3 rounded-2xl font-extrabold text-black shadow-md hover:shadow-lg transition-all"
           style="background: var(--secondary);"
@@ -142,5 +145,46 @@ include __DIR__ . '/../includes/partials/head.php';
 </main>
 
 <script src="<?php echo $baseUrl; ?>/assets/js/form-validators.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.querySelector('form[action$="add-admin-process.php"]');
+  if (!form) return;
+
+  const submitBtn = document.getElementById('createAdminBtn');
+  if (submitBtn) {
+    const LOCK_TEXT = 'Creating account...';
+    let locked = false;
+
+    const applyLockedText = () => {
+      submitBtn.textContent = LOCK_TEXT;
+      submitBtn.setAttribute('data-loading-text', LOCK_TEXT); // in case another script reads this
+    };
+
+    // If any script changes the text after submit, force it back
+    const observer = new MutationObserver(() => {
+      if (!locked) return;
+      if (submitBtn.textContent.trim() !== LOCK_TEXT) {
+        applyLockedText();
+      }
+    });
+    observer.observe(submitBtn, { childList: true, characterData: true, subtree: true });
+
+    form.addEventListener('submit', () => {
+      locked = true;
+      applyLockedText();
+
+      // extra safety: re-apply after other submit handlers run
+      setTimeout(applyLockedText, 0);
+      setTimeout(applyLockedText, 50);
+    }, true);
+  }
+
+  // keep your "no red ring while typing" fix
+  const errClasses = ["ring-2", "ring-red-400", "ring-offset-0", "focus:ring-red-400"];
+  form.querySelectorAll("[data-validate]").forEach((el) => {
+    el.addEventListener("input", () => el.classList.remove(...errClasses));
+  });
+});
+</script>
 </body>
 </html>

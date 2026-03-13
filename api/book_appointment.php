@@ -5,6 +5,8 @@ header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../includes/auth.php';
 
 require_once __DIR__ . '/../includes/sms_templates.php';
+require_once __DIR__ . '/../includes/appointment_mailer.php';
+require_once __DIR__ . '/../includes/clinic_blacklist.php';
 date_default_timezone_set('Asia/Manila');
 
 function json_out(array $data, int $status = 200): void {
@@ -29,7 +31,7 @@ function resolve_schedule_for_date(array $schedule, string $date): ?array {
   if ($ts === false) return null;
 
   $dow = (int)date('w', $ts); // 0=Sun
-  $dayKey = date('D', $ts);   // Mon,Tue,...
+  $dayKey = date('D', $ts);   // Mon,Tue,Wed,Thu,Fri,Sat,Sun
 
   // ----- FORMAT B: Weekly object with day keys (Mon..Sun) -----
   if (isset($schedule[$dayKey]) && is_array($schedule[$dayKey])) {
@@ -39,15 +41,13 @@ function resolve_schedule_for_date(array $schedule, string $date): ?array {
 
     $start = (string)($row['start'] ?? '');
     $end   = (string)($row['end'] ?? '');
-
-    // accept either key name
-    $int   = (int)($row['slot_mins'] ?? $row['interval'] ?? 30);
+    $int   = (int)($row['slot_mins'] ?? $row['interval'] ?? 20);
 
     if (!preg_match('/^\d{2}:\d{2}$/', $start)) return null;
     if (!preg_match('/^\d{2}:\d{2}$/', $end)) return null;
-    if (!in_array($int, [15,20,30], true)) $int = 30;
+    if (!in_array($int, [15,20], true)) $int = 20;
 
-    return ['start'=>$start, 'end'=>$end, 'int'=>$int];
+    return ['start' => $start, 'end' => $end, 'int' => $int];
   }
 
   // ----- FORMAT A: Object with days[] + start/end -----
@@ -58,26 +58,31 @@ function resolve_schedule_for_date(array $schedule, string $date): ?array {
     $enabledToday = false;
     foreach ($days as $d) {
       $d = (int)$d;
-      if ($d === $dow || ($d === 7 && $dow === 0)) { // support 1-7 Sunday=7
+
+      // PHP dow format: Sun=0..Sat=6
+      // allow ISO Sunday=7 if ever used
+      if ($d === $dow || ($d === 7 && $dow === 0)) {
         $enabledToday = true;
         break;
       }
     }
+
     if (!$enabledToday) return null;
 
     $start = (string)($schedule['start'] ?? '');
     $end   = (string)($schedule['end'] ?? '');
-    $int   = (int)($schedule['slot_mins'] ?? $schedule['interval'] ?? 30);
+    $int   = (int)($schedule['slot_mins'] ?? $schedule['interval'] ?? 20);
 
     if (!preg_match('/^\d{2}:\d{2}$/', $start)) return null;
     if (!preg_match('/^\d{2}:\d{2}$/', $end)) return null;
-    if (!in_array($int, [15,20,30], true)) $int = 30;
+    if (!in_array($int, [15,20], true)) $int = 20;
 
-    return ['start'=>$start, 'end'=>$end, 'int'=>$int];
+    return ['start' => $start, 'end' => $end, 'int' => $int];
   }
 
   return null;
 }
+
 
 function is_valid_slot_in_schedule(array $schedule, string $date, string $time): bool {
   $win = resolve_schedule_for_date($schedule, $date);
@@ -117,6 +122,11 @@ $date     = trim((string)($_POST['date'] ?? ''));
 $time     = trim((string)($_POST['time'] ?? '')); // expect HH:MM
 $notes    = trim((string)($_POST['notes'] ?? ''));
 
+$clinicBlacklist = get_clinic_blacklist_row($pdo, $userId, $clinicId, false);
+if ((int)($clinicBlacklist['is_blacklisted'] ?? 0) === 1) {
+  json_out(['error' => 'Your account is blacklisted from booking appointments in this clinic.'], 403);
+}
+
 if ($userId <= 0) json_out(['error' => 'Invalid user session.'], 401);
 if ($clinicId <= 0 || $doctorId <= 0) json_out(['error' => 'Missing clinic_id or doctor_id'], 400);
 
@@ -137,22 +147,105 @@ if ($date < $today) {
 }
 if ($date === $today) {
   $nowHHMM = date('H:i');
-  if ($timeSql <= $nowHHMM) {
+  if ($timeSql < $nowHHMM) {
     json_out(['error' => 'You cannot book a past time.'], 400);
   }
 }
 
+//new
+$confirmNearTime = (int)($_POST['confirm_near_time'] ?? 0) === 1;
+$minutesUntilBooking = null;
+$nearTimeWarning = null;
+
+$newBookingMinutes = time_to_minutes($timeSql);
+
+// Check other active bookings of this user on the SAME DATE.
+// Exclude cancelled/done. Exclude same clinic rule? No — check all clinics, because you asked
+// for warning based on the booking schedule itself.
+$nearStmt = $pdo->prepare("
+  SELECT
+    APT_AppointmentID,
+    APT_ClinicID,
+    APT_DoctorID,
+    APT_Time
+  FROM appointments
+  WHERE APT_UserID = ?
+    AND APT_Date = ?
+    AND APT_Status IN ('pending','approved')
+");
+$nearStmt->execute([$userId, $date]);
+
+$closestDiff = null;
+$closestTime = null;
+
+foreach ($nearStmt->fetchAll(PDO::FETCH_ASSOC) as $existing) {
+  $existingTime = substr((string)($existing['APT_Time'] ?? ''), 0, 5);
+  if (!preg_match('/^\d{2}:\d{2}$/', $existingTime)) {
+    continue;
+  }
+
+  $existingMinutes = time_to_minutes($existingTime);
+  $diffMinutes = abs($newBookingMinutes - $existingMinutes);
+
+  if ($diffMinutes <= 60 && ($closestDiff === null || $diffMinutes < $closestDiff)) {
+    $closestDiff = $diffMinutes;
+    $closestTime = $existingTime;
+  }
+}
+
+if ($closestDiff !== null) {
+  $minutesUntilBooking = $closestDiff;
+
+  if ($closestDiff === 0) {
+    $nearTimeWarning = 'Warning: You already have another active booking at ' . $closestTime . ' on this date. Do you still want to continue?';
+  } else {
+    $nearTimeWarning = 'Warning: You already have another active booking at ' . $closestTime . ' on this date. This new booking is only ' . $closestDiff . ' minute' . ($closestDiff === 1 ? '' : 's') . ' apart. Do you still want to continue?';
+  }
+
+  if (!$confirmNearTime) {
+    json_out([
+      'error' => $nearTimeWarning,
+      'warning_required' => true,
+      'minutes_until_booking' => $closestDiff,
+      'existing_booking_time' => $closestTime,
+    ], 409);
+  }
+}
+
 try {
-  $pdo->beginTransaction();
+    $pdo->beginTransaction();
+    
+    /* 🔒 SLOT LOCK (prevents race conditions) */
+    $lock = $pdo->prepare("
+      SELECT APT_AppointmentID
+      FROM appointments
+      WHERE APT_ClinicID = ?
+        AND APT_DoctorID = ?
+        AND APT_Date = ?
+        AND APT_Time = ?
+        AND APT_Status IN ('pending','approved','done')
+    ");
+    $lock->execute([$clinicId, $doctorId, $date, $timeSql]);
+    
+    $row = $lock->fetch(PDO::FETCH_ASSOC);
+
+    if ($row) {
+      $pdo->rollBack();
+      json_out([
+        'error' => 'Slot already taken',
+        'source' => 'lock_check',
+        'debug' => $row,
+      ], 409);
+    }
 
   // ✅ Clinic must be APPROVED and OPEN (optional but recommended)
   $c = $pdo->prepare("
-    SELECT approval_status, is_open, open_time, close_time
-    FROM clinics
-    WHERE id = ?
-    LIMIT 1
-    FOR UPDATE
-  ");
+      SELECT approval_status, is_open, open_time, close_time, weekly_schedule
+      FROM clinics
+      WHERE id = ?
+      LIMIT 1
+      FOR UPDATE
+    ");
   $c->execute([$clinicId]);
   $clinic = $c->fetch(PDO::FETCH_ASSOC);
 
@@ -171,16 +264,56 @@ try {
     json_out(['error' => 'Clinic is currently closed.'], 403);
   }
 
-  // ✅ enforce clinic hours if set (open_time/close_time expected like "09:00:00")
-  $ot = (string)($clinic['open_time'] ?? '');
-  $ct = (string)($clinic['close_time'] ?? '');
-  if ($ot !== '' && $ct !== '') {
-    $open = substr($ot, 0, 5);
-    $close = substr($ct, 0, 5);
-    if ($timeSql < $open || $timeSql >= $close) {
-      $pdo->rollBack();
-      json_out(['error' => "Selected time is outside clinic hours ($open–$close)."], 400);
+    // ✅ enforce clinic weekly schedule for the selected day
+  $defaultWeeklySchedule = [
+    'Mon' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+    'Tue' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+    'Wed' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+    'Thu' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+    'Fri' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+    'Sat' => ['enabled' => false, 'start' => '',      'end' => ''],
+    'Sun' => ['enabled' => false, 'start' => '',      'end' => ''],
+  ];
+
+  $weeklySchedule = $defaultWeeklySchedule;
+
+  if (!empty($clinic['weekly_schedule'])) {
+    $decoded = json_decode((string)$clinic['weekly_schedule'], true);
+    if (is_array($decoded)) {
+      foreach ($defaultWeeklySchedule as $day => $defaults) {
+        $weeklySchedule[$day] = [
+          'enabled' => !empty($decoded[$day]['enabled']),
+          'start'   => (string)($decoded[$day]['start'] ?? $defaults['start']),
+          'end'     => (string)($decoded[$day]['end'] ?? $defaults['end']),
+        ];
+      }
     }
+  }
+
+  $clinicDayKey = day_key_from_date($date);
+  $clinicDaySchedule = $clinicDayKey ? ($weeklySchedule[$clinicDayKey] ?? null) : null;
+
+  if (
+    !$clinicDayKey ||
+    empty($clinicDaySchedule['enabled']) ||
+    empty($clinicDaySchedule['start']) ||
+    empty($clinicDaySchedule['end'])
+  ) {
+    $pdo->rollBack();
+    json_out(['error' => 'Clinic is closed on the selected day.'], 400);
+  }
+
+  $clinicOpen = substr((string)$clinicDaySchedule['start'], 0, 5);
+  $clinicClose = substr((string)$clinicDaySchedule['end'], 0, 5);
+
+  if (!preg_match('/^\d{2}:\d{2}$/', $clinicOpen) || !preg_match('/^\d{2}:\d{2}$/', $clinicClose)) {
+    $pdo->rollBack();
+    json_out(['error' => 'Clinic schedule for the selected day is invalid.'], 400);
+  }
+
+  if ($timeSql < $clinicOpen || $timeSql >= $clinicClose) {
+    $pdo->rollBack();
+    json_out(['error' => "Selected time is outside clinic schedule for {$clinicDayKey} ({$clinicOpen}–{$clinicClose})."], 400);
   }
 
   // ✅ Doctor must belong to clinic + must be APPROVED + fetch JSON schedule
@@ -226,48 +359,32 @@ try {
     }
   }
 
+    $resolved = resolve_schedule_for_date($schedule, $date);
+
 
   if (empty($schedule) || !is_valid_slot_in_schedule($schedule, $date, $timeSql)) {
     $pdo->rollBack();
     json_out(['error' => 'Selected time is not in the doctor’s schedule.'], 400);
   }
 
-  // ✅ Prevent overlapping booking for same clinic+doctor+date+time
-  $stmt = $pdo->prepare("
-    SELECT APT_AppointmentID
-    FROM appointments
-    WHERE APT_ClinicID = ?
-      AND APT_DoctorID = ?
-      AND APT_Date = ?
-      AND APT_Time = ?
-      AND APT_Status IN ('pending','approved','done')
-    LIMIT 1
-    FOR UPDATE
-  ");
-  $stmt->execute([$clinicId, $doctorId, $date, $timeSql]);
-
-  if ($stmt->fetch()) {
-    $pdo->rollBack();
-    json_out(['error' => 'Slot already taken'], 409);
-  }
-
-  // ✅ Only 1 active booking per user account (unless they cancel)
-  // Active = pending/approved, and date is today or future
-  $today = (new DateTime('now'))->format('Y-m-d');
-  $stmt = $pdo->prepare("
-    SELECT APT_AppointmentID
-    FROM appointments
-    WHERE APT_UserID = ?
-      AND APT_Status IN ('pending','approved')
-      AND APT_Date >= ?
-    LIMIT 1
-    FOR UPDATE
-  ");
-  $stmt->execute([$userId, $today]);
-  if ($stmt->fetch()) {
-    $pdo->rollBack();
-    json_out(['error' => 'You already have an active appointment. Please cancel it first before booking another.'], 409);
-  }
+  // ✅ Only 1 active booking per user PER CLINIC (unless they cancel)
+    $today = (new DateTime('now'))->format('Y-m-d');
+    $stmt = $pdo->prepare("
+      SELECT APT_AppointmentID
+      FROM appointments
+      WHERE APT_UserID = ?
+        AND APT_ClinicID = ?
+        AND APT_Status IN ('pending','approved')
+        AND APT_Date >= ?
+      LIMIT 1
+      FOR UPDATE
+    ");
+    $stmt->execute([$userId, $clinicId, $today]);
+    
+    if ($stmt->fetch()) {
+      $pdo->rollBack();
+      json_out(['error' => 'You already have an active appointment in this clinic. Please cancel it first before booking another here.'], 409);
+    }
 
   // ✅ Insert
   $stmt = $pdo->prepare("
@@ -276,12 +393,61 @@ try {
     VALUES
       (?, ?, ?, ?, ?, 'approved', ?, NOW())
   ");
-  $stmt->execute([$userId, $doctorId, $clinicId, $date, $timeSql, $notes]);
+  try {
+    $stmt->execute([$userId, $doctorId, $clinicId, $date, $timeSql, $notes]);
+  } catch (PDOException $e) {
+      if ((string)$e->getCode() === '23000') {
+        $errMsg = (string)($e->errorInfo[2] ?? $e->getMessage());
+    
+        // If it's the "1 active per clinic" unique key
+        if (stripos($errMsg, 'uniq_user_clinic_active') !== false) {
+          $pdo->rollBack();
+          json_out(['error' => 'You already have an active appointment in this clinic. Please cancel it first before booking another here.'], 409);
+        }
+    
+        $pdo->rollBack();
+        json_out([
+          'error' => 'Slot already taken',
+          'source' => 'insert_constraint',
+          'debug_sql' => $errMsg
+        ], 409);
+      }
+      throw $e;
+    }
 
   $apptId = (int)$pdo->lastInsertId();
 
   $pdo->commit();
+  
+    // 🔔 REAL-TIME NAVBAR TRIGGER (BOOKING -> USER)
+  // Publish to the same channel the navbar listens to: user-<userId>
+  try {
+    $ablyKey = getenv('ABLY_API_KEY') ?: 'KtC7rw.-df6sw:fEo5tVYYnOpj_RrNA450TNLUaST_v6qYWplSC79SdmU';
 
+    $url = 'https://rest.ably.io/channels/user-' . $userId . '/messages';
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_USERPWD, $ablyKey); // keyName:keySecret
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+      'name' => 'notif-updated',
+      'data' => [
+        'action' => 'new_booking',
+        'appointment_id' => $apptId,
+        'clinic_id' => $clinicId,
+        'doctor_id' => $doctorId,
+        'date' => $date,
+        'time' => $timeSql
+      ]
+    ]));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_exec($ch);
+    curl_close($ch);
+  } catch (Throwable $e) {
+    // ignore realtime errors
+  }
   // realtime signal after commit (don’t block booking if realtime fails)
   try {
     require_once __DIR__ . '/../includes/realtime_ably.php';
@@ -300,18 +466,24 @@ try {
     if (defined('IPROGSMS_API_TOKEN') && (string)IPROGSMS_API_TOKEN !== '' && $apptId > 0) {
       $q = $pdo->prepare("
         SELECT
+          a.APT_AppointmentID,
           a.APT_UserID,
           a.APT_DoctorID,
           a.APT_ClinicID,
           u.name AS user_name,
+          c.clinic_name AS clinic_name,
+
           u.phone AS user_phone,
+          u.email AS user_email,
           d.name AS doctor_name,
           d.contact_number AS doctor_phone,
+          d.email AS doctor_email,
           a.APT_Date,
           a.APT_Time
         FROM appointments a
         JOIN accounts u ON u.id = a.APT_UserID
         JOIN clinic_doctors d ON d.id = a.APT_DoctorID
+        JOIN clinics c ON c.id = a.APT_ClinicID
         WHERE a.APT_AppointmentID = :id
         LIMIT 1
       ");
@@ -319,6 +491,7 @@ try {
       $row = $q->fetch(PDO::FETCH_ASSOC) ?: null;
 
       if (is_array($row)) {
+        $row['APT_AppointmentID'] = (int)($row['APT_AppointmentID'] ?? $apptId);
         $patientName = (string)($row['user_name'] ?? '');
         $doctorName  = (string)($row['doctor_name'] ?? '');
 
@@ -332,6 +505,7 @@ try {
         $userPhone = (string)($row['user_phone'] ?? '');
         if (trim($userPhone) !== '') {
           $userMsg = sms_template('booking_user', [
+            'clinic_name'  => (string)($row['clinic_name'] ?? ''),
             'patient_name' => $patientName,
             'doctor_name'  => $doctorName,
             'date'         => $whenDate,
@@ -350,6 +524,7 @@ try {
         $docPhone = (string)($row['doctor_phone'] ?? '');
         if (trim($docPhone) !== '') {
           $docMsg = sms_template('booking_doctor', [
+            'clinic_name'  => (string)($row['clinic_name'] ?? ''),
             'patient_name' => $patientName,
             'doctor_name'  => $doctorName,
             'date'         => $whenDate,
@@ -369,7 +544,20 @@ try {
     // ignore SMS errors (do not block booking)
   }
 
-  json_out(['ok' => true, 'message' => 'Approved, please check notification for your checkup appointment.']);
+  try {
+    if (isset($row) && is_array($row)) {
+      akas_send_booking_emails($row);
+    }
+  } catch (Throwable $mailErr) {
+    // ignore email errors (do not block booking)
+  }
+
+  json_out([
+    'ok' => true,
+    'message' => 'Approved, please check notification for your checkup appointment.',
+    'minutes_until_booking' => $minutesUntilBooking,
+    'near_time_warning' => $nearTimeWarning,
+  ]);
 } catch (Throwable $e) {
   if ($pdo->inTransaction()) $pdo->rollBack();
   json_out(['error' => 'Server error: ' . $e->getMessage()], 500);

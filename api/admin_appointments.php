@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/appointment_auto_complete.php';
+
+akas_auto_complete_appointments();
 
 date_default_timezone_set('Asia/Manila');
 
@@ -21,18 +24,6 @@ $pdo = db();
 $clinicId = (int)(auth_clinic_id() ?? 0);
 if ($clinicId <= 0) {
   json_out(['ok' => false, 'message' => 'Clinic not linked to this admin account.'], 400);
-}
-
-// Auto-mark past APPROVED appointments as DONE
-try {
-  $upd = $pdo->prepare("UPDATE appointments
-                         SET APT_Status='DONE'
-                         WHERE APT_ClinicID = ?
-                           AND APT_Status = 'APPROVED'
-                           AND TIMESTAMP(APT_Date, APT_Time) < NOW()");
-  $upd->execute([$clinicId]);
-} catch (Throwable $e) {
-  // don't fail the dashboard if this update fails
 }
 
 // Doctor availability (overlay)

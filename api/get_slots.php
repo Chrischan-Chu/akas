@@ -17,7 +17,7 @@ $clinicId = (int)($_GET['clinic_id'] ?? 0);
 $date     = trim((string)($_GET['date'] ?? ''));
 $doctorId = (int)($_GET['doctor_id'] ?? 0);
 
-$allowedIntervals = [15, 20, 30];
+$allowedIntervals = [15, 20];
 
 if ($clinicId <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
   json_out(['ok' => false, 'message' => 'Invalid request.'], 400);
@@ -57,23 +57,33 @@ function resolve_schedule(string $raw, string $date, array $allowedIntervals): ?
     $days = array_map('intval', $schedule['days']);
 
     // supports 0-6 OR 1-7 (with 7 meaning Sunday)
+    // supports:
+    // - PHP dow: 0..6 where Sun=0
+    // - Mon-based: 0..6 where Mon=0 (common JS format)
+    // - ISO-ish: 1..7 where Sunday=7
     $enabledToday = false;
+
     foreach ($days as $d) {
+      $d = (int)$d;
+    
+      // PHP dow format (Sun=0..Sat=6)
+      // allow ISO Sunday=7 if ever used
       if ($d === $dow || ($d === 7 && $dow === 0)) {
         $enabledToday = true;
         break;
       }
     }
+    
     if (!$enabledToday) return null;
 
     $start = (string)($schedule['start'] ?? '');
     $end   = (string)($schedule['end'] ?? '');
-    $mins  = (int)($schedule['slot_mins'] ?? 30);
+    $mins  = (int)($schedule['slot_mins'] ?? $schedule['interval'] ?? 20);
 
     if (!preg_match('/^\d{2}:\d{2}$/', $start)) return null;
     if (!preg_match('/^\d{2}:\d{2}$/', $end)) return null;
 
-    if (!in_array($mins, $allowedIntervals, true)) $mins = 30;
+    if (!in_array($mins, $allowedIntervals, true)) $mins = 20;
 
     return [
       'start' => $start,
@@ -92,12 +102,12 @@ function resolve_schedule(string $raw, string $date, array $allowedIntervals): ?
 
     $start = (string)($row['start'] ?? '');
     $end   = (string)($row['end'] ?? '');
-    $mins  = (int)($row['slot_mins'] ?? 30);
+    $mins  = (int)($row['slot_mins'] ?? $row['interval'] ?? 20);
 
     if (!preg_match('/^\d{2}:\d{2}$/', $start)) return null;
     if (!preg_match('/^\d{2}:\d{2}$/', $end)) return null;
 
-    if (!in_array($mins, $allowedIntervals, true)) $mins = 30;
+    if (!in_array($mins, $allowedIntervals, true)) $mins = 20;
 
     return [
       'start' => $start,
@@ -124,16 +134,59 @@ function resolve_schedule_from_row(array $row, string $date, array $allowedInter
    1) Clinic Hours
 =========================================================== */
 
-$stmt = $pdo->prepare('SELECT is_open, open_time, close_time FROM clinics WHERE id = ? LIMIT 1');
+$stmt = $pdo->prepare('SELECT is_open, open_time, close_time, weekly_schedule FROM clinics WHERE id = ? LIMIT 1');
 $stmt->execute([$clinicId]);
 $c = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+$defaultWeeklySchedule = [
+  'Mon' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Tue' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Wed' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Thu' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Fri' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Sat' => ['enabled' => false, 'start' => '',      'end' => ''],
+  'Sun' => ['enabled' => false, 'start' => '',      'end' => ''],
+];
+
+$weeklySchedule = $defaultWeeklySchedule;
+
+if (!empty($c['weekly_schedule'])) {
+  $decoded = json_decode((string)$c['weekly_schedule'], true);
+  if (is_array($decoded)) {
+    foreach ($defaultWeeklySchedule as $day => $defaults) {
+      $weeklySchedule[$day] = [
+        'enabled' => !empty($decoded[$day]['enabled']),
+        'start'   => (string)($decoded[$day]['start'] ?? $defaults['start']),
+        'end'     => (string)($decoded[$day]['end'] ?? $defaults['end']),
+      ];
+    }
+  }
+}
 
 if ((int)($c['is_open'] ?? 0) !== 1) {
   json_out(['ok'=>true,'slots'=>[],'meta'=>['clinic_status'=>'CLINIC_CLOSED']]);
 }
 
-$clinicOpen  = substr((string)($c['open_time'] ?? ''), 0, 5);
-$clinicClose = substr((string)($c['close_time'] ?? ''), 0, 5);
+$selectedDay = date('D', strtotime($date));
+$daySchedule = $weeklySchedule[$selectedDay] ?? null;
+
+if (
+  empty($daySchedule['enabled']) ||
+  empty($daySchedule['start']) ||
+  empty($daySchedule['end'])
+) {
+  json_out([
+    'ok' => true,
+    'slots' => [],
+    'meta' => [
+      'clinic_status' => 'CLINIC_CLOSED_DAY',
+      'clinic_day' => $selectedDay
+    ]
+  ]);
+}
+
+$clinicOpen  = substr((string)($daySchedule['start'] ?? ''), 0, 5);
+$clinicClose = substr((string)($daySchedule['end'] ?? ''), 0, 5);
 
 if (!preg_match('/^\d{2}:\d{2}$/', $clinicOpen) || !preg_match('/^\d{2}:\d{2}$/', $clinicClose)) {
   json_out(['ok'=>true,'slots'=>[],'meta'=>['clinic_status'=>'INVALID_CLINIC_HOURS']]);
@@ -164,17 +217,38 @@ if (!$resolved) {
   ]);
 }
 
-$effectiveOpen  = (string)$resolved['start'];
-$effectiveClose = (string)$resolved['end'];
-$slotMins       = (int)$resolved['slot_mins'];
+$doctorStart = (string)$resolved['start'];
+$doctorEnd   = (string)$resolved['end'];
+$slotMins    = (int)$resolved['slot_mins'];
 $doctorScheduleMeta = $resolved['meta'];
 
-/* Clamp inside clinic hours */
-if ($effectiveOpen < $clinicOpen) $effectiveOpen = $clinicOpen;
-if ($effectiveClose > $clinicClose) $effectiveClose = $clinicClose;
+/* Clamp close time only */
+$effectiveOpen  = ($doctorStart > $clinicOpen) ? $doctorStart : $clinicOpen;
+$effectiveClose = ($doctorEnd < $clinicClose) ? $doctorEnd : $clinicClose;
 
-$start = new DateTime("$date $effectiveOpen");
-$end   = new DateTime("$date $effectiveClose");
+$doctorStartMinutes = ((int)substr($doctorStart, 0, 2) * 60) + (int)substr($doctorStart, 3, 2);
+$effectiveOpenMinutes = ((int)substr($effectiveOpen, 0, 2) * 60) + (int)substr($effectiveOpen, 3, 2);
+$effectiveCloseMinutes = ((int)substr($effectiveClose, 0, 2) * 60) + (int)substr($effectiveClose, 3, 2);
+
+/* Move to the first slot aligned with doctor's real schedule */
+if ($effectiveOpenMinutes > $doctorStartMinutes) {
+  $offset = ($effectiveOpenMinutes - $doctorStartMinutes) % $slotMins;
+  if ($offset !== 0) {
+    $effectiveOpenMinutes += ($slotMins - $offset);
+  }
+}
+
+if ($effectiveCloseMinutes <= $effectiveOpenMinutes) {
+  json_out(['ok'=>true,'slots'=>[],'meta'=>['clinic_status'=>'INVALID_HOURS']]);
+}
+
+$startHour = floor($effectiveOpenMinutes / 60);
+$startMin  = $effectiveOpenMinutes % 60;
+$endHour   = floor($effectiveCloseMinutes / 60);
+$endMin    = $effectiveCloseMinutes % 60;
+
+$start = new DateTime(sprintf('%s %02d:%02d', $date, $startHour, $startMin));
+$end   = new DateTime(sprintf('%s %02d:%02d', $date, $endHour, $endMin));
 
 if ($end <= $start) {
   json_out(['ok'=>true,'slots'=>[],'meta'=>['clinic_status'=>'INVALID_HOURS']]);

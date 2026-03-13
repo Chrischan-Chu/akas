@@ -237,34 +237,61 @@ if ($isContactPost) {
                 <label class="block text-sm font-semibold text-white/90 mb-2">Select Clinic</label>
 
                 <div class="relative">
-                  <select
-                    id="clinicSelect"
-                    class="appearance-none w-full rounded-2xl px-4 pr-12 py-3 font-medium border border-white/10 focus:outline-none focus:ring-2"
-                    style="background-color: rgba(255,255,255,0.95); color:#0f172a;"
-                  >
-                    <option value="" selected disabled>-- Select a clinic name --</option>
-
-                    <?php if (empty($clinics)): ?>
-                      <option value="" disabled>No approved clinics found</option>
-                    <?php else: ?>
-                      <?php foreach ($clinics as $c): ?>
-                        <option
-                          value="<?= (int)$c['id']; ?>"
-                          data-name="<?= h($c['name']); ?>"
-                          data-address="<?= h($c['address']); ?>"
-                          data-email="<?= h($c['email']); ?>"
-                          data-phone="<?= h($c['phone']); ?>"
-                        >
-                          <?= h($c['name']); ?>
-                        </option>
-                      <?php endforeach; ?>
-                    <?php endif; ?>
+                  <select id="clinicSelect" class="hidden" aria-hidden="true" tabindex="-1">
+                    <option value="" selected>-- Select a clinic name --</option>
+                    <?php foreach ($clinics as $c): ?>
+                      <option
+                        value="<?= (int)$c['id']; ?>"
+                        data-name="<?= h($c['name']); ?>"
+                        data-address="<?= h($c['address']); ?>"
+                        data-email="<?= h($c['email']); ?>"
+                        data-phone="<?= h($c['phone']); ?>"
+                      >
+                        <?= h($c['name']); ?>
+                      </option>
+                    <?php endforeach; ?>
                   </select>
 
-                  <div class="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-700">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path d="M6 9l6 6 6-6"/>
+                  <button
+                    id="clinicSelectBtn"
+                    type="button"
+                    class="w-full text-left rounded-2xl px-4 pr-12 py-3 font-semibold border border-slate-300 bg-white focus:outline-none focus:ring-2"
+                    style="--tw-ring-color: rgba(59,130,246,.45); color:#0f172a;"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                  >
+                    <span id="clinicSelectBtnText">-- Select a clinic name --</span>
+                  </button>
+
+                  <div class="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
                     </svg>
+                  </div>
+
+                  <div
+                    id="clinicSelectMenu"
+                    class="hidden absolute z-30 mt-2 w-full rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden"
+                    role="listbox"
+                  >
+                    <div class="max-h-60 overflow-y-auto">
+                      <?php if (empty($clinics)): ?>
+                        <div class="px-4 py-3 text-sm text-slate-500">
+                          No clinics with available contact email addresses are currently listed.
+                        </div>
+                      <?php else: ?>
+                        <?php foreach ($clinics as $c): ?>
+                          <button
+                            type="button"
+                            class="w-full px-4 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                            data-id="<?= (int)$c['id']; ?>"
+                            data-name="<?= h($c['name']); ?>"
+                          >
+                            <?= h($c['name']); ?>
+                          </button>
+                        <?php endforeach; ?>
+                      <?php endif; ?>
+                    </div>
                   </div>
                 </div>
 

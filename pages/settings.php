@@ -12,6 +12,20 @@ $stmt = $pdo->prepare('SELECT name, gender, email, phone, birthdate FROM account
 $stmt->execute([auth_user_id()]);
 $me = $stmt->fetch() ?: [];
 
+// Inline errors + old values (set by settings-process.php)
+$settings_errors = $_SESSION['settings_errors'] ?? [];
+$settings_old = $_SESSION['settings_old'] ?? [];
+unset($_SESSION['settings_errors'], $_SESSION['settings_old']);
+
+$val = function (string $key, string $fallback = '') use ($settings_old, $me): string {
+  if (array_key_exists($key, $settings_old)) return (string)$settings_old[$key];
+  return isset($me[$key]) ? (string)$me[$key] : $fallback;
+};
+
+$err = function (string $key) use ($settings_errors): string {
+  return isset($settings_errors[$key]) ? (string)$settings_errors[$key] : '';
+};
+
 $successMsg = flash_get('success');
 $errorMsg = flash_get('error');
 
@@ -42,17 +56,22 @@ include "../includes/partials/head.php";
     <form id="settingsForm"
       action="<?php echo $baseUrl; ?>/pages/settings-process.php"
       method="POST"
-      class="grid gap-4">
+      class="grid gap-4"
+      data-inline-errors="1"
+      data-loading-text="Saving changes..."
+      novalidate>
 
   <div>
     <label class="block text-xs font-bold text-slate-600 mb-2">Full Name</label>
     <input
       id="name"
       name="name"
-      value="<?php echo htmlspecialchars((string)($me['name'] ?? '')); ?>"
+	      value="<?php echo htmlspecialchars($val('name')); ?>"
       required
+	      data-validate="full-name"
       class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-200"
     />
+	    <p class="mt-1 text-sm text-red-600" data-err-for="name"><?php echo htmlspecialchars($err('name')); ?></p>
   </div>
   <div>
     <label class="block text-xs font-bold text-slate-600 mb-2">Gender</label>
@@ -65,13 +84,13 @@ include "../includes/partials/head.php";
         class="appearance-none w-full rounded-xl bg-white px-4 pr-12 py-3
               text-slate-700 outline-none border border-slate-200
               focus:ring-2 focus:ring-slate-200">
-        <option value="" disabled hidden <?= empty($me['gender']) ? 'selected' : '' ?>>
+	        <option value="" disabled hidden <?= empty($val('gender')) ? 'selected' : '' ?>>
           Select a Gender
         </option>
 
-        <option value="Male" <?= ($me['gender'] ?? '') === 'Male' ? 'selected' : '' ?>>Male</option>
-        <option value="Female" <?= ($me['gender'] ?? '') === 'Female' ? 'selected' : '' ?>>Female</option>
-        <option value="Prefer not to say" <?= ($me['gender'] ?? '') === 'Prefer not to say' ? 'selected' : '' ?>>
+	        <option value="Male" <?= ($val('gender') ?? '') === 'Male' ? 'selected' : '' ?>>Male</option>
+	        <option value="Female" <?= ($val('gender') ?? '') === 'Female' ? 'selected' : '' ?>>Female</option>
+	        <option value="Prefer not to say" <?= ($val('gender') ?? '') === 'Prefer not to say' ? 'selected' : '' ?>>
           Prefer not to say
         </option>
       </select>
@@ -79,7 +98,8 @@ include "../includes/partials/head.php";
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M6 9l6 6 6-6"/>
         </svg>
-      </div>
+	    </div>
+	    <p class="mt-1 text-sm text-red-600" data-err-for="gender"><?php echo htmlspecialchars($err('gender')); ?></p>
     </div>
   </div>
   <div>
@@ -91,28 +111,40 @@ include "../includes/partials/head.php";
       class="w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50 text-slate-600"
     />
   </div>
-  <div>
-    <label class="block text-xs font-bold text-slate-600 mb-2">Phone Number</label>
+  <div class="grid gap-4 sm:grid-cols-2">
+ <div>
+  <label class="block text-xs font-bold text-slate-600 mb-2">
+    Phone Number
+  </label>
 
-    <div class="flex items-center w-full rounded-xl border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-slate-200">
-      <span class="px-4 py-4 bg-slate-100 text-slate-600 text-sm font-semibold border-r border-slate-200 select-none">
-        +63
-      </span>
+  <div class="flex w-full">
+    
+    <!-- +63 -->
+    <span
+      class="px-4 py-3 bg-slate-100 text-slate-600 text-sm font-semibold border border-r-0 border-slate-200 rounded-l-xl select-none">
+      +63
+    </span>
 
-      <input
-        type="tel"
-        id="phone"
-        name="phone"
-        value="<?php echo htmlspecialchars((string)($me['phone'] ?? '')); ?>"
-        maxlength="10"
-        inputmode="numeric"
-        placeholder="9XXXXXXXXX"
-        data-validate="phone-ph"
-        required
-        class="flex-1 px-4 py-3 outline-none"
-      />
-    </div>
+    <!-- Input -->
+    <input
+      type="tel"
+      id="phone"
+      name="phone"
+      value="<?php echo htmlspecialchars((string)($me['phone'] ?? '')); ?>"
+      maxlength="10"
+      inputmode="numeric"
+      placeholder="9XXXXXXXXX"
+      data-validate="phone-ph"
+      data-unique="accounts_phone"
+      data-unique-original="<?php echo htmlspecialchars((string)($me['phone'] ?? '')); ?>"
+      required
+      class="flex-1 px-4 py-3 border border-slate-200 rounded-r-xl outline-none focus:ring-2 focus:ring-slate-200"
+    />
+
   </div>
+
+  <p data-err-for="phone" class="mt-2 text-sm text-red-600"></p>
+</div>
   <div>
     <label class="block text-xs font-bold text-slate-600 mb-2">Birthdate</label>
 
@@ -125,6 +157,8 @@ include "../includes/partials/head.php";
       required
       class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-200"
     />
+    <p data-err-for="birthdate" class="mt-2 text-sm text-red-600"></p>
+  </div>
   </div>
   <div class="rounded-2xl border border-slate-200 p-4">
   <div class="font-bold text-slate-900">Change Password (Optional)</div>
@@ -137,6 +171,7 @@ include "../includes/partials/head.php";
       placeholder="Current password"
       class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-200"
     />
+    <p data-err-for="current_password" class="text-sm text-red-600"></p>
     <input
       type="password"
       id="new_password"
@@ -145,6 +180,7 @@ include "../includes/partials/head.php";
       data-validate="password-optional"
       class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-200"
     />
+    <p data-err-for="new_password" class="text-sm text-red-600"></p>
     <input
       type="password"
       id="confirm_password"
@@ -154,6 +190,7 @@ include "../includes/partials/head.php";
       data-match="new_password"
       class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-200"
     />
+    <p data-err-for="confirm_password" class="text-sm text-red-600"></p>
 
   </div>
 </div>
@@ -167,7 +204,9 @@ include "../includes/partials/head.php";
       type="submit"
       disabled
       class="flex-1 py-3 rounded-xl font-bold text-white opacity-50 cursor-not-allowed"
-      style="background: var(--secondary);">
+      style="background: var(--secondary);"
+      data-original-text="Save Changes"
+      data-loading-text="Saving changes...">
       Save Changes
     </button>
   </div>
@@ -181,6 +220,9 @@ include "../includes/partials/head.php";
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("settingsForm");
   const saveBtn = document.getElementById("saveBtn");
+  const currentPw = document.getElementById("current_password");
+  const newPw = document.getElementById("new_password");
+  const confirmPw = document.getElementById("confirm_password");
 
   if (!form || !saveBtn) return;
 
@@ -194,20 +236,33 @@ document.addEventListener("DOMContentLoaded", () => {
   ].map(id => document.getElementById(id));
 
   const initial = {};
-  fields.forEach(el => initial[el.id] = el.value);
+  fields.filter(Boolean).forEach(el => initial[el.id] = el.value);
+
+  const togglePwRequired = () => {
+    const hasNew = !!(newPw && String(newPw.value || "").trim().length);
+    if (currentPw) currentPw.required = hasNew;
+    if (confirmPw) confirmPw.required = hasNew;
+  };
 
   const update = () => {
-    const changed = fields.some(el => el.value !== initial[el.id]);
+    togglePwRequired();
+    const changed = fields.filter(Boolean).some(el => el.value !== initial[el.id]);
 
     saveBtn.disabled = !changed;
     saveBtn.classList.toggle("opacity-50", !changed);
     saveBtn.classList.toggle("cursor-not-allowed", !changed);
   };
 
-  fields.forEach(el => {
+  fields.filter(Boolean).forEach(el => {
     el.addEventListener("input", update);
     el.addEventListener("change", update);
   });
+
+  newPw?.addEventListener("input", update);
+  confirmPw?.addEventListener("input", update);
+
+  togglePwRequired();
+  update();
 });
 </script>
 

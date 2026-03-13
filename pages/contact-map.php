@@ -92,7 +92,10 @@ $payload = [
 
             <!-- Hidden REAL select (kept for compatibility; JS will keep it empty behind the scenes) -->
             <select id="akasClinicSelect" class="hidden" aria-hidden="true" tabindex="-1">
-              <option value="">Select a clinic…</option>
+              <option value="" selected disabled>-- Select a clinic name --</option>
+              <?php if (empty($clinics)): ?>
+                <option value="" disabled>No approved clinics found</option>
+              <?php endif; ?>
               <?php foreach ($clinics as $c): ?>
                 <option value="<?= (int)$c['id']; ?>"><?= h((string)$c['name']); ?></option>
               <?php endforeach; ?>
@@ -108,7 +111,7 @@ $payload = [
                 aria-haspopup="listbox"
                 aria-expanded="false"
               >
-                <span id="akasClinicSelectBtnText">Select a clinic…</span>
+                <span id="akasClinicSelectBtnText">-- Select a clinic name --</span>
               </button>
 
               <div class="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-500">
@@ -124,16 +127,22 @@ $payload = [
 >
 
                 <div class="max-h-60 overflow-y-auto">
-                  <?php foreach ($clinics as $c): ?>
-                    <button
-                      type="button"
-                      class="w-full px-4 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50"
-                      data-id="<?= (int)$c['id']; ?>"
-                      data-name="<?= h((string)$c['name']); ?>"
-                    >
-                      <?= h((string)$c['name']); ?>
-                    </button>
-                  <?php endforeach; ?>
+                  <?php if (empty($clinics)): ?>
+                    <div class="px-4 py-3 text-left text-sm text-slate-500 bg-slate-100">
+                     No clinics have pinned their location on the map yet.
+                    </div>
+                  <?php else: ?>
+                    <?php foreach ($clinics as $c): ?>
+                      <button
+                        type="button"
+                        class="w-full px-4 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                        data-id="<?= (int)$c['id']; ?>"
+                        data-name="<?= h((string)$c['name']); ?>"
+                      >
+                        <?= h((string)$c['name']); ?>
+                      </button>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
                 </div>
               </div>
             </div>

@@ -137,7 +137,7 @@ if ($action === 'save') {
   }
 
   // ---------------------------------------------
-  // BUILD WEEKLY SCHEDULE JSON (15,20,30 only)
+  // BUILD WEEKLY SCHEDULE JSON (15,20 only)
   // ---------------------------------------------
   $days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   $scheduleArr = [];
@@ -149,10 +149,10 @@ if ($action === 'save') {
 
     $start = trim((string)($_POST["start_$day"] ?? ''));
     $end   = trim((string)($_POST["end_$day"] ?? ''));
-    $interval = (int)($_POST["interval_$day"] ?? 30);
+    $interval = (int)($_POST["interval_$day"] ?? 20);//CHANGED TO BE 15 and 20 mins only
 
-    if (!in_array($interval, [15,20,30], true)) {
-      $errors[] = "$day interval must be 15, 20, or 30 minutes.";
+    if (!in_array($interval, [15,20], true)) {
+      $errors[] = "$day interval must be 15 or 20 minutes.";
     }
 
     if ($enabled) {
@@ -282,8 +282,6 @@ if ($action === 'save') {
             schedule=?,
             email=?,
             contact_number=?,
-            approval_status='PENDING',
-            declined_reason=NULL,
             created_via='CMS',
             updated_at=CURRENT_TIMESTAMP
         WHERE id=? AND clinic_id=?
@@ -305,8 +303,6 @@ if ($action === 'save') {
             schedule=?,
             email=?,
             contact_number=?,
-            approval_status='PENDING',
-            declined_reason=NULL,
             created_via='CMS',
             updated_at=CURRENT_TIMESTAMP
         WHERE id=? AND clinic_id=?
@@ -319,7 +315,7 @@ if ($action === 'save') {
       ]);
     }
 
-    flash_set('ok', 'Doctor updated (sent for approval).');
+    flash_set('ok', 'Doctor updated successfully.');
     header('Location: ' . $baseUrl . '/admin/doctors.php');
     exit;
   }
@@ -515,16 +511,16 @@ $pref = parse_schedule_json($edit['schedule'] ?? '');
                 $enabled = (bool)($row['enabled'] ?? false);
                 $start = (string)($row['start'] ?? '');
                 $end = (string)($row['end'] ?? '');
-                $slot = (int)($row['slot_mins'] ?? 30);
-                if (!in_array($slot, [15,20,30], true)) $slot = 30;
+                $slot = (int)($row['slot_mins'] ?? 20);//CHanged to 20 mins 
+                if (!in_array($slot, [15,20], true)) $slot = 20;
               ?>
                 <?php
                 $row = $pref[$day] ?? [];
                 $enabled = (bool)($row['enabled'] ?? false);
                 $start = (string)($row['start'] ?? '');
                 $end = (string)($row['end'] ?? '');
-                $slot = (int)($row['slot_mins'] ?? 30);
-                if (!in_array($slot, [15,20,30], true)) $slot = 30;
+                $slot = (int)($row['slot_mins'] ?? 20);
+                if (!in_array($slot, [15,20], true)) $slot = 20;
 
                 $wrapId = "row_$day";
                 $chkId  = "chk_$day";
@@ -577,7 +573,6 @@ $pref = parse_schedule_json($edit['schedule'] ?? '');
                           <?php echo $enabled ? '' : 'disabled'; ?>>
                     <option value="15" <?php echo $slot===15?'selected':''; ?>>15 mins</option>
                     <option value="20" <?php echo $slot===20?'selected':''; ?>>20 mins</option>
-                    <option value="30" <?php echo $slot===30?'selected':''; ?>>30 mins</option>
                   </select>
                 </div>
 
