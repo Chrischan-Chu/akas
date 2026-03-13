@@ -58,7 +58,21 @@
     }
 
     // fallback
-    return input.parentElement;
+    const key2 = input.name || input.id || "field";
+    const parent2 = input.parentElement;
+
+    // If your template places <p data-err-for="..."> as a sibling of the input wrapper
+    // (e.g. phone input inside a flex row, with the error message below the row),
+    // return the outer wrapper so we reuse that <p> instead of injecting one inside the flex row.
+    if (
+      parent2 &&
+      parent2.parentElement &&
+      parent2.parentElement.querySelector(`p[data-err-for="${CSS.escape(key2)}"]`)
+    ) {
+      return parent2.parentElement;
+    }
+
+    return parent2;
   };
 
   const getErrorTextEl = (input) => {
@@ -239,6 +253,24 @@
   const runCheckNow = async (phase = "blur") => {
     const v = (input.value || "").trim();
 
+    // If the field hasn't changed from its original value, treat as available.
+    // (Useful on Settings pages where the current user's phone/email should not
+    // block submission.)
+    const orig = (input.dataset.uniqueOriginal || "").trim();
+    if (orig) {
+      const norm = (s) => {
+        if (type === "email" || type === "clinic_email") return String(s).trim().toLowerCase();
+        // phone-like
+        return String(s).replace(/\D/g, "");
+      };
+      if (norm(v) === norm(orig)) {
+        if (input.validationMessage === message) input.setCustomValidity("");
+        clearError(input);
+        clearInlineError(input);
+        return true;
+      }
+    }
+
     if (!v) return true;
     if (!input.checkValidity()) return true;
 
@@ -303,10 +335,25 @@
 
     const submitBtn =
       form.querySelector('button[type="submit"], input[type="submit"]');
-    if (submitBtn) submitBtn.disabled = true;
+
+    // Allow different forms to set their own loading text.
+    // Example: Settings form wants "Saving changes..." instead of "Creating Account...".
+    const origBtnText = submitBtn ? submitBtn.innerText : "";
+    const loadingText =
+      (submitBtn && submitBtn.dataset && submitBtn.dataset.loadingText) ||
+      (form && form.dataset && form.dataset.loadingText) ||
+      "Saving changes...";
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.dataset._origText = origBtnText;
+    }
 
     const unlock = () => {
-      if (submitBtn) submitBtn.disabled = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = submitBtn.dataset._origText || origBtnText || "Submit";
+      }
       delete form.dataset.uniqueSubmitLock;
     };
 
@@ -352,12 +399,12 @@
     }
 
     delete form.dataset.uniqueSubmitLock;
-if (submitBtn) {
-  submitBtn.disabled = true;
-  submitBtn.innerText = "Creating Account...";
-}
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerText = loadingText;
+    }
 
-form.submit();
+    form.submit();
   },
   true
 );

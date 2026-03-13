@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/appointment_auto_complete.php';
+
+akas_auto_complete_appointments();
 
 if (!auth_is_logged_in() || auth_role() !== 'user') {
   http_response_code(401);
@@ -23,13 +26,17 @@ $stmt = $pdo->prepare("
     a.APT_AppointmentID AS appointment_id,
     a.APT_Date AS appt_date,
     a.APT_Time AS appt_time,
+    a.APT_Status AS appt_status,
+    a.APT_OldDate AS old_date,
+    a.APT_OldTime AS old_time,
+    a.APT_RescheduleReason AS reschedule_reason,
     c.clinic_name,
     d.name AS doctor_name
   FROM appointments a
   LEFT JOIN clinics c ON c.id = a.APT_ClinicID
   LEFT JOIN clinic_doctors d ON d.id = a.APT_DoctorID
   WHERE a.APT_UserID = :uid
-    AND a.APT_Status = 'approved'
+    AND a.APT_Status IN ('APPROVED','RESCHEDULE_PENDING')
     AND (
       a.APT_Date > :today
       OR (a.APT_Date = :today AND a.APT_Time >= :nowTime)
@@ -54,6 +61,10 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
     'time_12' => $time12,
     'clinic_name' => (string)($r['clinic_name'] ?? ''),
     'doctor_name' => (string)($r['doctor_name'] ?? ''),
+    'status' => (string)($r['appt_status'] ?? ''),
+    'old_date' => (string)($r['old_date'] ?? ''),
+    'old_time' => (string)($r['old_time'] ?? ''),
+    'reason' => (string)($r['reschedule_reason'] ?? ''),
   ];
 }
 

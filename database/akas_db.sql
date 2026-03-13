@@ -1,21 +1,27 @@
 -- AKAS Database Schema (multi-admin clinics)
--- If you already have an older AKAS database, it's best to CREATE a new one and import this.
+-- Use this in phpMyAdmin > SQL
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+08:00";
 
-DROP TABLE IF EXISTS `contact_messages`;
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS `email_logs`;
 DROP TABLE IF EXISTS `sms_logs`;
 DROP TABLE IF EXISTS `appointments`;
+DROP TABLE IF EXISTS `contact_messages`;
+DROP TABLE IF EXISTS `account_clinic_blacklist`;
 DROP TABLE IF EXISTS `clinic_doctors`;
 DROP TABLE IF EXISTS `accounts`;
 DROP TABLE IF EXISTS `clinics`;
 
-/* =====================
-   Table: clinics
-   One clinic can have MANY clinic_admin accounts.
-   ===================== */
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- =====================
+-- Table: clinics
+-- One clinic can have MANY clinic_admin accounts.
+-- =====================
 CREATE TABLE `clinics` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `clinic_name` varchar(190) NOT NULL,
@@ -43,10 +49,10 @@ CREATE TABLE `clinics` (
   UNIQUE KEY `uniq_clinic_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/* =====================
-   Table: accounts
-   clinic_id is NULL for normal users.
-   ===================== */
+-- =====================
+-- Table: accounts
+-- clinic_id is NULL for normal users.
+-- =====================
 CREATE TABLE `accounts` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `role` enum('user','clinic_admin','super_admin') NOT NULL,
@@ -58,17 +64,14 @@ CREATE TABLE `accounts` (
   `phone` varchar(32) DEFAULT NULL,
   `birthdate` date DEFAULT NULL,
   `admin_work_id_path` varchar(255) DEFAULT NULL,
-
-  -- ✅ Auth (local / google)
   `auth_provider` enum('local','google') NOT NULL DEFAULT 'local',
   `google_sub` varchar(64) DEFAULT NULL,
   `google_picture` varchar(255) DEFAULT NULL,
-
-  -- ✅ Email verification (manual/local accounts)
   `email_verified_at` datetime DEFAULT NULL,
   `email_verify_token_hash` varchar(64) DEFAULT NULL,
   `email_verify_expires_at` datetime DEFAULT NULL,
-
+  `password_reset_token_hash` varchar(64) DEFAULT NULL,
+  `password_reset_expires_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_email` (`email`),
@@ -76,57 +79,73 @@ CREATE TABLE `accounts` (
   KEY `idx_clinic_id` (`clinic_id`),
   KEY `idx_google_sub` (`google_sub`),
   KEY `idx_email_verified` (`email_verified_at`),
-  CONSTRAINT `fk_accounts_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE SET NULL
+  KEY `idx_password_reset_hash` (`password_reset_token_hash`),
+  CONSTRAINT `fk_accounts_clinic`
+    FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`)
+    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/* =====================
-   ✅ NEW Table: contact_messages
-   Stores messages sent from Contact page to a clinic.
-   - sender_account_id is NULL for guests
-   - email_sent tracks if SMTP succeeded
-   ===================== */
+-- =====================
+-- Table: contact_messages
+-- Stores messages sent from Contact page to a clinic.
+-- sender_account_id is NULL for guests.
+-- =====================
 CREATE TABLE `contact_messages` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-
   `clinic_id` int(10) unsigned NOT NULL,
   `sender_account_id` int(10) unsigned DEFAULT NULL,
-
   `sender_role` enum('guest','user','clinic_admin','super_admin') NOT NULL DEFAULT 'guest',
   `sender_name` varchar(190) NOT NULL,
   `sender_email` varchar(190) NOT NULL,
-
   `message` text NOT NULL,
-
-  -- snapshot at time of sending
   `clinic_name_snapshot` varchar(190) DEFAULT NULL,
   `clinic_email_snapshot` varchar(190) DEFAULT NULL,
-
-  -- delivery tracking
   `email_sent` tinyint(1) NOT NULL DEFAULT 0,
   `provider` varchar(40) NOT NULL DEFAULT 'brevo',
   `provider_message_id` varchar(128) DEFAULT NULL,
-
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
   PRIMARY KEY (`id`),
   KEY `idx_cm_clinic` (`clinic_id`),
   KEY `idx_cm_sender_account` (`sender_account_id`),
   KEY `idx_cm_created` (`created_at`),
-
   CONSTRAINT `fk_cm_clinic`
     FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`)
     ON DELETE CASCADE,
-
   CONSTRAINT `fk_cm_sender_account`
     FOREIGN KEY (`sender_account_id`) REFERENCES `accounts` (`id`)
     ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- =====================
+-- Table: account_clinic_blacklist
+-- Tracks cancellations and blacklist state per user per clinic.
+-- =====================
+CREATE TABLE `account_clinic_blacklist` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) unsigned NOT NULL,
+  `clinic_id` int(10) unsigned NOT NULL,
+  `cancel_count` int(11) NOT NULL DEFAULT 0,
+  `is_blacklisted` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `blacklisted_at` datetime DEFAULT NULL,
+  `blacklist_reason` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_user_clinic_blacklist` (`user_id`,`clinic_id`),
+  KEY `idx_blacklist_user` (`user_id`),
+  KEY `idx_blacklist_clinic` (`clinic_id`),
+  CONSTRAINT `fk_blacklist_user`
+    FOREIGN KEY (`user_id`) REFERENCES `accounts` (`id`)
+    ON DELETE CASCADE,
+  CONSTRAINT `fk_blacklist_clinic`
+    FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/* =====================
-   Table: clinic_doctors
-   Doctors belong to a clinic (not to a specific admin).
-   ===================== */
+-- =====================
+-- Table: clinic_doctors
+-- Doctors belong to a clinic.
+-- =====================
 CREATE TABLE `clinic_doctors` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `clinic_id` int(10) unsigned NOT NULL,
@@ -140,27 +159,27 @@ CREATE TABLE `clinic_doctors` (
   `about` text DEFAULT NULL,
   `availability` varchar(255) DEFAULT NULL,
   `image_path` varchar(255) DEFAULT NULL,
-
-  -- ✅ Doctor approval workflow
   `approval_status` enum('PENDING','APPROVED','DECLINED') NOT NULL DEFAULT 'PENDING',
   `approved_at` datetime DEFAULT NULL,
   `declined_at` datetime DEFAULT NULL,
   `declined_reason` varchar(255) DEFAULT NULL,
   `created_via` enum('CMS','REGISTRATION') NOT NULL DEFAULT 'CMS',
-
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_doctor_prc_no` (`prc_no`),
   KEY `idx_clinic_id` (`clinic_id`),
   KEY `idx_doc_status` (`approval_status`),
   KEY `idx_doc_via` (`created_via`),
-  CONSTRAINT `fk_clinic_doctors_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_clinic_doctors_clinic`
+    FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`)
+    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/* =====================
-   Table: appointments
-   Used by api/book_appointment.php
-   ===================== */
+-- =====================
+-- Table: appointments
+-- Supports booking, pending reschedule, accept/decline, cancel, done.
+-- =====================
 CREATE TABLE `appointments` (
   `APT_AppointmentID` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `APT_UserID` int(10) unsigned NOT NULL,
@@ -168,18 +187,34 @@ CREATE TABLE `appointments` (
   `APT_ClinicID` int(10) unsigned NOT NULL,
   `APT_Date` date NOT NULL,
   `APT_Time` time NOT NULL,
-  `APT_Status` enum('PENDING','APPROVED','CANCELLED','DONE') NOT NULL DEFAULT 'PENDING',
+  `APT_Status` enum('PENDING','APPROVED','RESCHEDULE_PENDING','CANCELLED','DONE') NOT NULL DEFAULT 'PENDING',
   `APT_Notes` text DEFAULT NULL,
+  `APT_OldDate` date DEFAULT NULL,
+  `APT_OldTime` time DEFAULT NULL,
+  `APT_RescheduleReason` varchar(255) DEFAULT NULL,
+  `APT_RescheduledBy` enum('user','admin') DEFAULT NULL,
+  `APT_RescheduleRespondedAt` datetime DEFAULT NULL,
   `APT_Created` datetime NOT NULL,
   PRIMARY KEY (`APT_AppointmentID`),
   KEY `idx_appt_clinic_dt` (`APT_ClinicID`,`APT_Date`,`APT_Time`),
   KEY `idx_appt_user` (`APT_UserID`),
   KEY `idx_appt_doctor` (`APT_DoctorID`),
-  CONSTRAINT `fk_appt_user` FOREIGN KEY (`APT_UserID`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_appt_clinic` FOREIGN KEY (`APT_ClinicID`) REFERENCES `clinics` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_appt_doctor` FOREIGN KEY (`APT_DoctorID`) REFERENCES `clinic_doctors` (`id`) ON DELETE CASCADE
+  KEY `idx_appt_status` (`APT_Status`),
+  KEY `idx_appt_old_dt` (`APT_OldDate`,`APT_OldTime`),
+  CONSTRAINT `fk_appt_user`
+    FOREIGN KEY (`APT_UserID`) REFERENCES `accounts` (`id`)
+    ON DELETE CASCADE,
+  CONSTRAINT `fk_appt_clinic`
+    FOREIGN KEY (`APT_ClinicID`) REFERENCES `clinics` (`id`)
+    ON DELETE CASCADE,
+  CONSTRAINT `fk_appt_doctor`
+    FOREIGN KEY (`APT_DoctorID`) REFERENCES `clinic_doctors` (`id`)
+    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- =====================
+-- Table: sms_logs
+-- =====================
 CREATE TABLE `sms_logs` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `appointment_id` int(10) unsigned DEFAULT NULL,
@@ -199,12 +234,59 @@ CREATE TABLE `sms_logs` (
   KEY `idx_sms_clinic` (`clinic_id`),
   KEY `idx_sms_user` (`user_id`),
   KEY `idx_sms_doctor` (`doctor_id`),
+  KEY `idx_sms_event` (`event_type`),
   KEY `idx_sms_created` (`created_at`),
-  CONSTRAINT `fk_sms_appt` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`APT_AppointmentID`) ON DELETE SET NULL,
-  CONSTRAINT `fk_sms_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_sms_user` FOREIGN KEY (`user_id`) REFERENCES `accounts` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_sms_doctor` FOREIGN KEY (`doctor_id`) REFERENCES `clinic_doctors` (`id`) ON DELETE SET NULL
+  CONSTRAINT `fk_sms_appt`
+    FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`APT_AppointmentID`)
+    ON DELETE SET NULL,
+  CONSTRAINT `fk_sms_clinic`
+    FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`)
+    ON DELETE SET NULL,
+  CONSTRAINT `fk_sms_user`
+    FOREIGN KEY (`user_id`) REFERENCES `accounts` (`id`)
+    ON DELETE SET NULL,
+  CONSTRAINT `fk_sms_doctor`
+    FOREIGN KEY (`doctor_id`) REFERENCES `clinic_doctors` (`id`)
+    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- =====================
+-- Table: email_logs
+-- =====================
+CREATE TABLE `email_logs` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `appointment_id` int(10) unsigned DEFAULT NULL,
+  `clinic_id` int(10) unsigned DEFAULT NULL,
+  `user_id` int(10) unsigned DEFAULT NULL,
+  `doctor_id` int(10) unsigned DEFAULT NULL,
+  `event_type` varchar(50) NOT NULL,
+  `recipient_type` enum('user','doctor','system') NOT NULL DEFAULT 'system',
+  `recipient_name` varchar(191) NOT NULL DEFAULT '',
+  `recipient_email` varchar(255) NOT NULL,
+  `subject` varchar(255) NOT NULL,
+  `message` text NOT NULL,
+  `is_ok` tinyint(1) NOT NULL DEFAULT 0,
+  `error_message` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_email_appt` (`appointment_id`),
+  KEY `idx_email_clinic` (`clinic_id`),
+  KEY `idx_email_user` (`user_id`),
+  KEY `idx_email_doctor` (`doctor_id`),
+  KEY `idx_email_event` (`event_type`),
+  KEY `idx_email_created` (`created_at`),
+  CONSTRAINT `fk_email_appt`
+    FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`APT_AppointmentID`)
+    ON DELETE SET NULL,
+  CONSTRAINT `fk_email_clinic`
+    FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`)
+    ON DELETE SET NULL,
+  CONSTRAINT `fk_email_user`
+    FOREIGN KEY (`user_id`) REFERENCES `accounts` (`id`)
+    ON DELETE SET NULL,
+  CONSTRAINT `fk_email_doctor`
+    FOREIGN KEY (`doctor_id`) REFERENCES `clinic_doctors` (`id`)
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 COMMIT;

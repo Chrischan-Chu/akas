@@ -14,7 +14,9 @@ include "includes/partials/head.php";
   <?php include "pages/home.php"; ?>
   <?php include "pages/about.php"; ?>
   <?php include "pages/mission-vision.php"; ?>
+   <?php include "pages/scheduleflow.php"; ?>
   <?php include "pages/clinics.php"; ?>
+  <?php include "pages/faq.php"; ?>
   <?php include "pages/contact.php"; ?>
   <?php include "pages/contact-map.php"; ?>
 </main>

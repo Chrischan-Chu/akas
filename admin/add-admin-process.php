@@ -62,10 +62,20 @@ if ($password !== $confirm) {
   exit;
 }
 
-// Unique email
-$stmt = $pdo->prepare('SELECT id FROM accounts WHERE email = ? LIMIT 1');
+// Unique email (check across all email holders)
+$stmt = $pdo->prepare('
+  SELECT 1 FROM (
+    SELECT email FROM accounts
+    UNION ALL
+    SELECT email FROM clinics
+    UNION ALL
+    SELECT email FROM clinic_doctors
+  ) t
+  WHERE t.email = ?
+  LIMIT 1
+');
 $stmt->execute([$email]);
-if ($stmt->fetch()) {
+if ($stmt->fetchColumn()) {
   flash_set('error', 'Email is already in use.');
   header('Location: ' . $baseUrl . '/admin/add-admin.php');
   exit;
@@ -103,6 +113,18 @@ $ins = $pdo->prepare('INSERT INTO accounts (role, name, email, password_hash, cl
                       VALUES (?,?,?,?,?,?)');
 $ins->execute(['clinic_admin', $adminName, $email, $hash, $clinicId, $workIdPath]);
 
-flash_set('ok', 'Admin account created. They can now log in and manage the same clinic.');
+// Send verification email
+require_once __DIR__ . '/../includes/email_verification.php';
+$newAccountId = (int)$pdo->lastInsertId();
+$token = akas_create_email_verify_token($pdo, $newAccountId, 30);
+$sent = akas_send_verification_email($baseUrl, $email, $adminName, $token);
+
+if (!$sent) {
+  flash_set('error', 'Admin account created, but we could not send the verification email. Please check your mail settings, or use the resend option on the login page.');
+  header('Location: ' . $baseUrl . '/admin/add-admin.php');
+  exit;
+}
+
+flash_set('ok', 'Admin account created. They must verify their email first before they can log in and manage this clinic.');
 header('Location: ' . $baseUrl . '/admin/add-admin.php');
 exit;

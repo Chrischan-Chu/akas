@@ -77,6 +77,9 @@ try {
     /* ================= clinic details wiring ================= */
     const select = document.getElementById("clinicSelect");
     const hidden = document.getElementById("clinicHidden");
+    const clinicBtn = document.getElementById("clinicSelectBtn");
+    const clinicBtnText = document.getElementById("clinicSelectBtnText");
+    const clinicMenu = document.getElementById("clinicSelectMenu");
 
     const cdName = document.getElementById("cdName");
     const cdAddress = document.getElementById("cdAddress");
@@ -112,15 +115,92 @@ try {
       select.addEventListener("change", () => {
         const opt = select.options[select.selectedIndex];
         setClinicDetailsFromOption(opt);
-        setClinicErr(clinicErr, ""); // clear clinic required msg once selected
+        setClinicErr(clinicErr, "");
         syncSend();
       });
 
-      // on load, if a value is already selected (rare), sync details
       if (select.value) {
         const opt = select.options[select.selectedIndex];
         setClinicDetailsFromOption(opt);
       }
+    }
+
+    if (clinicBtn && clinicBtnText && clinicMenu) {
+      const menuHome = clinicMenu.parentElement;
+      const menuNextSibling = clinicMenu.nextSibling;
+
+      const positionMenuFixed = () => {
+        const r = clinicBtn.getBoundingClientRect();
+        clinicMenu.style.position = "fixed";
+        clinicMenu.style.left = r.left + "px";
+        clinicMenu.style.top = (r.bottom + 8) + "px";
+        clinicMenu.style.width = r.width + "px";
+        clinicMenu.style.zIndex = "99999";
+      };
+
+      const openMenu = () => {
+        if (clinicMenu.parentElement !== document.body) document.body.appendChild(clinicMenu);
+        positionMenuFixed();
+        clinicMenu.classList.remove("hidden");
+        clinicBtn.setAttribute("aria-expanded", "true");
+      };
+
+      const closeMenu = () => {
+        clinicMenu.classList.add("hidden");
+        clinicBtn.setAttribute("aria-expanded", "false");
+        if (clinicMenu.parentElement === document.body && menuHome) {
+          if (menuNextSibling) menuHome.insertBefore(clinicMenu, menuNextSibling);
+          else menuHome.appendChild(clinicMenu);
+        }
+        clinicMenu.style.position = "";
+        clinicMenu.style.left = "";
+        clinicMenu.style.top = "";
+        clinicMenu.style.width = "";
+        clinicMenu.style.zIndex = "";
+      };
+
+      clinicBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (clinicMenu.classList.contains("hidden")) openMenu();
+        else closeMenu();
+      });
+
+      clinicMenu.addEventListener("click", (e) => {
+        const item = e.target.closest("button[data-id]");
+        if (!item) return;
+
+        const selectedId = String(item.getAttribute("data-id") || "");
+        const selectedName = (item.getAttribute("data-name") || item.textContent || "").trim();
+        clinicBtnText.textContent = selectedName || "-- Select a clinic name --";
+
+        if (select) {
+          select.value = selectedId;
+          const opt = select.options[select.selectedIndex];
+          if (opt) {
+            setClinicDetailsFromOption(opt);
+            setClinicErr(clinicErr, "");
+          }
+        }
+
+        syncSend();
+        closeMenu();
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!clinicMenu.contains(e.target) && !clinicBtn.contains(e.target)) closeMenu();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeMenu();
+      });
+
+      window.addEventListener("scroll", () => {
+        if (!clinicMenu.classList.contains("hidden")) positionMenuFixed();
+      }, true);
+      window.addEventListener("resize", () => {
+        if (!clinicMenu.classList.contains("hidden")) positionMenuFixed();
+      });
     }
 
     /* ================= available clinics pagination ================= */

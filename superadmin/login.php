@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8" />
   <title>Super Admin Login</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="<?php echo $baseUrl; ?>/assets/css/output.css">
 </head>
 <body class="bg-[#f6f8fb] min-h-screen flex items-center justify-center p-6">
   <div class="w-full max-w-md bg-white rounded-3xl shadow-lg p-6">

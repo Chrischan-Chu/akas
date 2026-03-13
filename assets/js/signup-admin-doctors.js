@@ -64,24 +64,169 @@
 
     const errP = (key) => modal.querySelector(`[data-err-for="${CSS.escape(key)}"]`);
 
-    const setErr = (key, inputEl, msg) => {
-      if (inputEl) inputEl.setCustomValidity(msg || "Invalid value.");
+    const setErr = (key, inputEl, msg, errType = "general") => {
+      if (inputEl) {
+        inputEl.setCustomValidity(msg || "Invalid value.");
+        inputEl.dataset.errType = errType;
+      }
       const p = errP(key);
-      if (p) p.textContent = msg || "";
+      if (p) {
+        p.textContent = msg || "";
+        p.dataset.errType = errType;
+      }
       showRing(inputEl);
     };
 
     const clearErr = (key, inputEl) => {
-      if (inputEl) inputEl.setCustomValidity("");
+      if (inputEl) {
+        inputEl.setCustomValidity("");
+        delete inputEl.dataset.errType;
+      }
       const p = errP(key);
-      if (p) p.textContent = "";
+      if (p) {
+        p.textContent = "";
+        delete p.dataset.errType;
+      }
       clearRing(inputEl);
+    };
+
+    // Only clear if the current error type matches (prevents async unique checks from wiping format errors)
+    const clearErrIfType = (key, inputEl, expectedType) => {
+      const p = errP(key);
+      const inType = inputEl?.dataset?.errType;
+      const pType = p?.dataset?.errType;
+      if (inType === expectedType || pType === expectedType) clearErr(key, inputEl);
     };
 
     const requiredMsg = (el) => (el?.dataset?.requiredMsg || "Please fill out this field.").trim();
     const normalizeSpaces = (v) => (v || "").trim().replace(/\s+/g, " ");
 
-    /* ================= field rules ================= */
+    const isValidEmailFormat = (v) => /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(String(v || "").trim());
+    const isValidPHMobile = (v) => /^9\d{9}$/.test(String(v || "").trim());
+    const isValidPRC = (v) => /^\d{5,8}$/.test(String(v || "").trim());
+
+
+
+    
+    /* ================= uniqueness checks (doctor modal) ================= */
+
+    const UNIQUE_ENDPOINT = "/includes/check-unique.php";
+
+    const fetchUnique = async (type, value, signal) => {
+      const params = new URLSearchParams({ type, value });
+      const url = `${UNIQUE_ENDPOINT}?${params.toString()}`;
+      try {
+        const res = await fetch(url, { headers: { Accept: "application/json" }, signal });
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (typeof data?.available === "boolean") return data.available;
+        return null;
+      } catch {
+        return null;
+      }
+    };
+
+    const isDupLocal = (field, value) => {
+      const v = String(value || "").trim();
+      if (!v) return false;
+
+      const norm =
+        field === "email" ? v.toLowerCase() :
+        field === "phone" ? v.replace(/\D/g, "") :
+        v.replace(/\D/g, "");
+
+      return doctors.some((d, idx) => {
+        if (editingIndex >= 0 && idx === editingIndex) return false;
+        if (!d) return false;
+
+        if (field === "email") return String(d.email || "").trim().toLowerCase() === norm;
+        if (field === "prc") return String(d.prc || "").replace(/\D/g, "") === norm;
+        return String(d.contact_number || "").replace(/\D/g, "") === norm;
+      });
+    };
+
+    const checkEmailUnique = async ({ showMessage = true } = {}) => {
+      const v = String(iEmail?.value || "").trim();
+      if (!iEmail || !v) return true;
+      // Don't run uniqueness if email format is invalid (prevents wiping format error)
+      if (!isValidEmailFormat(v)) return true;
+
+      // local list duplicate
+      if (isDupLocal("email", v)) {
+        if (showMessage) setErr("docEmail", iEmail, "Email is already in use.", "unique");
+        return false;
+      }
+
+      const available = await fetchUnique("email", v);
+      if (available === false) {
+        if (showMessage) setErr("docEmail", iEmail, "Email is already in use.", "unique");
+        return false;
+      }
+      if (available === true) clearErrIfType("docEmail", iEmail, "unique");
+      return available !== false;
+    };
+
+    const checkPhoneUnique = async ({ showMessage = true } = {}) => {
+      const raw = String(iPhone?.value || "").trim();
+      if (!iPhone || !raw) return true;
+      // Don't run uniqueness if phone format is invalid (prevents wiping format error)
+      if (!isValidPHMobile(raw)) return true;
+
+      // local list duplicate
+      if (isDupLocal("phone", raw)) {
+        if (showMessage) setErr("docPhone", iPhone, "Phone number is already in use.", "unique");
+        return false;
+      }
+
+      const available = await fetchUnique("phone", raw);
+      if (available === false) {
+        if (showMessage) setErr("docPhone", iPhone, "Phone number is already in use.", "unique");
+        return false;
+      }
+      if (available === true) clearErrIfType("docPhone", iPhone, "unique");
+      return available !== false;
+    };
+
+    const checkPrcUnique = async ({ showMessage = true } = {}) => {
+      const raw = String(iPrc?.value || "").trim();
+      if (!iPrc || !raw) return true;
+      // Don't run uniqueness if PRC format is invalid (prevents wiping format error)
+      if (!isValidPRC(raw)) return true;
+
+      // local list duplicate
+      if (isDupLocal("prc", raw)) {
+        if (showMessage) setErr("docPrc", iPrc, "PRC is already in use.", "unique");
+        return false;
+      }
+
+      const available = await fetchUnique("prc", raw);
+      if (available === false) {
+        if (showMessage) setErr("docPrc", iPrc, "PRC is already in use.", "unique");
+        return false;
+      }
+      if (available === true) clearErrIfType("docPrc", iPrc, "unique");
+      return available !== false;
+    };
+
+
+    // run uniqueness checks on blur (nice UX)
+    iEmail?.addEventListener("blur", () => {
+      const v = String(iEmail?.value || "").trim();
+      if (v && isValidEmailFormat(v)) checkEmailUnique({ showMessage: true });
+    });
+
+    iPhone?.addEventListener("blur", () => {
+      const v = String(iPhone?.value || "").trim();
+      if (v && isValidPHMobile(v)) checkPhoneUnique({ showMessage: true });
+    });
+
+    iPrc?.addEventListener("blur", () => {
+      const v = String(iPrc?.value || "").trim();
+      if (v && isValidPRC(v)) checkPrcUnique({ showMessage: true });
+    });
+
+
+/* ================= field rules ================= */
 
     // User/Admin full-name rule (letters + spaces only)
     const lettersSpacing50 = (raw) => {
@@ -283,20 +428,43 @@
       el.addEventListener("invalid", (e) => e.preventDefault());
     });
 
+    const scrollBody = modal?.querySelector('.overflow-y-auto') || modal;
+
     const focusFirst = (el) => {
       try {
-        el?.focus?.();
-        el?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        if (!el) return;
+        // Ensure the field is visible inside the modal scroll container
+        if (scrollBody && scrollBody !== modal) {
+          const elTop = el.getBoundingClientRect().top;
+          const bodyTop = scrollBody.getBoundingClientRect().top;
+          const target = (elTop - bodyTop) + scrollBody.scrollTop - 80;
+          scrollBody.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+          el.focus({ preventScroll: true });
+        } else {
+          el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+          el.focus?.({ preventScroll: true });
+        }
       } catch {}
     };
 
     const clearAllErrors = () => {
+      // Preserve uniqueness errors for Email/Phone ("already in use") when the user
+      // clicks Save but other fields are invalid.
+      const isUniqueMsg = (key) => {
+        const p = errP(key);
+        const t = String(p?.textContent || "").toLowerCase();
+        return t.includes("already") && t.includes("use");
+      };
+
+      const preserveEmailUnique = isUniqueMsg("docEmail");
+      const preservePhoneUnique = isUniqueMsg("docPhone");
+
       clearErr("docFullName", iName);
       clearErr("docBirthdate", iBirth);
       clearErr("docSpecialization", iSpec);
       clearErr("docPrc", iPrc);
-      clearErr("docEmail", iEmail);
-      clearErr("docPhone", iPhone);
+      if (!preserveEmailUnique) clearErr("docEmail", iEmail);
+      if (!preservePhoneUnique) clearErr("docPhone", iPhone);
       clearErr("docSlotMins", iSlotMins);
       clearErr("docStartTime", iStart);
       clearErr("docEndTime", iEnd);
@@ -309,8 +477,14 @@
     const bindClear = (key, el) => {
       if (!el) return;
       const clear = () => clearErr(key, el);
+      // IMPORTANT:
+      // For email/phone, "change" fires on blur (e.g., when clicking Save),
+      // which was clearing the error immediately after we set it (flash/disappear).
+      // Only clear on "input" so the error stays until the user edits the value.
       el.addEventListener("input", clear);
-      el.addEventListener("change", clear);
+      if (key !== "docEmail" && key !== "docPhone") {
+        el.addEventListener("change", clear);
+      }
     };
 
     bindClear("docFullName", iName);
@@ -457,7 +631,7 @@
       if (iPrc) iPrc.value = "";
       if (iEmail) iEmail.value = "";
       if (iPhone) iPhone.value = "";
-      if (iSlotMins) iSlotMins.value = "30";
+      if (iSlotMins) iSlotMins.value = "20";//Changed into 20
       if (iStart) iStart.value = "09:00";
       if (iEnd) iEnd.value = "17:00";
 
@@ -493,7 +667,7 @@
         }
       } catch {}
 
-      const slot = a?.slot_mins ?? d.slot_mins ?? 30;
+      const slot = a?.slot_mins ?? d.slot_mins ?? 20;
       const start = a?.start ?? d.start_time ?? "09:00";
       const end = a?.end ?? d.end_time ?? "17:00";
       const days = Array.isArray(a?.days) ? a.days : Array.isArray(d.days) ? d.days : [1, 2, 3, 4, 5];
@@ -521,9 +695,9 @@
       let ok = true;
       let firstBad = null;
 
-      const mark = (key, el, msg) => {
+      const mark = (key, el, msg, errType = "general") => {
         ok = false;
-        setErr(key, el, msg);
+        setErr(key, el, msg, errType);
         if (!firstBad) firstBad = el;
       };
 
@@ -585,13 +759,13 @@
       if (iEmail && String(iEmail.value || "").trim() !== "") {
         const v = String(iEmail.value || "").trim();
         const emailOk = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(v);
-        if (!emailOk) mark("docEmail", iEmail, "Enter a valid email (ex: name@gmail.com).");
+        if (!emailOk) mark("docEmail", iEmail, "Enter a valid email (ex: name@gmail.com).", "format");
       }
 
       // Phone
       if (iPhone && String(iPhone.value || "").trim() !== "") {
         const v = String(iPhone.value || "").trim();
-        if (!/^9\d{9}$/.test(v)) mark("docPhone", iPhone, "Enter a valid PH mobile number (ex: 9123456789).");
+        if (!/^9\d{9}$/.test(v)) mark("docPhone", iPhone, "Enter a valid PH mobile number (ex: 9123456789).", "format");
       }
 
       // Start < End
@@ -614,15 +788,33 @@
 
     /* ================= save (Add Doctor button) ================= */
 
-    saveBtn?.addEventListener("click", () => {
+    saveBtn?.addEventListener("click", async () => {
       const r = validateAll();
       if (!r.ok) {
         focusFirst(r.firstBad);
         return;
       }
 
+      // Uniqueness checks (DB + local list)
+      const emailOk = await checkEmailUnique({ showMessage: true });
+      if (!emailOk) {
+        focusFirst(iEmail);
+        return;
+      }
+      const phoneOk = await checkPhoneUnique({ showMessage: true });
+      if (!phoneOk) {
+        focusFirst(iPhone);
+        return;
+      }
+      const prcOk = await checkPrcUnique({ showMessage: true });
+      if (!prcOk) {
+        focusFirst(iPrc);
+        return;
+      }
+
       const days = getSelectedDays();
-      const slotMins = parseInt(String(iSlotMins?.value || "30"), 10) || 30;
+      let slotMins = parseInt(String(iSlotMins?.value || "20"), 10) || 20;
+        if (![15, 20].includes(slotMins)) slotMins = 20;
       const startTime = String(iStart?.value || "").trim();
       const endTime = String(iEnd?.value || "").trim();
 

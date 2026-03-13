@@ -27,8 +27,9 @@ $stmt = $pdo->prepare(
       approval_status,
       is_open,
       open_time,
-      close_time,
-      updated_at
+        close_time,
+        weekly_schedule,
+        updated_at
    FROM clinics
    WHERE id=?
    LIMIT 1"
@@ -53,6 +54,43 @@ if ($approval !== 'APPROVED' && !$canViewUnapproved) {
 }
 
 $details = $clinic ?: [];
+
+$defaultWeeklySchedule = [
+  'Mon' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Tue' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Wed' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Thu' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Fri' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Sat' => ['enabled' => false, 'start' => '',      'end' => ''],
+  'Sun' => ['enabled' => false, 'start' => '',      'end' => ''],
+];
+
+$weeklySchedule = $defaultWeeklySchedule;
+
+if (!empty($clinic['weekly_schedule'])) {
+  $decoded = json_decode((string)$clinic['weekly_schedule'], true);
+  if (is_array($decoded)) {
+    foreach ($defaultWeeklySchedule as $day => $defaults) {
+      $weeklySchedule[$day] = [
+        'enabled' => !empty($decoded[$day]['enabled']),
+        'start'   => (string)($decoded[$day]['start'] ?? $defaults['start']),
+        'end'     => (string)($decoded[$day]['end'] ?? $defaults['end']),
+      ];
+    }
+  }
+}
+
+$todayKey = date('D');
+$todaySched = $weeklySchedule[$todayKey] ?? null;
+$todayHours = 'Closed';
+
+if (
+  !empty($todaySched['enabled']) &&
+  !empty($todaySched['start']) &&
+  !empty($todaySched['end'])
+) {
+  $todayHours = to12($todaySched['start']) . ' – ' . to12($todaySched['end']);
+}
 
 $isLoggedIn = auth_is_logged_in();
 $role = auth_role();
@@ -177,7 +215,7 @@ function doctor_schedule_text(array $d): string {
 // -------------------------
 if ($isAdminViewer) {
   $stmt = $pdo->prepare('
-    SELECT id, name, about, schedule, availability, image_path
+    SELECT id, name, specialization, about, schedule, availability, image_path
     FROM clinic_doctors
     WHERE clinic_id=?
     ORDER BY id DESC
@@ -185,7 +223,7 @@ if ($isAdminViewer) {
   $stmt->execute([$clinicId]);
 } else {
   $stmt = $pdo->prepare('
-    SELECT id, name, about, schedule, availability, image_path
+    SELECT id, name, specialization, about, schedule, availability, image_path
     FROM clinic_doctors
     WHERE clinic_id=?
       AND approval_status="APPROVED"
@@ -264,7 +302,16 @@ include "../includes/partials/head.php";
           class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200">
           <option value="">Select a doctor</option>
           <?php foreach ($doctors as $d): ?>
-            <option value="<?php echo (int)$d['id']; ?>"><?php echo h((string)$d['name']); ?></option>
+            <?php 
+              // We MUST grab the schedule text so the Javascript has data to read!
+              $rawSched = (string)($d['schedule'] ?? '');
+              if (trim($rawSched) === '') {
+                  $rawSched = (string)($d['availability'] ?? '');
+              }
+            ?>
+            <option value="<?php echo (int)$d['id']; ?>" data-schedule="<?php echo h($rawSched); ?>">
+              <?php echo h((string)$d['name']); ?>
+            </option>
           <?php endforeach; ?>
         </select>
 
@@ -311,10 +358,30 @@ include "../includes/partials/head.php";
     <div class="lg:col-span-2 min-w-0 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
       <h3 class="text-xl font-extrabold" style="color:var(--secondary)">About the Clinic</h3>
 
-      <p class="mt-2 text-slate-600 leading-relaxed whitespace-normal break-words"
-         style="overflow-wrap:anywhere; word-break:break-word;">
-        <?php echo !empty($details['description']) ? nl2br(h((string)$details['description'])) : 'No clinic description yet.'; ?>
-      </p>
+      <?php $clinicDescription = trim((string)($details['description'] ?? '')); ?>
+
+        <div class="mt-2">
+          <div
+            id="clinicDescription"
+            class="text-slate-600 leading-relaxed whitespace-pre-line break-words overflow-hidden transition-all duration-300"
+            style="overflow-wrap:anywhere; word-break:break-word; max-height: 20rem;"
+            data-expanded="0"
+          >
+            <?php echo $clinicDescription !== '' ? h($clinicDescription) : 'No clinic description yet.'; ?>
+          </div>
+        
+          <?php if ($clinicDescription !== '' && mb_strlen($clinicDescription) > 350): ?>
+            <button
+              type="button"
+              id="toggleClinicDescription"
+              class="mt-3 inline-flex items-center text-sm font-semibold hover:underline"
+              style="color: var(--secondary);"
+              aria-expanded="false"
+            >
+              See more
+            </button>
+          <?php endif; ?>
+        </div>
 
       <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="rounded-xl p-4 min-w-0" style="background: rgba(64,183,255,.10);">
@@ -356,18 +423,11 @@ include "../includes/partials/head.php";
             <?php $isOpen = (int)($details['is_open'] ?? 1) === 1; ?>
             <span class="font-semibold"><?php echo $isOpen ? 'Open' : 'Closed'; ?></span>
           </div>
-
+            <!-- Modified -->
           <div class="flex items-center justify-between">
-            <span class="text-slate-500">Hours</span>
-            <?php
-              $ot = $details['open_time'] ?? null;
-              $ct = $details['close_time'] ?? null;
-              $hours = ($ot && $ct)
-                ? (date('g:i A', strtotime((string)$ot)) . ' – ' . date('g:i A', strtotime((string)$ct)))
-                : '—';
-            ?>
-            <span class="font-semibold"><?php echo h($hours); ?></span>
-          </div>
+              <span class="text-slate-500">Hours</span>
+              <span class="font-semibold"><?php echo h($todayHours); ?></span>
+            </div>
 
           <div class="flex items-center justify-between">
             <span class="text-slate-500">Type</span>
@@ -379,7 +439,26 @@ include "../includes/partials/head.php";
             </span>
           </div>
         </div>
-
+        
+        <div class="pt-3 mt-3 border-t border-slate-200">
+          <div class="text-slate-500 text-sm mb-2">Day Schedule</div>
+        
+          <?php foreach (['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as $day): ?>
+            <?php
+              $sched = $weeklySchedule[$day] ?? ['enabled' => false, 'start' => '', 'end' => ''];
+              $label = 'Closed';
+        
+              if (!empty($sched['enabled']) && !empty($sched['start']) && !empty($sched['end'])) {
+                $label = to12($sched['start']) . ' – ' . to12($sched['end']);
+              }
+            ?>
+            <div class="flex items-center justify-between py-1 text-sm">
+              <span class="text-slate-600"><?php echo h($day); ?></span>
+              <span class="font-medium text-slate-700"><?php echo h($label); ?></span>
+            </div>
+          <?php endforeach; ?>
+        </div>
+        
         <div class="mt-5 rounded-xl p-4 text-xs text-slate-600" style="background: rgba(15,23,42,.04);">
           <?php if ($isAdminViewer): ?>
             Admin accounts can view schedules, but can’t book appointments.
@@ -400,7 +479,7 @@ include "../includes/partials/head.php";
   style="-webkit-overflow-scrolling: touch;">
 
   <div class="w-full max-w-5xl my-auto bg-white rounded-3xl shadow-2xl border border-white/30
-              flex flex-col max-h-[calc(100vh-3rem)] overflow-hidden">
+              flex flex-col max-h-[calc(100vh-2rem)] overflow-hidden">
 
     <!-- Header (sticky) -->
     <div class="sticky top-0 z-20 flex items-start justify-between gap-4 px-6 py-5 border-b border-slate-200"
@@ -443,37 +522,34 @@ include "../includes/partials/head.php";
               <div>
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Full name</label>
                 <input id="patientName" name="patient_name" type="text"
-                  class="w-full rounded-2xl px-4 py-2.5 border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="Full name"
                   value="<?php echo h($viewer['name']); ?>"
-                  <?php echo $isUser ? 'readonly' : ''; ?>
                   required>
               </div>
 
               <div>
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Contact number</label>
                 <input id="patientContact" name="patient_contact" type="text"
-                  class="w-full rounded-2xl px-4 py-2.5 border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="09xx xxx xxxx"
                   value="<?php echo h($viewer['phone']); ?>"
-                  <?php echo $isUser ? 'readonly' : ''; ?>
                   required>
               </div>
 
               <div>
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Email</label>
                 <input id="patientEmail" name="patient_email" type="email"
-                  class="w-full rounded-2xl px-4 py-2.5 border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="name@email.com"
                   value="<?php echo h($viewer['email']); ?>"
-                  <?php echo $isUser ? 'readonly' : ''; ?>
                   required>
               </div>
 
               <div>
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Age</label>
                 <input id="patientAge" name="patient_age" type="number" min="0" max="120"
-                  class="w-full rounded-2xl px-4 py-2.5 border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  class="w-full rounded-2xl px-4 py-3 border border-slate-200 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   placeholder="Age"
                   >
               </div>
@@ -490,7 +566,7 @@ include "../includes/partials/head.php";
             <p class="text-sm text-slate-600 mt-1">Approved doctors only.</p>
 
             <select id="doctorSelect"
-              class="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200">
+              class="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-slate-50/70 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300">
               <option value="">Select a doctor</option>
               <?php foreach ($doctors as $d): ?>
                 <option value="<?php echo (int)$d['id']; ?>">
@@ -577,7 +653,7 @@ include "../includes/partials/head.php";
               <div class="mt-5">
                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Notes (optional)</label>
                 <textarea id="notes"
-                  class="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                   rows="3"
                   placeholder="Any additional notes…"
                   <?php echo (!$isUser ? 'disabled' : ''); ?>></textarea>
@@ -645,10 +721,9 @@ include "../includes/partials/head.php";
             $shortAbout = mb_strlen($about) > 70 ? mb_substr($about, 0, 70) . '...' : $about;
 
             // one-line schedule preview for the card
-            $schedPreview = '';
-            if ($schedText !== '') {
-              $firstLine = explode("\n", $schedText)[0] ?? '';
-              $schedPreview = $firstLine;
+            $specPreview = trim((string)($d['specialization'] ?? ''));
+            if ($specPreview === '') {
+              $specPreview = 'General Practice';
             }
           ?>
           <a href="#"
@@ -665,24 +740,20 @@ include "../includes/partials/head.php";
                 <?php endif; ?>
               </div>
 
-              <div class="p-6 text-white h-32 flex flex-col justify-center" style="background:var(--primary)">
-                <h5 class="font-semibold"><?php echo h((string)$d['name']); ?></h5>
+              <div class="p-6 text-white flex flex-col items-start" style="background:var(--primary)">
+  <h5 class="font-semibold text-[1.15rem] leading-tight">
+    <?php echo h((string)$d['name']); ?>
+  </h5>
 
-                <p class="text-sm text-white/90 mt-1">
-                  <?php echo h($shortAbout); ?>
-                </p>
+  <p class="text-sm text-white/90 font-medium mt-1 truncate w-full">
+    🩺 <?php echo h($specPreview); ?>
+  </p>
 
-                <?php if ($schedPreview !== ''): ?>
-                  <p class="text-xs text-white/80 mt-2 truncate">
-                    🗓 <?php echo h($schedPreview); ?>
-                  </p>
-                <?php endif; ?>
-
-                <span class="mt-2 inline-block text-sm font-semibold cursor-pointer group-hover:underline transition"
-                      style="color: var(--secondary);">
-                  Read Full Profile →
-                </span>
-              </div>
+  <span class="mt-4 inline-block text-sm font-semibold cursor-pointer group-hover:underline transition"
+        style="color: var(--secondary);">
+    Read Full Profile →
+  </span>
+</div>
             </div>
           </a>
         <?php endforeach; ?>
@@ -691,19 +762,36 @@ include "../includes/partials/head.php";
   </div>
 </section>
 
-<div id="doctorModal" class="fixed inset-0 z-[9999] hidden" aria-hidden="true">
+
+<div id="doctorModal"
+     class="fixed left-0 right-0 bottom-0 z-[25000] hidden"
+     style="top:72px;"
+     aria-hidden="true">
+
   <div id="doctorBackdrop" class="absolute inset-0 bg-black/55"></div>
-  <div class="relative h-full w-full flex items-center justify-center p-4 sm:p-6">
-    <div class="w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-white/40">
-      <div class="flex items-center justify-between px-5 py-4" style="background: rgba(64,183,255,.12);">
-        <h3 class="font-extrabold" style="color: var(--secondary);">Doctor Profile</h3>
+
+  <div class="absolute inset-0 bg-slate-100">
+    <div class="relative h-full w-full overflow-hidden">
+
+      <div class="sticky top-0 z-20 flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-200 bg-white shadow-sm">
+        <div>
+          <h3 class="text-xl font-extrabold text-slate-900">Doctor Profile</h3>
+          <p class="text-sm text-slate-500">Quick overview, schedule, and contact details</p>
+        </div>
+
         <button id="closeDoctorModal"
-                class="h-10 w-10 rounded-full bg-white border border-slate-200 hover:bg-slate-50 flex items-center justify-center"
-                aria-label="Close">✕</button>
+                type="button"
+                class="h-11 w-11 rounded-full bg-slate-100 border border-slate-200 hover:bg-slate-200 flex items-center justify-center shrink-0 text-xl leading-none text-slate-700">
+          ✕
+        </button>
       </div>
-      <div id="doctorModalBody" class="p-5 sm:p-6">
+
+      <div id="doctorModalBody"
+           class="absolute left-0 right-0 bottom-0 overflow-y-auto bg-slate-100 px-4 sm:px-5 lg:px-6 py-4"
+           style="top:81px; padding-bottom:32px;">
         <div class="text-slate-600 text-sm">Loading…</div>
       </div>
+
     </div>
   </div>
 </div>
@@ -716,6 +804,29 @@ include "../includes/partials/head.php";
     const alt = document.getElementById("closeBookingAlt");
     const main = document.getElementById("closeBooking");
     if (alt && main) alt.addEventListener("click", () => main.click());
+  })();
+  
+  (function () {
+    const box = document.getElementById("clinicDescription");
+    const btn = document.getElementById("toggleClinicDescription");
+
+    if (!box || !btn) return;
+
+    btn.addEventListener("click", function () {
+      const expanded = box.getAttribute("data-expanded") === "1";
+
+      if (expanded) {
+        box.style.maxHeight = "20rem";
+        box.setAttribute("data-expanded", "0");
+        btn.textContent = "See more";
+        btn.setAttribute("aria-expanded", "false");
+      } else {
+        box.style.maxHeight = box.scrollHeight + "px";
+        box.setAttribute("data-expanded", "1");
+        btn.textContent = "See less";
+        btn.setAttribute("aria-expanded", "true");
+      }
+    });
   })();
 </script>
 

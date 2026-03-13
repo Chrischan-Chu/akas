@@ -1,108 +1,83 @@
-<section id="about" class="scroll-mt-24 py-8 px-4 bg-white">
-  <div class="max-w-6xl mx-auto">
+<section id="about" class="scroll-mt-8 py-10 bg-white">
 
-    <div class="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+  <!-- Main Layout -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 items-center gap-8 lg:gap-10 px-6 sm:px-8 lg:px-16">
 
-      <div class="px-8 py-5 flex items-center gap-3"
-           style="background: linear-gradient(90deg,
-              var(--primary) 0%,
-              var(--secondary) 50%,
-              var(--accent) 100%
-            );">
-        <span class="h-10 w-10 rounded-2xl bg-white/80 border border-white/60 flex items-center justify-center shadow-sm">
-          <i class="bi bi-lightbulb-fill text-[var(--secondary)] text-lg"></i>
-        </span>
+    <!-- LEFT: Two Images -->
+    <div class="flex items-center justify-center lg:justify-self-end">
+      <div class="relative w-full max-w-[480px]">
 
-        <div class="leading-tight">
-          <p class="text-xs font-semibold tracking-widest uppercase text-slate-600">
-            About AKAS
-          </p>
-          <h2 class="text-2xl sm:text-3xl font-extrabold text-white">
-            Why We Built AKAS
-          </h2>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 p-8 sm:p-10">
-
-        <div class="text-slate-700 leading-relaxed">
-          <p class="text-base">
-            Many local clinics still use manual scheduling like logbooks, phone calls, and walk-ins. Because of that, patients often
-            experience long waiting times, confusing appointment schedules, and sometimes even double bookings. For clinic staff,
-            managing the schedule can be stressful, especially during busy hours.
-          </p>
-
-          <p class="text-base mt-4">
-            We built AKAS to make the appointment process simpler and more organized. With AKAS, patients can request or book
-            an appointment online without needing to line up or call repeatedly. Clinics also get an easier way to manage schedules,
-            track requests, and keep basic patient details in one place.
-          </p>
-
-          <p class="text-base mt-4">
-            Overall, AKAS is meant to help clinics work faster and help patients access healthcare with less hassle. It’s a practical tool
-            designed for real situations in the community—especially for small clinics that want to modernize without needing complicated systems.
-          </p>
-
-          <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Patients</p>
-              <p class="mt-1 text-sm font-semibold text-slate-800">Book online</p>
-            </div>
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Clinics</p>
-              <p class="mt-1 text-sm font-semibold text-slate-800">Manage schedules</p>
-            </div>
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">System</p>
-              <p class="mt-1 text-sm font-semibold text-slate-800">Less hassle</p>
-            </div>
-          </div>
+        <!-- Main Image -->
+        <div class="rounded-[40px] overflow-hidden shadow-sm">
+          <img
+            src="assets/img/akas_about.png"
+            alt="About main"
+            class="w-full h-[360px] sm:h-[420px] object-cover"
+          >
         </div>
 
-        <div class="flex items-center justify-center">
-          <div class="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-sm p-8">
-
-            <div class="flex items-center gap-3 mb-6">
-              <span class="h-10 w-10 rounded-2xl flex items-center justify-center"
-                    style="background: rgba(64,183,255,.18);">
-                <i class="bi bi-calendar-check text-[var(--primary)] text-lg"></i>
-              </span>
-              <div>
-                <p class="text-sm font-bold text-slate-800">Simple scheduling flow</p>
-                <p class="text-xs text-slate-500">From booking to confirmation</p>
-              </div>
-            </div>
-
-            <div class="space-y-3">
-              <div class="rounded-2xl p-4 border border-slate-200"
-                   style="background: rgba(64,183,255,.10);">
-                <p class="text-xs font-bold text-slate-700">1) Patient submits request</p>
-                <p class="text-xs text-slate-600 mt-1">Chooses clinic, date, and concern</p>
-              </div>
-
-              <div class="rounded-2xl p-4 border border-slate-200"
-                   style="background: rgba(255,161,84,.12);">
-                <p class="text-xs font-bold text-slate-700">2) Clinic reviews schedule</p>
-                <p class="text-xs text-slate-600 mt-1">Approves or suggests a new slot</p>
-              </div>
-
-              <div class="rounded-2xl p-4 border border-slate-200"
-                   style="background: rgba(11,56,105,.06);">
-                <p class="text-xs font-bold text-slate-700">3) Appointment confirmed</p>
-                <p class="text-xs text-slate-600 mt-1">Patient gets updates & reminders</p>
-              </div>
-            </div>
-
-            <div class="mt-6 text-xs text-slate-500">
-              Tip: You can replace this illustration with an image later (PNG/SVG).
-            </div>
-
+        <!-- Floating Image (no border now) -->
+        <div class="absolute -left-6 -top-6 sm:-left-8 sm:-top-8">
+          <div class="rounded-2xl overflow-hidden w-40 h-32 sm:w-48 sm:h-36 shadow-md">
+            <img
+              src="assets/img/akas_aboutpage.png"
+              alt="About inset"
+              class="w-full h-full object-cover"
+            >
           </div>
         </div>
 
       </div>
     </div>
 
+    <!-- RIGHT: Content -->
+    <div class="max-w-[520px]">
+
+      <p class="text-xs font-sans font-extrabold tracking-[0.25em] uppercase text-[#FF9239]">
+        ABOUT AKAS
+      </p>
+
+      <h2 class="mt-2 text-3xl sm:text-4xl font-sans font-extrabold leading-tight text-[#40B7FF]">
+        Why We Built AKAS
+      </h2>
+
+      <p class="mt-4 text-slate-600 leading-relaxed">
+        Many local clinics still use manual scheduling like logbooks, phone calls, and walk-ins. Because of that, patients often experience long waiting times, confusing appointment schedules, and sometimes even double bookings. For clinic staff, managing the schedule can be stressful, especially during busy hours.
+      </p>
+
+      <p class="mt-4 text-slate-600 leading-relaxed">
+        We built AKAS to make the appointment process simpler and more organized. With AKAS, patients can request or book an appointment online without needing to line up or call repeatedly. Clinics also get an easier way to manage schedules, track requests, and keep basic patient details in one place. It is meant to help clinics work faster and help patients access healthcare with less hassle. It’s a practical tool designed for real situations in the community especially for public clinics that want to modernize without needing complicated systems.
+      </p>
+
+      <!-- Bullet Points -->
+      <div class="mt-6 space-y-3">
+        <div class="flex items-start gap-3">
+          <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#FF9239]">
+            <i class="bi bi-check-lg text-blue-600 text-sm"></i>
+          </span>
+          <p class="text-sm font-semibold text-[#40B7FF]">
+            Faster booking without long queues
+          </p>
+        </div>
+
+        <div class="flex items-start gap-3">
+          <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#FF9239]">
+            <i class="bi bi-check-lg text-blue-600 text-sm"></i>
+          </span>
+          <p class="text-sm font-semibold text-[#40B7FF]">
+            Clear scheduling system
+          </p>
+        </div>
+
+        <div class="flex items-start gap-3">
+          <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#FF9239]">
+            <i class="bi bi-check-lg text-blue-600 text-sm"></i>
+          </span>
+          <p class="text-sm font-semibold text-[#40B7FF]">
+            Organized appointment management
+          </p>
+        </div>
+      </div>
+    </div>
   </div>
-<!-- IMPORTANT: DO NOT close </section> here.
-     We will close it at the end of mission-vision.php to make Mission/Vision part of About. -->
+</section>

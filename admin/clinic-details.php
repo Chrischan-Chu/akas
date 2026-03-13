@@ -61,6 +61,31 @@ $stmt = $pdo->prepare('SELECT * FROM clinics WHERE id = ? LIMIT 1');
 $stmt->execute([$clinicId]);
 $row = $stmt->fetch() ?: [];
 
+$defaultWeeklySchedule = [
+  'Mon' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Tue' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Wed' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Thu' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Fri' => ['enabled' => true,  'start' => '09:00', 'end' => '17:00'],
+  'Sat' => ['enabled' => false, 'start' => '',      'end' => ''],
+  'Sun' => ['enabled' => false, 'start' => '',      'end' => ''],
+];
+
+$weeklySchedule = $defaultWeeklySchedule;
+
+if (!empty($row['weekly_schedule'])) {
+  $decoded = json_decode((string)$row['weekly_schedule'], true);
+  if (is_array($decoded)) {
+    foreach ($defaultWeeklySchedule as $day => $defaults) {
+      $weeklySchedule[$day] = [
+        'enabled' => !empty($decoded[$day]['enabled']),
+        'start'   => (string)($decoded[$day]['start'] ?? $defaults['start']),
+        'end'     => (string)($decoded[$day]['end'] ?? $defaults['end']),
+      ];
+    }
+  }
+}
+
 // Current logo from clinics
 $currentLogo = (string)($row['logo_path'] ?? '');
 
@@ -160,6 +185,43 @@ if ($address === '') {
   // basic time validation (HH:MM) -> store HH:MM:SS or NULL
   $openTime  = preg_match('/^\d{2}:\d{2}$/', $openTime) ? ($openTime . ':00') : null;
   $closeTime = preg_match('/^\d{2}:\d{2}$/', $closeTime) ? ($closeTime . ':00') : null;
+        
+    $days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  $weeklyScheduleInput = $_POST['weekly_schedule'] ?? [];
+  $weeklyScheduleToSave = [];
+
+  foreach ($days as $day) {
+    $enabled = isset($weeklyScheduleInput[$day]['enabled']);
+    $start   = trim((string)($weeklyScheduleInput[$day]['start'] ?? ''));
+    $end     = trim((string)($weeklyScheduleInput[$day]['end'] ?? ''));
+
+    if (!$enabled) {
+      $start = '';
+      $end = '';
+    }
+
+    if ($enabled) {
+      if (!preg_match('/^\d{2}:\d{2}$/', $start) || !preg_match('/^\d{2}:\d{2}$/', $end)) {
+        flash_set('error', "Please provide valid start and end times for {$day}.");
+        header('Location: ' . $baseUrl . '/admin/clinic-details.php');
+        exit;
+      }
+
+      if ($start >= $end) {
+        flash_set('error', "{$day} start time must be earlier than end time.");
+        header('Location: ' . $baseUrl . '/admin/clinic-details.php');
+        exit;
+      }
+    }
+
+    $weeklyScheduleToSave[$day] = [
+      'enabled' => $enabled,
+      'start'   => $start,
+      'end'     => $end,
+    ];
+  }
+
+  $weeklyScheduleJson = json_encode($weeklyScheduleToSave, JSON_UNESCAPED_SLASHES);        
 
   // Update clinic record
   $sql = "
@@ -172,8 +234,9 @@ if ($address === '') {
            contact         = :contact,
            email           = :email,
            is_open         = :is_open,
-           open_time       = :open_time,
+            open_time       = :open_time,
            close_time      = :close_time,
+           weekly_schedule = :weekly_schedule,
            latitude        = :latitude,
            longitude       = :longitude,
            updated_at      = CURRENT_TIMESTAMP
@@ -194,6 +257,7 @@ if ($address === '') {
     ':is_open' => $isOpen,
     ':open_time' => $openTime,
     ':close_time' => $closeTime,
+    ':weekly_schedule' => $weeklyScheduleJson,
     ':latitude' => $latitude,
     ':longitude' => $longitude,
   ]);
@@ -502,6 +566,55 @@ include __DIR__ . '/../includes/partials/head.php';
               value="<?php echo h(isset($row['close_time']) ? substr((string)$row['close_time'], 0, 5) : '17:00'); ?>"
               class="mt-2 w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
             />
+          </div>
+        </div>
+        
+        <div class="mt-5 rounded-2xl border border-slate-200 p-4">
+          <h3 class="text-sm font-extrabold uppercase tracking-wide text-slate-700">Weekly Schedule</h3>
+          <p class="text-xs text-slate-500 mt-1">Set which days your clinic is open and the hours for each day.</p>
+        
+          <div class="mt-4 space-y-3">
+            <?php foreach (['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as $day): ?>
+              <?php $sched = $weeklySchedule[$day] ?? ['enabled' => false, 'start' => '', 'end' => '']; ?>
+              <div class="rounded-2xl border border-slate-200 p-3">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="font-semibold text-slate-700"><?php echo h($day); ?></div>
+        
+                  <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <input
+                      type="checkbox"
+                      name="weekly_schedule[<?php echo h($day); ?>][enabled]"
+                      value="1"
+                      <?php echo !empty($sched['enabled']) ? 'checked' : ''; ?>
+                      class="rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--secondary)]"
+                    >
+                    Open
+                  </label>
+                </div>
+        
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600">Start</label>
+                    <input
+                      type="time"
+                      name="weekly_schedule[<?php echo h($day); ?>][start]"
+                      value="<?php echo h($sched['start']); ?>"
+                      class="mt-1 w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+                    />
+                  </div>
+        
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600">End</label>
+                    <input
+                      type="time"
+                      name="weekly_schedule[<?php echo h($day); ?>][end]"
+                      value="<?php echo h($sched['end']); ?>"
+                      class="mt-1 w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--secondary)]/40"
+                    />
+                  </div>
+                </div>
+              </div>
+            <?php endforeach; ?>
           </div>
         </div>
 
